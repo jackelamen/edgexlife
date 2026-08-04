@@ -1,0 +1,135 @@
+@import "tailwindcss";
+
+/*
+  EdgeX Life — design tokens
+  ---------------------------------------------------------------
+  Core emotion: STEADINESS. Not "calm spa", not "dashboard". This is a
+  field almanac you keep for years: quiet paper, one deep evergreen ink,
+  and a single warm ochre reserved for *today* and *now*.
+
+  Deliberately NOT xFocus's palette (coral on pale blue) — sibling app,
+  distinct identity. Deliberately NOT Inter/Roboto: Fraunces carries the
+  headings (a serif with real optical character), Archivo does the work.
+
+  Colour discipline: evergreen dominates, ochre is rare and always means
+  "this is live right now", clay only ever means "attention". If a third
+  accent starts appearing, something has gone wrong.
+*/
+:root {
+  /* Paper */
+  --canvas: #f7f8f6;
+  --surface: #ffffff;
+  --surface-sunk: #f1f3ef;
+
+  /* Ink — cool evergreen-black, never pure #000 */
+  --ink: #16241f;
+  --ink-2: #47574f;
+  --ink-3: #7c8b83;
+  --ink-4: #adb8b1;
+
+  /* Dominant accent */
+  --ever: #1f6f5c;
+  --ever-deep: #14523f;
+  --ever-soft: #dcece6;
+  --ever-mist: #eef5f2;
+
+  /* The rare accent — "today", "active", "now". Use sparingly. */
+  --ochre: #b8791b;
+  --ochre-soft: #f7ecd8;
+
+  /* Attention only */
+  --clay: #a8482f;
+  --clay-soft: #f7e4de;
+
+  --line: rgba(22, 36, 31, 0.08);
+  --line-2: rgba(22, 36, 31, 0.14);
+  --shadow: 0 12px 32px rgba(22, 60, 47, 0.10);
+  --shadow-sm: 0 3px 12px rgba(22, 60, 47, 0.07);
+
+  --radius: 14px;
+  --radius-sm: 9px;
+}
+
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Archivo', ui-sans-serif, system-ui, sans-serif;
+  background: var(--canvas);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1, h2, h3, .lf-display {
+  font-family: 'Fraunces', ui-serif, Georgia, serif;
+  font-optical-sizing: auto;
+  letter-spacing: -0.015em;
+  font-weight: 500;
+}
+
+/* ── primitives ─────────────────────────────────────────────── */
+.lf-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+
+.lf-eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.lf-btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 9px 15px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line-2);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit; font-size: 14px; font-weight: 500;
+  cursor: pointer;
+  transition: background 140ms ease, border-color 140ms ease;
+}
+.lf-btn:hover { background: var(--surface-sunk); border-color: var(--ink-4); }
+.lf-btn-primary {
+  background: var(--ever); border-color: var(--ever); color: #fff;
+}
+.lf-btn-primary:hover { background: var(--ever-deep); border-color: var(--ever-deep); }
+
+.lf-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit; font-size: 14px;
+}
+.lf-input:focus { outline: 2px solid var(--ever-soft); outline-offset: 1px; border-color: var(--ever); }
+
+/* Scrollbars stay out of the way */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: var(--ink-4); border-radius: 10px; border: 3px solid var(--canvas); }
+::-webkit-scrollbar-track { background: transparent; }
+
+/*
+  Motion: ONE orchestrated moment — content settling in on route entry.
+  No ambient hovers, no sprinkled micro-animations.
+*/
+@keyframes lf-settle {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+.lf-settle { animation: lf-settle 320ms cubic-bezier(0.22, 0.61, 0.36, 1) both; }
+.lf-settle-1 { animation-delay: 40ms; }
+.lf-settle-2 { animation-delay: 90ms; }
+.lf-settle-3 { animation-delay: 140ms; }
+
+@media (prefers-reduced-motion: reduce) {
+  .lf-settle { animation: none; }
+}
