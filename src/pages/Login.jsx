@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import toast from 'react-hot-toast'
-import Logo from '../components/shell/Logo'
+import BrandMark from '../components/shell/BrandMark'
+import { Field } from '../components/ui/Kit'
 import { useAuth } from '../store/authStore'
 
 export default function Login() {
@@ -22,41 +23,46 @@ export default function Login() {
   }
 
   return (
-    <div className="h-full grid place-items-center px-5">
-      <form onSubmit={submit} className="w-full max-w-[360px] lf-settle">
-        <div className="flex items-center gap-3 mb-7">
-          <Logo size={40} variant="solid" />
+    <div style={{
+      minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      padding: '20px', background: 'var(--bg)',
+    }}>
+      <form onSubmit={submit} className="card card-pad" style={{ width: '100%', maxWidth: 380 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 26 }}>
+          <BrandMark size={40} />
           <div>
-            <h1 className="text-[22px] leading-tight">EdgeX Life</h1>
-            <p className="text-[13px]" style={{ color: 'var(--ink-3)' }}>
+            <h1 className="page-title" style={{ fontSize: 20 }}>EdgeX Life</h1>
+            <p style={{ fontSize: 13, color: 'var(--text-3)', fontWeight: 600 }}>
               Sign in with your Pulse account
             </p>
           </div>
         </div>
 
-        <label className="lf-eyebrow block mb-1.5">Email</label>
-        <input
-          className="lf-input mb-4"
-          type="email"
-          autoComplete="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-        />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <Field label="Email">
+            <input
+              type="email"
+              autoComplete="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          </Field>
 
-        <label className="lf-eyebrow block mb-1.5">Password</label>
-        <input
-          className="lf-input mb-6"
-          type="password"
-          autoComplete="current-password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-        />
+          <Field label="Password">
+            <input
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </Field>
 
-        <button className="lf-btn lf-btn-primary w-full justify-center" disabled={busy}>
-          {busy ? 'Signing in…' : 'Continue'}
-        </button>
+          <button className="btn btn-primary" style={{ width: '100%', marginTop: 6 }} disabled={busy}>
+            {busy ? 'Signing in…' : 'Continue'}
+          </button>
+        </div>
       </form>
     </div>
   )
