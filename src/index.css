@@ -280,13 +280,15 @@ h1, h2, h3, h4, .page-title {
 .badge-muted { background: var(--white-soft); color: var(--text-3); }
 
 .tabs {
-  display: inline-flex; gap: 3px; flex-wrap: wrap; background: var(--white);
+  display: inline-flex; gap: 3px; flex-wrap: nowrap; background: var(--white);
   border-radius: 99px; padding: 4px;
-  width: max-content; box-shadow: var(--shadow); margin-bottom: 20px;
+  width: max-content; max-width: 100%; box-shadow: var(--shadow); margin-bottom: 20px;
+  overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch;
 }
+.tabs::-webkit-scrollbar { display: none; }
 .tab {
   border: none; background: transparent; padding: 9px 16px; border-radius: 99px;
-  font-family: inherit; font-size: 13px; font-weight: 700;
+  font-family: inherit; font-size: 13px; font-weight: 700; white-space: nowrap;
   color: var(--text-2); cursor: pointer; transition: background .15s, color .15s;
 }
 .tab.active { background: var(--text); color: #fff; }
