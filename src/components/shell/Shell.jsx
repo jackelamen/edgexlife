@@ -22,6 +22,11 @@ const NAV = [
 
 const LINKS = NAV.filter((n) => n.to)
 
+/* Phone bottom bar: the four modules only. Today leads because it's the
+   home surface; Settings stays in the drawer with sign-out rather than
+   spending a quarter of the bar on something opened once a month. */
+const BOTTOM_NAV = LINKS.filter((n) => n.module !== 'settings')
+
 function useModuleTheme(pathname) {
   const mod = LINKS.find((n) => (n.end ? pathname === n.to : pathname.startsWith(n.to)))?.module || 'today'
   useEffect(() => { document.documentElement.dataset.module = mod }, [mod])
@@ -135,6 +140,28 @@ export default function Shell({ children }) {
       <main className="app-main">
         {children}
       </main>
+
+      {/*
+        Bottom nav — phones only (see .botnav in index.css). Modules are the
+        thing you switch between constantly, so they belong under the thumb
+        rather than behind a hamburger. The drawer stays for Settings and
+        sign-out. The active tab is marked in that module's own hue, the same
+        way its hero and desktop nav pill are.
+      */}
+      <nav className="botnav">
+        {BOTTOM_NAV.map((n) => (
+          <NavLink key={n.to} to={n.to} end={n.end}
+            className={({ isActive }) => `botnav-item${isActive ? ' active' : ''}`}>
+            {({ isActive }) => (
+              <>
+                {isActive && <span className="botnav-ind" />}
+                <Icon name={n.icon} size={21} fill={isActive} />
+                {n.label}
+              </>
+            )}
+          </NavLink>
+        ))}
+      </nav>
 
       {cmd && <CommandPalette onClose={() => setCmd(false)} />}
     </div>

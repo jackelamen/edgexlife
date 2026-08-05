@@ -117,19 +117,22 @@ function Dashboard({ latest, notes, todayCheckins, onCheckIn, onNav, onOpenCheck
             <Badge tone="purple"><Icon name="spa" size={14} /> Clarity</Badge>
             <h2 style={{ fontSize: 26, lineHeight: 1.15, letterSpacing: '-.03em', margin: '8px 0' }}>{title}</h2>
             <p style={{ color: 'rgba(255,255,255,.68)', maxWidth: 560 }}>{copy}</p>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 16 }}>
-              <button className="btn btn-primary" onClick={onCheckIn}>
-                <Icon name="edit_note" size={17} /> {latest ? 'Update Check-In' : 'Check In'}
-              </button>
-              <button className="btn btn-secondary" onClick={() => onNav('reset')}>
-                <Icon name="restart_alt" size={17} /> Reset
-              </button>
-              <button className="btn btn-secondary" onClick={() => onNav('meditate')}>
-                <Icon name="timer" size={17} /> Meditate
-              </button>
-            </div>
           </div>
           <Ring score={score} sub="signal" />
+          {/* Spans the full hero width (see .hero-actions) so that on a
+              narrow phone, where the ring sits beside the copy, these don't
+              get crushed into a half-width column. */}
+          <div className="hero-actions">
+            <button className="btn btn-primary" onClick={onCheckIn}>
+              <Icon name="edit_note" size={17} /> {latest ? 'Update Check-In' : 'Check In'}
+            </button>
+            <button className="btn btn-secondary" onClick={() => onNav('reset')}>
+              <Icon name="restart_alt" size={17} /> Reset
+            </button>
+            <button className="btn btn-secondary" onClick={() => onNav('meditate')}>
+              <Icon name="timer" size={17} /> Meditate
+            </button>
+          </div>
         </div>
       </div>
 
