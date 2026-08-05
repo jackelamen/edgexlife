@@ -11,13 +11,12 @@ import SettingsPage from './pages/SettingsPage'
 
 export default function App() {
   const { user, ready, init } = useAuth()
-
   useEffect(() => { init() }, [init])
 
   if (!ready) {
     return (
-      <div className="h-full grid place-items-center" style={{ color: 'var(--ink-3)' }}>
-        <span className="lf-eyebrow">EdgeX Life</span>
+      <div style={{ height: '100%', display: 'grid', placeItems: 'center', color: 'var(--text-3)', fontWeight: 700 }}>
+        EDGEx Life
       </div>
     )
   }
@@ -33,14 +32,17 @@ export default function App() {
 
   return (
     <Shell>
-      <Routes>
-        <Route path="/" element={<TodayPage />} />
-        <Route path="/goals" element={<GoalsPage />} />
-        <Route path="/health" element={<HealthPage />} />
-        <Route path="/wellness" element={<WellnessPage />} />
-        <Route path="/settings" element={<SettingsPage />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+      {/* .view carries the page padding, so individual pages don't repeat it */}
+      <div className="view">
+        <Routes>
+          <Route path="/" element={<TodayPage />} />
+          <Route path="/goals" element={<GoalsPage />} />
+          <Route path="/health" element={<HealthPage />} />
+          <Route path="/wellness" element={<WellnessPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </div>
     </Shell>
   )
 }

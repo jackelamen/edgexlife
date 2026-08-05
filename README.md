@@ -68,6 +68,19 @@ scoped to `auth.uid()`, granted to `authenticated` only:
 | `life_wellness_notes()` | thoughts + practices |
 | `life_goal_rollup()` | per-goal open task / habit counts |
 
+Writes merge server-side, so saving one check-in uploads a few hundred bytes
+instead of rewriting the whole 363 kB blob the way the old modules did:
+`life_save_health_log`, `life_delete_health_log`, `life_save_health_settings`,
+`life_save_routines`, `life_set_routine_check`, `life_save_workout_plan`,
+`life_add_workout_session`, `life_delete_workout_session`,
+`life_save_checkin`, `life_delete_checkin`, `life_save_thought`,
+`life_delete_thought`, `life_add_practice`, `life_delete_practice`.
+
+New vision photos go to the private `life-vision` Storage bucket (RLS scoped
+to your own uid folder) via `vision_items`. The 15 legacy base64 photos stay
+readable until you run **Settings → Move to Storage**, which copies each one
+out and calls `life_drop_legacy_vision` to remove it from the blob.
+
 Schema additions (additive and nullable, so Pulse and xFocus are unaffected):
 `tasks.goal_id`, `habits.goal_id`, plus a partial unique index
 `habit_logs (habit_id, logged_on) where deleted_at is null`.
@@ -93,18 +106,26 @@ of a blank deployed screen — this app shows an explicit config error instead.
 
 ## Design
 
-Core emotion: **steadiness** — a field almanac you keep for years, not a
-dashboard and not a spa.
+Built as an app, not a page: a dark nav rail, sticky module headers with view
+tabs, toolbars, modals and inline editing, dense rows over whitespace.
 
-- **Type:** Fraunces (headings, real optical character) + Archivo (UI).
-  Deliberately not Inter.
-- **Colour:** evergreen dominates; ochre is rare and always means *live right
-  now*; clay only ever means *attention*. Tokens in `src/index.css`.
-- **Motion:** one orchestrated settle on route entry. No ambient hovers.
-- **Layout:** chronological and content-led. No hero-plus-three-cards.
+**Per-module accents, inherited from the originals.** A neutral graphite
+chassis never changes; one accent swaps when you move between modules, so each
+section still reads as the app it replaces:
 
-Distinct from xFocus's coral-on-pale-blue on purpose: sibling app, own
-identity.
+| Module | Accent | From |
+|---|---|---|
+| Goals | emerald `#059669` | goals.html |
+| Health | sky `#0ea5e9` | health.html |
+| Wellness | violet `#7c3aed` | wellness.html |
+
+The switch is a single attribute: `<html data-module>`, set by `useModuleTheme`
+in `Shell.jsx`. Every accent-coloured control reads `--accent` /
+`--accent-dark` / `--accent-light` / `--accent-ring`, so no component ever
+hardcodes a module colour. Semantic colours (good / warn / bad) are never
+module-tinted.
+
+Type is Fraunces for headings and Archivo for UI — deliberately not Inter.
 
 ## Structure
 
@@ -121,11 +142,41 @@ src/
   components/      shell, goals, health, common
 ```
 
+## Views
+
+Full parity with the three original modules, 19 views in total.
+
+**Goals** — Today (live cycles, tactics, vision board, vision statements),
+Goal Room (CRUD, metrics, task/habit linking), Focus Cycles (phases +
+tactics), Roadmap, Retrospectives.
+
+**Health** — Dashboard (Health Score, coach, routine checklist), Log (list +
+full entry editor with live score preview), Routines library, Workouts
+(weekly plan, session history), Trends (metric charts + driver hit rates),
+Settings (targets).
+
+**Wellness** — Dashboard (Clarity Score, coach), Check in, Reset tools,
+Meditate (breath pacer with 5 patterns), Open loops inbox, Journal, Trends.
+
+### Score engines
+
+Both are ported verbatim from the originals in `src/lib/scores.js`, so
+historical numbers stay continuous. Changing a weight silently re-reads every
+past score, so don't.
+
+| Health Score | | Clarity Score | |
+|---|---|---|---|
+| sleep | .28 | mood | .22 |
+| energy | .22 | stress ease | .24 |
+| steps | .18 | clarity | .28 |
+| sleep quality | .18 | grounded | .26 |
+| water | .14 | | |
+| *minus* pain × 7 | | | |
+
 ## Not done yet
 
-- Writing new check-ins and health logs from this app (currently read-only over
-  the historical data; you still log in the old modules)
-- Migrating the base64 vision images into a Storage bucket, which would let
-  Supabase's CDN and image transforms do the work instead of the RPC
+- Samsung Health / wearable import (the old health module read
+  `edgex_daily_signals_v2`)
+- Meditation music player
+- Savings targets on goals
 - Retiring `goals.html` / `health.html` / `wellness.html` from traction-hub
-  once this reaches parity

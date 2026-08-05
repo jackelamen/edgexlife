@@ -1,135 +1,233 @@
-import { useState } from 'react'
-import { NavLink, useLocation } from 'react-router-dom'
-import { CalendarDays, Compass, HeartPulse, Menu, Settings, Sprout, X } from 'lucide-react'
-import Logo from './Logo'
+import { useEffect, useState } from 'react'
+import { NavLink, useLocation, useNavigate } from 'react-router-dom'
+import Icon from '../ui/Icon'
 import { useAuth } from '../../store/authStore'
 
+/*
+  Sidebar ported from the originals: 256px, #1a1a2e, section labels, and
+  Material Symbols that switch to their FILL variant when active. The module
+  accent tints the active pill via --accent-rgb.
+*/
+
 const NAV = [
-  { to: '/', label: 'Today', icon: CalendarDays, end: true },
-  { to: '/goals', label: 'Goals', icon: Compass },
-  { to: '/health', label: 'Health', icon: HeartPulse },
-  { to: '/wellness', label: 'Wellness', icon: Sprout },
+  { section: 'Main' },
+  { to: '/', label: 'Today', icon: 'today', end: true, module: 'today' },
+  { to: '/goals', label: 'Goals', icon: 'flag', module: 'goals' },
+  { to: '/health', label: 'Health', icon: 'monitor_heart', module: 'health' },
+  { to: '/wellness', label: 'Wellness', icon: 'self_improvement', module: 'wellness' },
+  { section: 'System' },
+  { to: '/settings', label: 'Settings', icon: 'settings', module: 'settings' },
 ]
 
-function NavItems({ onNavigate }) {
-  return (
-    <nav className="flex flex-col gap-1">
-      {NAV.map(({ to, label, icon: Icon, end }) => (
-        <NavLink
-          key={to}
-          to={to}
-          end={end}
-          onClick={onNavigate}
-          className="flex items-center gap-3 px-3 py-2.5 rounded-[9px] text-[14px] font-medium transition-colors"
-          style={({ isActive }) => ({
-            background: isActive ? 'var(--ever-mist)' : 'transparent',
-            color: isActive ? 'var(--ever-deep)' : 'var(--ink-2)',
-          })}
-        >
-          <Icon size={17} strokeWidth={1.9} />
-          {label}
-        </NavLink>
-      ))}
-    </nav>
-  )
+const LINKS = NAV.filter((n) => n.to)
+
+function useModuleTheme(pathname) {
+  const mod = LINKS.find((n) => (n.end ? pathname === n.to : pathname.startsWith(n.to)))?.module || 'today'
+  useEffect(() => { document.documentElement.dataset.module = mod }, [mod])
+  return mod
 }
 
 export default function Shell({ children }) {
   const [open, setOpen] = useState(false)
+  const [cmd, setCmd] = useState(false)
   const { user, signOut } = useAuth()
   const location = useLocation()
+  useModuleTheme(location.pathname)
+
+  useEffect(() => { setOpen(false) }, [location.pathname])
+
+  // Cmd+K module switcher, same affordance as the originals.
+  useEffect(() => {
+    const onKey = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        setCmd((v) => !v)
+      }
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [])
+
+  const sidebar = (
+    <>
+      <div style={{ marginBottom: 32 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+          <div style={{
+            width: 30, height: 30, borderRadius: 10,
+            background: 'var(--accent)',
+            display: 'grid', placeItems: 'center',
+          }}>
+            <Icon name="bolt" size={17} fill style={{ color: '#fff' }} />
+          </div>
+          <span style={{ color: '#fff', fontWeight: 800, fontSize: 17, letterSpacing: '-.01em' }}>
+            EDGEx
+          </span>
+        </div>
+        <div style={{ color: 'rgba(255,255,255,.35)', fontSize: 11.5, fontWeight: 600, marginTop: 3, marginLeft: 39 }}>
+          Life
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 1, flex: 1 }}>
+        {NAV.map((n, i) =>
+          n.section ? (
+            <div key={'s' + i} className="nav-section-label" style={i === 0 ? { marginTop: 0 } : undefined}>
+              {n.section}
+            </div>
+          ) : (
+            <NavLink key={n.to} to={n.to} end={n.end}
+              className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}>
+              {({ isActive }) => (
+                <>
+                  <Icon name={n.icon} size={19} fill={isActive} />
+                  {n.label}
+                </>
+              )}
+            </NavLink>
+          )
+        )}
+      </div>
+
+      <div style={{
+        marginTop: 20, display: 'flex', flexDirection: 'column', gap: 8,
+        borderTop: '1px solid rgba(255,255,255,0.07)', paddingTop: 16,
+      }}>
+        <button className="nav-item" onClick={() => setCmd(true)}>
+          <Icon name="search" size={19} />
+          Switch module
+          <kbd style={{
+            marginLeft: 'auto', fontSize: 10, background: 'rgba(255,255,255,.08)',
+            borderRadius: 4, padding: '2px 5px', color: 'rgba(255,255,255,.45)',
+          }}>⌘K</kbd>
+        </button>
+        <button className="nav-item" onClick={signOut} style={{ color: 'rgba(248,113,113,.85)' }}>
+          <Icon name="logout" size={19} />
+          Sign out
+        </button>
+        <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,.25)', paddingLeft: 14 }}>
+          {user?.email}
+        </div>
+      </div>
+    </>
+  )
 
   return (
-    <div className="h-full flex">
-      {/* Desktop rail */}
-      <aside
-        className="hidden lg:flex flex-col w-[228px] shrink-0 px-4 py-5 border-r"
-        style={{ borderColor: 'var(--line)', background: 'var(--surface)' }}
-      >
-        <div className="flex items-center gap-2.5 px-1 pb-6">
-          <Logo size={30} variant="solid" />
-          <div className="leading-tight">
-            <div className="lf-display text-[15px]">EdgeX Life</div>
-          </div>
-        </div>
+    <div style={{ display: 'flex', minHeight: '100vh' }}>
+      <aside id="sidebar-desktop">{sidebar}</aside>
 
-        <NavItems />
-
-        <div className="mt-auto pt-4 border-t" style={{ borderColor: 'var(--line)' }}>
-          <NavLink
-            to="/settings"
-            className="flex items-center gap-3 px-3 py-2.5 rounded-[9px] text-[14px]"
-            style={{ color: 'var(--ink-2)' }}
-          >
-            <Settings size={17} strokeWidth={1.9} />
-            Settings
-          </NavLink>
-          <button
-            onClick={signOut}
-            className="w-full text-left px-3 py-2 text-[12px]"
-            style={{ color: 'var(--ink-3)' }}
-          >
-            {user?.email}
-          </button>
-        </div>
-      </aside>
-
-      {/* Mobile top bar */}
-      <div
-        className="lg:hidden fixed top-0 inset-x-0 z-40 flex items-center gap-3 px-4 h-14 border-b"
-        style={{ background: 'var(--surface)', borderColor: 'var(--line)' }}
-      >
-        <button onClick={() => setOpen(true)} aria-label="Open menu" style={{ color: 'var(--ink-2)' }}>
-          <Menu size={21} />
+      {/* Mobile top bar — visible only under 1024px, see .mobile-topbar in index.css */}
+      <div className="mobile-topbar">
+        <button onClick={() => setOpen(true)} aria-label="Menu"
+          style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.7)', cursor: 'pointer' }}>
+          <Icon name="menu" size={22} />
         </button>
-        <Logo size={24} variant="solid" />
-        <span className="lf-display text-[15px]">EdgeX Life</span>
+        <span style={{ color: '#fff', fontWeight: 800, fontSize: 16, letterSpacing: '-.01em' }}>EDGEx Life</span>
       </div>
 
       {open && (
         <>
-          <div
-            className="lg:hidden fixed inset-0 z-40"
-            style={{ background: 'rgba(22,36,31,0.35)' }}
-            onClick={() => setOpen(false)}
-          />
-          <aside
-            className="lg:hidden fixed left-0 top-0 bottom-0 z-50 w-[250px] px-4 py-5 flex flex-col"
-            style={{ background: 'var(--surface)' }}
-          >
-            <div className="flex items-center justify-between pb-6">
-              <div className="flex items-center gap-2.5">
-                <Logo size={28} variant="solid" />
-                <span className="lf-display text-[15px]">EdgeX Life</span>
-              </div>
-              <button onClick={() => setOpen(false)} aria-label="Close menu" style={{ color: 'var(--ink-3)' }}>
-                <X size={19} />
-              </button>
-            </div>
-            <NavItems onNavigate={() => setOpen(false)} />
-            <div className="mt-auto pt-4 border-t" style={{ borderColor: 'var(--line)' }}>
-              <NavLink
-                to="/settings"
-                onClick={() => setOpen(false)}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-[9px] text-[14px]"
-                style={{ color: 'var(--ink-2)' }}
-              >
-                <Settings size={17} strokeWidth={1.9} />
-                Settings
-              </NavLink>
-              <button onClick={signOut} className="w-full text-left px-3 py-2 text-[12px]" style={{ color: 'var(--ink-3)' }}>
-                Sign out
-              </button>
-            </div>
+          <div onClick={() => setOpen(false)}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 70 }} />
+          <aside id="sidebar-mobile">
+            {sidebar}
           </aside>
         </>
       )}
 
-      <main className="flex-1 min-w-0 overflow-y-auto pt-14 lg:pt-0">
-        <div key={location.pathname} className="max-w-[1120px] mx-auto px-5 lg:px-9 py-7 lg:py-10">
-          {children}
-        </div>
+      <main className="app-main">
+        {children}
       </main>
+
+      {cmd && <CommandPalette onClose={() => setCmd(false)} />}
     </div>
   )
+}
+
+function CommandPalette({ onClose }) {
+  const nav = useNavigate()
+  const [q, setQ] = useState('')
+  const [sel, setSel] = useState(0)
+
+  const items = LINKS.filter((l) => l.label.toLowerCase().includes(q.toLowerCase()))
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === 'Escape') return onClose()
+      if (e.key === 'ArrowDown') { e.preventDefault(); setSel((s) => Math.min(s + 1, items.length - 1)) }
+      if (e.key === 'ArrowUp') { e.preventDefault(); setSel((s) => Math.max(s - 1, 0)) }
+      if (e.key === 'Enter' && items[sel]) { nav(items[sel].to); onClose() }
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [items, sel, nav, onClose])
+
+  return (
+    <div onClick={onClose} style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
+      zIndex: 9999, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: '14vh',
+    }}>
+      <div onClick={(e) => e.stopPropagation()} style={{
+        width: '100%', maxWidth: 520, background: 'var(--sidebar-bg)',
+        border: '1px solid rgba(255,255,255,0.1)', borderRadius: 16, overflow: 'hidden',
+        boxShadow: '0 24px 80px rgba(0,0,0,0.6)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 18px', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+          <Icon name="search" size={18} style={{ color: 'rgba(255,255,255,.45)' }} />
+          <input autoFocus value={q} onChange={(e) => { setQ(e.target.value); setSel(0) }}
+            placeholder="Jump to…"
+            style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: '#fff', fontSize: 15, fontWeight: 500, padding: 0 }} />
+        </div>
+        <div style={{ maxHeight: 320, overflowY: 'auto', padding: 8 }}>
+          {items.map((it, i) => (
+            <button key={it.to} onClick={() => { nav(it.to); onClose() }}
+              onMouseEnter={() => setSel(i)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px',
+                borderRadius: 10, width: '100%', textAlign: 'left', border: 'none', cursor: 'pointer',
+                background: i === sel ? 'rgba(255,255,255,0.08)' : 'transparent',
+                color: 'rgba(255,255,255,0.82)', fontFamily: 'inherit',
+              }}>
+              <span style={{ width: 36, height: 36, borderRadius: 8, display: 'grid', placeItems: 'center', background: 'rgba(255,255,255,.06)' }}>
+                <Icon name={it.icon} size={18} />
+              </span>
+              <span style={{ fontSize: 13.5, fontWeight: 600 }}>{it.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/** Page padding now lives on the .view wrapper in App, so this is a passthrough. */
+export function View({ children }) {
+  return <>{children}</>
+}
+
+/* Compatibility shims for Goals / Wellness, which are still on the previous
+   layout API and get their own deep pass next. Delete as each is rebuilt. */
+
+export function ModuleHeader({ title, views, view, onView, actions }) {
+  return (
+    <div style={{ marginBottom: 18 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+        <h1 className="page-title">{title}</h1>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>{actions}</div>
+      </div>
+      {views?.length > 1 && (
+        <div className="tabs" style={{ marginTop: 14, marginBottom: 0 }}>
+          {views.map((v) => (
+            <button key={v.key} className={`tab${v.key === view ? ' active' : ''}`}
+              onClick={() => onView(v.key)}>
+              {v.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+export function ModuleBody({ children }) {
+  return <div style={{ paddingTop: 4 }}>{children}</div>
 }

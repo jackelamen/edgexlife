@@ -4,6 +4,9 @@ export const iso = (d) => format(d, 'yyyy-MM-dd')
 export const today = () => iso(new Date())
 export const daysAgo = (n) => iso(subDays(new Date(), n))
 
+/** Shift an arbitrary ISO date by N days (positive or negative), not just "from today". */
+export const shiftDate = (dateStr, days) => iso(subDays(new Date(`${dateStr}T12:00:00`), -days))
+
 /**
  * All history reads are date-bounded. Defaults are deliberately short —
  * "everything ever" is exactly the query pattern that ran the egress bill up.
