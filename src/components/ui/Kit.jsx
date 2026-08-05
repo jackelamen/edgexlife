@@ -331,7 +331,7 @@ export function Ring({ score, size = 150, stroke = 13, sub, onAccent = true }) {
      is, so the narrow-phone CSS can shrink it (see .ring in index.css)
      without the geometry cropping. */
   return (
-    <div className="ring" style={{ width: size, height: size, position: 'relative', marginLeft: 'auto' }}>
+    <div className="score-ring" style={{ width: size, height: size, position: 'relative', marginLeft: 'auto' }}>
       <svg width="100%" height="100%" viewBox={`0 0 ${size} ${size}`} style={{ transform: 'rotate(-90deg)', display: 'block' }}>
         <circle cx={size / 2} cy={size / 2} r={r} fill="none"
           stroke={onAccent ? 'rgba(255,255,255,.24)' : 'var(--white-soft)'} strokeWidth={stroke} />
@@ -340,10 +340,10 @@ export function Ring({ score, size = 150, stroke = 13, sub, onAccent = true }) {
           style={{ transition: 'stroke-dashoffset 1s cubic-bezier(.4,0,.2,1), stroke .4s' }} />
       </svg>
       <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column' }}>
-        <div className="tnum ring-num" style={{ fontSize: size * 0.3, fontWeight: 800, letterSpacing: '-.03em', lineHeight: 1 }}>
+        <div className="tnum score-ring-num" style={{ fontSize: size * 0.3, fontWeight: 800, letterSpacing: '-.03em', lineHeight: 1 }}>
           {score == null ? '--' : Math.round(score)}
         </div>
-        {sub && <div className="ring-sub" style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.09em', textTransform: 'uppercase', opacity: .72, marginTop: 4 }}>{sub}</div>}
+        {sub && <div className="score-ring-sub" style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.09em', textTransform: 'uppercase', opacity: .72, marginTop: 4 }}>{sub}</div>}
       </div>
     </div>
   )

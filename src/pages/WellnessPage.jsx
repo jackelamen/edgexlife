@@ -100,6 +100,25 @@ export default function WellnessPage() {
 
 /* ══════════════════ Today ══════════════════ */
 
+/* The headline figure on each clarity tile — the raw thing you logged,
+   not the normalised score (that's what the fill and pill already say).
+   Keyed to clarityDetails() component keys. */
+const RATING_VALUE = {
+  mood: (c) => (c?.mood ? MOOD_LABELS[c.mood] : '--'),
+  stress: (c) => (c?.stress != null ? `${c.stress}/5` : '--'),
+  clarity: (c) => (c?.clarity != null ? `${c.clarity}/5` : '--'),
+  grounded: (c) => (c?.grounded != null ? `${c.grounded}/5` : '--'),
+}
+
+/* Shown before the first check-in, so the tiles keep their shape and hues
+   rather than collapsing the layout. Mirrors clarityDetails()' order. */
+const CLARITY_PLACEHOLDERS = [
+  { key: 'mood', label: 'Mood' },
+  { key: 'stress', label: 'Stress ease' },
+  { key: 'clarity', label: 'Clarity' },
+  { key: 'grounded', label: 'Groundedness' },
+]
+
 function Dashboard({ latest, notes, todayCheckins, onCheckIn, onNav, onOpenCheckin }) {
   const details = latest ? clarityDetails(latest) : null
   const score = details?.score ?? null
@@ -136,11 +155,33 @@ function Dashboard({ latest, notes, todayCheckins, onCheckIn, onNav, onOpenCheck
         </div>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5" style={{ marginBottom: 18 }}>
-        <StatCard label="Mood" value={latest?.mood ? MOOD_LABELS[latest.mood] : '--'} sub="current emotional tone" />
-        <StatCard label="Stress" value={latest?.stress ?? '--'} sub="1 low, 5 high" />
-        <StatCard label="Clarity" value={latest?.clarity ?? '--'} sub="1 foggy, 5 clear" />
-        <StatCard label="Practice" value={`${practiceMins}m`} sub="meditation today" />
+      {/*
+        The four tiles are the four things the Clarity score is actually made
+        of, driven straight off clarityDetails — so a tile's hue is that
+        metric's identity, its fill is the exact value feeding the score, and
+        the pill is how that value is doing. Read a tile and you've read its
+        row in the Score Breakdown below; they can't disagree.
+
+        Practice sits apart on purpose: minutes meditated is an activity, not
+        a rating against a target, so filling a tile with it would be
+        decoration — which rule 2 of the system forbids.
+      */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5" style={{ marginBottom: 12 }}>
+        {(details?.components ?? CLARITY_PLACEHOLDERS).map((c) => (
+          <StatCard key={c.key} metricKey={c.key} label={c.label}
+            pct={details ? c.value : null}
+            value={details ? RATING_VALUE[c.key](latest) : '--'}
+            sub={details ? c.detail : 'not checked in'} />
+        ))}
+      </div>
+
+      <div className="practice-row" style={{ marginBottom: 18 }}>
+        <span className="practice-ic"><Icon name="self_improvement" size={17} fill /></span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div className="practice-lbl">Practice today</div>
+          <div className="practice-sub">Not part of the score — a thing you did, not a rating.</div>
+        </div>
+        <span className="practice-val">{practiceMins}m</span>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5" style={{ marginBottom: 18 }}>
