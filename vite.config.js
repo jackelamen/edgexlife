@@ -15,8 +15,8 @@ export default defineConfig({
         name: 'EdgeX Life — Goals, Health, Wellness',
         short_name: 'EdgeX Life',
         description: 'Vision, goals, health and wellness for The EDGEx',
-        theme_color: '#f5f2ea',
-        background_color: '#f5f2ea',
+        theme_color: '#f6f4ef',
+        background_color: '#f6f4ef',
         display: 'standalone',
         start_url: '/',
         icons: [
