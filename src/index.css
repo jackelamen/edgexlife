@@ -570,6 +570,16 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
   .mob-fab { display: flex; }
 }
 
+/* Narrow phones (folded Z Fold and similar, ~340-400px) — the module tab
+   bar (Today/Daily Log/Workout/Routines etc.) can still be wider than the
+   screen even with more tabs than a normal phone shows at once. It's
+   already horizontally scrollable; this just tightens it enough that most
+   bars fit without scrolling at all, and any leftover overflow scrolls the
+   same way it does everywhere else. */
+@media (max-width: 420px) {
+  .tab { padding: 8px 12px; font-size: 12px; }
+}
+
 /* ── Today / mission control ───────────────────────────────── */
 /* Attention queue. Severity uses the reserved status ramp only — the left
    bar and the icon wash are the same colour, so scanning the left edge
