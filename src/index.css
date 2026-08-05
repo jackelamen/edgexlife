@@ -671,9 +671,18 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
   .score-ring { width: 84px !important; height: 84px !important; }
   .score-ring-num { font-size: 23px !important; }
   .score-ring-sub { font-size: 8px !important; margin-top: 2px !important; }
-  /* Equal-width buttons read as one control group at this width. */
-  .hero-actions { gap: 7px; }
-  .hero-actions .btn { flex: 1; min-width: 0; padding: 10px 8px; font-size: 12px; }
+  /* Three equal columns don't work here: "Update Check-In" is roughly twice
+     the length of "Reset", so equal widths wrapped it onto two lines and
+     left the row ragged. Give the primary action its own full-width row and
+     let the two resets share the one below — deliberate, and it also puts
+     the thing you press most under the widest target. */
+  .hero-actions {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 7px;
+  }
+  .hero-actions .btn {
+    min-width: 0; padding: 11px 8px; font-size: 12.5px; white-space: nowrap;
+  }
+  .hero-actions .btn-primary { grid-column: 1 / -1; }
 
   /* Tiles: 2-up and shorter. Fill still equals percent of target. */
   .stat-card { min-height: 92px; padding: 11px; border-radius: 17px; }
