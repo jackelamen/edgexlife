@@ -36,13 +36,24 @@ export function sprintCurrentWeek(sp) {
 }
 export const sprintProgressPct = (sp) => Math.round((sprintCurrentWeek(sp) / 12) * 100)
 
+/** Whether "today" (calendar day, not exact timestamp) falls within the
+    cycle's date range. Deliberately a plain string comparison of the
+    YYYY-MM-DD dates rather than constructing Date objects anchored at
+    T12:00 and comparing against `new Date()` — that anchoring meant a
+    cycle starting "today" only counted as active from noon onward, so
+    anyone checking before noon on day one (or, worse, checking overnight,
+    when the clock has already rolled to a new calendar date but the
+    session still feels like "last night") saw their brand-new cycle as
+    not live yet. Plain ISO-date strings sort correctly lexicographically,
+    so this can't drift out of sync with sprintCurrentWeek's own
+    local-midnight math below. */
 export function isSprintActive(sp) {
   if (!sp.start_date || !sp.end_date) return false
-  const now = new Date(), s = new Date(sp.start_date + 'T12:00'), e = new Date(sp.end_date + 'T12:00')
-  return s <= now && now <= e
+  const t = localDateKey()
+  return sp.start_date <= t && t <= sp.end_date
 }
 export function isSprintUpcoming(sp) {
-  return sp.start_date ? new Date(sp.start_date + 'T12:00') > new Date() : false
+  return sp.start_date ? sp.start_date > localDateKey() : false
 }
 
 /** Weeks 1-4 -> phase 0, 5-8 -> phase 1, 9-12 -> phase 2 (fixed 3-phase structure). */

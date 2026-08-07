@@ -78,7 +78,7 @@ export default function TodayPage() {
   }, [goals.data])
 
   const activeGoals = (goals.data || []).filter((g) => g.status === 'active')
-  const liveCycles = (sprints.data || []).filter(isSprintActive)
+  const liveCycles = (sprints.data || []).filter((s) => isSprintActive(s) && !s.archived)
   const habitList = habits.data || []
 
   /* ── Today's due cycle actions, flattened across every live cycle ── */
