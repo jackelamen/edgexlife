@@ -69,11 +69,11 @@ export default function StreakChart({ sprint, phases, tactics }) {
             </g>
           )
         })}
+        {/* The header above already states "avg N%" — repeating it here as
+            a second text label crowded a 90px-tall chart. The dashed line
+            alone still marks where the average sits against the bars. */}
         {avgScore != null && (
-          <>
-            <line x1={padL} y1={avgY} x2={startX + totalW} y2={avgY} stroke="rgba(var(--accent-rgb),0.35)" strokeWidth="1.5" strokeDasharray="4 3" />
-            <text x={startX + totalW + 4} y={avgY + 3} fontSize="8" fontWeight="800" fill="rgba(var(--accent-rgb),0.6)">avg {avgScore}%</text>
-          </>
+          <line x1={padL} y1={avgY} x2={startX + totalW} y2={avgY} stroke="rgba(var(--accent-rgb),0.35)" strokeWidth="1.5" strokeDasharray="4 3" />
         )}
         <line x1={padL} y1={H - padB} x2={startX + totalW} y2={H - padB} stroke="var(--border)" strokeWidth="1" />
       </svg>

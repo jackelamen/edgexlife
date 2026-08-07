@@ -190,9 +190,16 @@ function CycleCard({ sprint, phases, tactics, goal, compact, onChanged, onDelete
   }
 
   return (
-    <div className="cycle-card">
+    <div className="cycle-card" style={{ borderLeftColor: areaColor(goal?.area) }}>
       <div className="cycle-header">
-        <div className="cycle-ring-section"><Ring score={score} size={72} stroke={7} sub={`wk ${week}`} /></div>
+        {/* onAccent defaults to true, meant for the ring sitting on a solid
+            accent background (hero cards). This card is plain white, so
+            without the override the ring's white arc and number were
+            rendering white-on-white — invisible. Execution score is a
+            genuine performance read, so off-accent correctly falls back to
+            the reserved status ramp (red/amber/green) rather than the
+            module accent. */}
+        <div className="cycle-ring-section"><Ring score={score} size={72} stroke={7} sub={`wk ${week}`} onAccent={false} /></div>
         <div className="cycle-info">
           <div className="cycle-meta">
             {isSprintActive(sprint) && !sprint.archived && <Badge tone="green">Live</Badge>}
@@ -206,9 +213,9 @@ function CycleCard({ sprint, phases, tactics, goal, compact, onChanged, onDelete
           </div>
         </div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
-          {onDuplicate && <button className="btn btn-icon btn-sm" onClick={onDuplicate} title="Duplicate cycle">
+          {onDuplicate && <button className="btn btn-icon btn-sm btn-ghost" onClick={onDuplicate} title="Duplicate cycle">
             <Icon name="content_copy" size={15} /></button>}
-          {onArchive && <button className="btn btn-icon btn-sm" onClick={onArchive} title={sprint.archived ? 'Unarchive' : 'Archive'}>
+          {onArchive && <button className="btn btn-icon btn-sm btn-ghost" onClick={onArchive} title={sprint.archived ? 'Unarchive' : 'Archive'}>
             <Icon name={sprint.archived ? 'unarchive' : 'archive'} size={15} /></button>}
           {onEdit && <button className="btn btn-icon btn-sm" onClick={onEdit}><Icon name="edit" size={15} /></button>}
           {onDelete && <button className="btn btn-icon btn-sm" onClick={onDelete}><Icon name="delete" size={15} /></button>}
