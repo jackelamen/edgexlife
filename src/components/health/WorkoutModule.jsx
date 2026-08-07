@@ -105,6 +105,7 @@ export default function WorkoutModule() {
       {tab === 'log' && (
         <SessionTab
           session={session} setSession={setSession} db={db} goals={healthGoals} plan={plan}
+          pastSessions={sessions.data || []} exerciseGoals={exGoals.data || []}
           onStart={startSession}
           onFinished={() => { sessions.reload(); setSession(null); setTab('history') }}
         />
@@ -537,12 +538,25 @@ async function syncPlanFromSession(session, plan) {
 
 /* ═══════════════ Live session ═══════════════ */
 
-function SessionTab({ session, setSession, db, goals, plan, onStart, onFinished }) {
+function SessionTab({ session, setSession, db, goals, plan, pastSessions, exerciseGoals, onStart, onFinished }) {
   const [secs, setSecs] = useState(0)
   const [running, setRunning] = useState(false)
   const [openEx, setOpenEx] = useState(0)
   const startedAt = useRef(0)
   const base = useRef(0)
+
+  // Active goals grouped by exercise name — surfaced right on the exercise
+  // card during logging, not just on a separate Progress tab you have to
+  // remember to visit. This is the moment the number is actually
+  // actionable, so it's the moment it should be visible.
+  const goalsByExercise = useMemo(() => {
+    const map = {}
+    ;(exerciseGoals || []).forEach((g) => {
+      if (g.celebratedAt) return
+      ;(map[g.exercise] ||= []).push(g)
+    })
+    return map
+  }, [exerciseGoals])
 
   useEffect(() => {
     if (!running) return
@@ -633,6 +647,7 @@ function SessionTab({ session, setSession, db, goals, plan, onStart, onFinished 
         {session.exercises.map((ex, i) => {
           const open = openEx === i
           const done = (ex.sets || []).filter((s) => s.done).length
+          const exGoalsHere = goalsByExercise[ex.name] || []
           return (
             <div key={i} className={`ex-card${open ? ' open' : ''}`}>
               <div className="ex-card-hdr" onClick={() => setOpenEx(open ? -1 : i)}>
@@ -653,6 +668,21 @@ function SessionTab({ session, setSession, db, goals, plan, onStart, onFinished 
                 </button>
                 <Icon name="expand_more" size={18} className="icon-chevron" />
               </div>
+
+              {exGoalsHere.length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: '0 12px 10px' }}>
+                  {exGoalsHere.map((g) => {
+                    const { best, pct } = evaluateGoal(pastSessions, g)
+                    const unit = goalUnit(g.mode)
+                    const qualifier = goalQualifier(g)
+                    return (
+                      <Badge key={g.id} tone="blue">
+                        🎯 {Math.round(best)}{unit} → {Math.round(g.target)}{unit}{qualifier ? ` ${qualifier}` : ''} · {Math.round(pct)}%
+                      </Badge>
+                    )
+                  })}
+                </div>
+              )}
 
               {open && (
                 <div className="ex-sets">
@@ -1060,14 +1090,28 @@ function evaluateGoal(sessions, goal) {
   const start = goal.startingValue || 0
   let best = start
   let achievedDate = null
+  let lastImprovedDate = null
   for (const r of rows) {
     const v = goalMetric(r, goal.mode, goal.atWeight)
-    if (v > best) best = v
+    if (v > best) { best = v; lastImprovedDate = r.date }
     if (!achievedDate && v >= goal.target) achievedDate = r.date
   }
   const span = goal.target - start
   const pct = span > 0 ? Math.max(0, Math.min(100, ((best - start) / span) * 100)) : (best >= goal.target ? 100 : 0)
-  return { best, achievedDate, pct, reached: !!achievedDate }
+  return { best, achievedDate, lastImprovedDate, pct, reached: !!achievedDate }
+}
+
+/** A sensible default target one notch above the current best, so setting
+    a goal doesn't start from a blank field — editable, never forced.
+    Weight goals round to the nearest 2.5kg plate jump; rep goals round to
+    a whole rep. Returns null until there's a starting value to build from. */
+function suggestTarget(mode, startingValue) {
+  if (!startingValue || startingValue <= 0) return null
+  if (mode === 'oneRM') {
+    const raw = startingValue * 1.1
+    return Math.max(startingValue + 2.5, Math.round(raw / 2.5) * 2.5)
+  }
+  return Math.max(startingValue + 1, Math.round(startingValue * 1.1))
 }
 
 /** All-time best for an exercise+mode(+atWeight) across full history —
@@ -1105,6 +1149,27 @@ function ProgressTab({ sessions, exGoals, db }) {
   const readyToCelebrate = evaluated.filter((e) => !e.goal.celebratedAt && e.reached)
   const completed = evaluated.filter((e) => e.goal.celebratedAt)
     .sort((a, b) => (b.goal.celebratedAt || '').localeCompare(a.goal.celebratedAt || ''))
+
+  // Fires a one-time toast the first time a goal crosses 25/50/75% — the
+  // only feedback in the old version was total silence until 100%, which
+  // is most of why grinding on a goal with no PR yet felt like nothing was
+  // happening. milestonesHit rides on the goal record so a milestone never
+  // re-fires after a reload. The in-flight ref guards against the toast
+  // double-firing while the save+reload round-trip is still in the air.
+  const milestoneInFlight = useRef(new Set())
+  useEffect(() => {
+    for (const { goal, pct } of active) {
+      const hit = new Set(goal.milestonesHit || [])
+      const next = [25, 50, 75].find((m) => pct >= m && !hit.has(m))
+      if (!next || milestoneInFlight.current.has(goal.id)) continue
+      milestoneInFlight.current.add(goal.id)
+      toast.success(`${goal.exercise} — ${next}% of the way there 💪`)
+      saveExerciseGoal({ ...goal, milestonesHit: [...hit, next] })
+        .then(() => exGoals.reload())
+        .catch(() => {})
+        .finally(() => milestoneInFlight.current.delete(goal.id))
+    }
+  }, [active]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function celebrate(goal) {
     try {
@@ -1151,7 +1216,15 @@ function ProgressTab({ sessions, exGoals, db }) {
                       <Icon name="celebration" size={17} /> Celebrate
                     </button>
                     <button className="btn btn-secondary"
-                      onClick={() => { setPrefill({ exercise: goal.exercise, mode: goal.mode, atWeight: goal.atWeight }); setNewGoalOpen(true) }}>
+                      onClick={() => {
+                        // Same jump that got them here, applied again — one
+                        // click into a fully-formed next goal instead of a
+                        // blank target field.
+                        const increment = goal.target - (goal.startingValue || 0)
+                        const nextTarget = increment > 0 ? Math.round((goal.target + increment) * 100) / 100 : null
+                        setPrefill({ exercise: goal.exercise, mode: goal.mode, atWeight: goal.atWeight, target: nextTarget })
+                        setNewGoalOpen(true)
+                      }}>
                       <Icon name="add" size={16} /> Next goal
                     </button>
                   </div>
@@ -1174,8 +1247,11 @@ function ProgressTab({ sessions, exGoals, db }) {
         </Card>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5" style={{ marginBottom: 18 }}>
-          {active.map(({ goal, best, pct }) => {
+          {active.map(({ goal, best, pct, lastImprovedDate }) => {
             const daysIn = Math.max(0, Math.round((new Date() - new Date(goal.startedAt + 'T12:00:00')) / 86400000))
+            const daysSincePR = lastImprovedDate
+              ? Math.max(0, Math.round((new Date() - new Date(lastImprovedDate + 'T12:00:00')) / 86400000))
+              : null
             const armed = confirm.isArmed(goal.id)
             const unit = goalUnit(goal.mode)
             const qualifier = goalQualifier(goal)
@@ -1209,6 +1285,9 @@ function ProgressTab({ sessions, exGoals, db }) {
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 700, marginTop: 6 }}>
                   {Math.round(pct)}% of the way from {Math.round(goal.startingValue || 0)}{unit} to {Math.round(goal.target)}{unit}
+                </div>
+                <div style={{ fontSize: 11, color: daysSincePR != null && daysSincePR >= 14 ? 'var(--orange)' : 'var(--text-3)', fontWeight: 700, marginTop: 3 }}>
+                  {daysSincePR == null ? `No PR yet — day ${daysIn} on this goal` : daysSincePR === 0 ? 'New PR today 🔥' : `Last PR ${daysSincePR}d ago`}
                 </div>
               </Card>
             )
@@ -1275,7 +1354,7 @@ function NewGoalModal({ open, prefill, sessions, db, onClose, onSaved }) {
     setExercise(ex)
     setMode(prefill?.mode || (ex ? (isBodyweightExercise(ex, sessions) ? 'reps' : 'oneRM') : 'oneRM'))
     setAtWeight(prefill?.atWeight ? String(prefill.atWeight) : '')
-    setTarget('')
+    setTarget(prefill?.target ? String(prefill.target) : '')
     setStartedAt(today())
     setNotes('')
   }, [open, prefill]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -1286,6 +1365,18 @@ function NewGoalModal({ open, prefill, sessions, db, onClose, onSaved }) {
     Object.values(db || {}).forEach((list) => list.forEach((n) => names.add(n)))
     return [...names].sort()
   }, [sessions, db])
+
+  // What today's best already is for whatever's currently selected — drives
+  // the "Suggest" chip so a new goal starts from a real number instead of a
+  // blank field. Recomputes live as exercise/mode/weight change.
+  const startingPreview = useMemo(() => {
+    if (!exercise.trim()) return 0
+    const weightVal = mode === 'repsAtWeight' ? Number(atWeight) || 0 : null
+    return bestEver(sessions, exercise.trim(), mode, weightVal)
+  }, [sessions, exercise, mode, atWeight])
+  const suggested = (mode !== 'repsAtWeight' || Number(atWeight) > 0)
+    ? suggestTarget(mode, startingPreview)
+    : null
 
   async function save() {
     if (!exercise.trim() || !target || Number(target) <= 0) {
@@ -1351,6 +1442,13 @@ function NewGoalModal({ open, prefill, sessions, db, onClose, onSaved }) {
           <SectionLabel>Target ({mode === 'oneRM' ? 'kg' : 'reps'})</SectionLabel>
           <input type="number" inputMode="decimal" min={1} value={target}
             onChange={(e) => setTarget(e.target.value)} placeholder={mode === 'oneRM' ? 'e.g. 100' : 'e.g. 15'} />
+          {suggested != null && (
+            <button type="button" className="btn btn-ghost btn-sm"
+              style={{ marginTop: 6, padding: '3px 8px', fontSize: 11, fontWeight: 700 }}
+              onClick={() => setTarget(String(suggested))}>
+              Suggest {suggested}{goalUnit(mode)} (+10%)
+            </button>
+          )}
         </div>
         <div>
           <SectionLabel>Started</SectionLabel>
