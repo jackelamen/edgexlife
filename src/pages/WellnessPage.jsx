@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
 import Icon from '../components/ui/Icon'
 import { View } from '../components/shell/Shell'
@@ -89,7 +89,7 @@ export default function WellnessPage() {
           onNav={setView}
         />
       )}
-      {view === 'reset' && <ResetView latest={latest} onNav={setView} />}
+      {view === 'reset' && <ResetView latest={latest} onNav={setView} onLogged={reloadAll} />}
       {view === 'meditate' && <MeditateView onLogged={reloadAll} />}
       {view === 'inbox' && <InboxView notes={notes} />}
       {view === 'journal' && <JournalView notes={notes} onEdit={openCheckin} />}
@@ -560,30 +560,128 @@ function CheckinView({ date, entryId, onSaved, onDeleted, onNav }) {
 
 /* ══════════════════ Reset Tools ══════════════════ */
 
-function ResetView({ latest, onNav }) {
+function ResetView({ latest, onNav, onLogged }) {
   const suggested = suggestedReset(latest?.state, latest ? clarityDetails(latest).score : null)
+  const [running, setRunning] = useState(null)
+  // Breathe and Brain Dump already go somewhere real — a guided timer and
+  // the Mental Load inbox, respectively. The other four used to just toast
+  // "selected" and do nothing else; those now open a real guided runner.
   function start(tool) {
     if (tool.id === 'breathe') { onNav('meditate'); return }
     if (tool.id === 'dump') { onNav('inbox'); return }
-    toast.success(tool.title + ' selected')
+    setRunning(tool)
   }
   return (
-    <div className="reset-grid">
-      {RESET_TOOLS.map((t) => (
-        <div key={t.id} className="reset-card" onClick={() => start(t)}>
-          <div className="reset-icon"><Icon name={t.icon || 'restart_alt'} size={18} /></div>
-          <h3 style={{ fontSize: 15, fontWeight: 800, marginBottom: 4 }}>{t.title}</h3>
-          <p style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 12 }}>{t.body}</p>
-          <div className="script-list">
-            {t.steps.map((s, i) => <div key={i} className="script-line">{s}</div>)}
+    <>
+      <div className="reset-grid">
+        {RESET_TOOLS.map((t) => (
+          <div key={t.id} className="reset-card" onClick={() => start(t)}>
+            <div className="reset-icon"><Icon name={t.icon || 'restart_alt'} size={18} /></div>
+            <h3 style={{ fontSize: 15, fontWeight: 800, marginBottom: 4 }}>{t.title}</h3>
+            <p style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 12 }}>{t.body}</p>
+            <div className="script-list">
+              {t.steps.map((s, i) => <div key={i} className="script-line">{s}</div>)}
+            </div>
+            {t.id === suggested.id && <div style={{ marginTop: 10 }}><Badge tone="purple">Suggested for you</Badge></div>}
+            <button className="btn btn-secondary btn-sm" style={{ marginTop: 12 }}>
+              <Icon name="play_arrow" size={15} /> Use Reset
+            </button>
           </div>
-          {t.id === suggested.id && <div style={{ marginTop: 10 }}><Badge tone="purple">Suggested for you</Badge></div>}
-          <button className="btn btn-secondary btn-sm" style={{ marginTop: 12 }}>
-            <Icon name="play_arrow" size={15} /> Use Reset
+        ))}
+      </div>
+      <ResetRunner tool={running} onClose={() => setRunning(null)} onLogged={onLogged} />
+    </>
+  )
+}
+
+/** Walks a reset tool's own `steps` one at a time instead of dumping them
+    on a card as read-only copy. The walk tool gets a real 10-minute
+    countdown on its "walk at an easy pace" step, since the card explicitly
+    promises "ten quiet minutes" — the one thing worth special-casing by
+    id rather than generalizing, since no other tool has a timed component.
+    Every tool ends on an optional reflection capture (copy-to-clipboard
+    for pasting into a text or journal entry) and logs completion via
+    addPractice under the tool's own title, so finishing a reset leaves a
+    real trace in wellness history instead of vanishing into a toast. */
+function ResetRunner({ tool, onClose, onLogged }) {
+  const [step, setStep] = useState(0)
+  const [note, setNote] = useState('')
+  const [walkSecs, setWalkSecs] = useState(600)
+  const [walkRunning, setWalkRunning] = useState(false)
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    setStep(0); setNote(''); setWalkSecs(600); setWalkRunning(false); setSaving(false)
+  }, [tool?.id])
+
+  useEffect(() => {
+    if (!walkRunning || walkSecs <= 0) return
+    const id = setTimeout(() => setWalkSecs((s) => s - 1), 1000)
+    return () => clearTimeout(id)
+  }, [walkRunning, walkSecs])
+
+  if (!tool) return null
+  const last = step === tool.steps.length - 1
+  const isWalkTimerStep = tool.id === 'walk' && step === 1
+
+  async function finish() {
+    setSaving(true)
+    try {
+      await addPractice({ date: today(), type: tool.title, minutes: tool.id === 'walk' ? 10 : 2, note: note.trim(), after: null })
+      toast.success(`${tool.title} logged`)
+      onLogged()
+      onClose()
+    } catch (e) { toast.error(e.message) } finally { setSaving(false) }
+  }
+
+  return (
+    <Modal open={Boolean(tool)} onClose={onClose} title={tool.title} sub={tool.body} width={480}>
+      <div style={{ display: 'flex', gap: 5, marginBottom: 18 }}>
+        {tool.steps.map((_, i) => (
+          <div key={i} style={{ flex: 1, height: 4, borderRadius: 99, background: i <= step ? 'var(--accent)' : 'var(--white-soft)' }} />
+        ))}
+      </div>
+
+      <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.07em', textTransform: 'uppercase', color: 'var(--text-3)', marginBottom: 6 }}>
+        Step {step + 1} of {tool.steps.length}
+      </div>
+      <p style={{ fontSize: 17, fontWeight: 700, lineHeight: 1.4 }}>{tool.steps[step]}</p>
+
+      {isWalkTimerStep && (
+        <div style={{ textAlign: 'center', padding: '18px 0 4px' }}>
+          <div className="tnum" style={{ fontSize: 40, fontWeight: 800, marginBottom: 10 }}>
+            {String(Math.floor(walkSecs / 60)).padStart(2, '0')}:{String(walkSecs % 60).padStart(2, '0')}
+          </div>
+          <button className={`timer-btn ${walkRunning ? 'stop' : 'start'}`} onClick={() => setWalkRunning((r) => !r)}>
+            {walkRunning ? 'Pause' : walkSecs === 600 ? 'Start' : 'Resume'}
           </button>
         </div>
-      ))}
-    </div>
+      )}
+
+      {last && (
+        <div style={{ marginTop: 16 }}>
+          <textarea rows={3} value={note} onChange={(e) => setNote(e.target.value)}
+            placeholder="Write it here if it helps — optional." />
+          {note.trim() && (
+            <button className="btn btn-ghost btn-sm" style={{ marginTop: 6 }}
+              onClick={() => { navigator.clipboard?.writeText(note.trim()); toast.success('Copied') }}>
+              <Icon name="content_copy" size={13} /> Copy
+            </button>
+          )}
+        </div>
+      )}
+
+      <div style={{ display: 'flex', gap: 8, marginTop: 18 }}>
+        {step > 0 && <button className="btn btn-secondary" onClick={() => setStep((s) => s - 1)}>Back</button>}
+        {!last ? (
+          <button className="btn btn-primary" onClick={() => setStep((s) => s + 1)}>Next</button>
+        ) : (
+          <button className="btn btn-primary" disabled={saving} onClick={finish}>
+            {saving ? 'Saving…' : 'Done'}
+          </button>
+        )}
+      </div>
+    </Modal>
   )
 }
 
