@@ -18,12 +18,14 @@ import {
 } from '../lib/scores'
 import { today, daysAgo, pretty, prettyShort } from '../lib/dates'
 import WorkoutModule from '../components/health/WorkoutModule'
+import FastingModule, { FastingStatusCard } from '../components/health/FastingModule'
 import TrendChart from '../components/health/TrendChart'
 
 const VIEWS = [
   { value: 'today', label: 'Today' },
   { value: 'log', label: 'Daily Log' },
   { value: 'workout', label: 'Workout' },
+  { value: 'fasting', label: 'Fasting' },
   { value: 'routines', label: 'Routines' },
   { value: 'trends', label: 'Trends' },
   { value: 'settings', label: 'Settings' },
@@ -53,9 +55,10 @@ export default function HealthPage() {
 
       <Tabs value={view} onChange={setView} options={VIEWS} />
 
-      {view === 'today' && <TodayView settings={settings.data} onEdit={setEditDate} />}
+      {view === 'today' && <TodayView settings={settings.data} onEdit={setEditDate} onNavFasting={() => setView('fasting')} />}
       {view === 'log' && <LogView settings={settings.data} index={index} onEdit={setEditDate} />}
       {view === 'workout' && <WorkoutModule />}
+      {view === 'fasting' && <FastingModule />}
       {view === 'routines' && <RoutinesView />}
       {view === 'trends' && <TrendsView settings={settings.data} index={index} />}
       {view === 'settings' && <SettingsView settings={settings} />}
@@ -72,7 +75,7 @@ export default function HealthPage() {
 
 /* ═══════════════ Today ═══════════════ */
 
-function TodayView({ settings, onEdit }) {
+function TodayView({ settings, onEdit, onNavFasting }) {
   const t = today()
   const logs = useAsync((f) => fetchHealthLogs(t, t, { force: f }), [t])
   const routines = useAsync((f) => fetchRoutines({ force: f }))
@@ -118,6 +121,8 @@ function TodayView({ settings, onEdit }) {
           <Ring score={details?.score ?? null} sub="today" />
         </div>
       </div>
+
+      <FastingStatusCard onNav={onNavFasting} />
 
       <MetricLegend keys={['sleepHours', 'steps', 'water', 'exercise', 'energy']} />
 

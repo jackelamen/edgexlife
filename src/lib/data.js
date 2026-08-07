@@ -339,6 +339,25 @@ export async function setRoutineCheck(date, routineId, done) {
   invalidate('checks')
 }
 
+/* ── Fasting ──────────────────────────────────────────────
+   Sessions, not daily logs: a fast can span midnight and doesn't map to
+   "one row per date" the way sleep/steps/water do. Same shape as workout
+   sessions — a capped jsonb array, upsert-by-id.
+   Session: { id, startedAt, endedAt|null, targetHours, method, notes }
+   endedAt === null means the fast is still running. */
+export const fetchFastingSessions = (o) => cachedQuery('fasting-sessions',
+  async () => (await rpc('life_get_fasting_sessions', { p_limit: 60 })) || [], { ttlMs: TTL.health, ...o })
+
+export async function saveFastingSession(session) {
+  await rpc('life_save_fasting_session', { p_session: session })
+  invalidate('fasting-sessions')
+}
+
+export async function deleteFastingSession(id) {
+  await rpc('life_delete_fasting_session', { p_id: id })
+  invalidate('fasting-sessions')
+}
+
 export const fetchWorkoutPlan = (o) => cachedQuery('workout-plan',
   async () => (await rpc('life_get_workout_plan')) || {}, { ttlMs: TTL.health, ...o })
 

@@ -73,6 +73,8 @@ export const METRICS = {
   energy: { label: 'Energy', icon: 'bolt', color: '#c2477e', tint: '#fbe1ed' },
   pain: { label: 'Low pain', icon: 'healing', color: '#8a5a4a', tint: '#f0e5e1' },
 
+  fasting: { label: 'Fasting', icon: 'schedule', color: '#445b73', tint: '#dfe5ec' },
+
   /* Wellness */
   mood: { label: 'Mood', icon: 'sentiment_satisfied', color: '#d1568c', tint: '#fbe3ee' },
   stress: { label: 'Stress ease', icon: 'air', color: '#3f6fd8', tint: '#e0e8fa' },
