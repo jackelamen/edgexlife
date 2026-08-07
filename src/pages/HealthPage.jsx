@@ -178,7 +178,7 @@ function TodayView({ settings, onEdit, onNavFasting }) {
             kicker="What would move it"
             title={`${weakest.label} is your weakest lever`}
             metricKey={weakest.key}
-            chip={`at ${Math.round(weakest.value)} of 100`}
+            chip={weakest.detail}
           >
             {weakest.advice}
           </CoachCard>

@@ -59,7 +59,18 @@ export function healthDetails(log, settings) {
     { key: 'sleepQuality', label: 'Sleep quality', value: quality, weight: 0.18,
       detail: `${i(log.sleepQuality, 3)} / 5`,
       advice: 'Improve the pre-sleep environment before adding more effort tomorrow.' },
-    { key: 'pain', label: 'Low pain', value: painScore, weight: 0.14,
+    // Label is 'Pain', not 'Low pain' — this is the one driver where the
+    // raw metric and the 0-100 "goodness" value move in OPPOSITE
+    // directions (high pain -> low value, unlike every other driver where
+    // more of the raw thing -> a higher value). A label phrased as the
+    // desirable direction reads backwards in any auto-generated sentence
+    // built for the other five drivers ("Low pain is dragging your score"
+    // sounds like having low pain is bad). Naming it after the raw thing,
+    // like every other driver, keeps those sentences correct — pair with
+    // `detail` (the raw "N / 5 strain" reading) rather than `value` in any
+    // UI that surfaces this driver by itself, since `value` alone doesn't
+    // carry the inversion.
+    { key: 'pain', label: 'Pain', value: painScore, weight: 0.14,
       detail: `${pain} / 5 strain`,
       advice: 'De-load today: mobility, easy walking, or rest instead of forcing intensity.' },
   ]
@@ -119,7 +130,7 @@ export function healthDrivers(logs, settings) {
     driver('Water', (l) => n(l.water, NaN), s.waterTarget, (v) => v >= s.waterTarget, (v) => `${v.toFixed(1)}L avg`),
     driver('Energy', (l) => i(l.energy, NaN), 4, (v) => v >= 4, (v) => `${v.toFixed(1)}/5 avg`, 5),
     driver('Sleep quality', (l) => i(l.sleepQuality, NaN), 4, (v) => v >= 4, (v) => `${v.toFixed(1)}/5 avg`, 5),
-    driver('Low pain', (l) => i(l.pain, NaN), 2, (v) => v <= 2, (v) => `${v.toFixed(1)}/5 avg`, 5, true),
+    driver('Pain', (l) => i(l.pain, NaN), 2, (v) => v <= 2, (v) => `${v.toFixed(1)}/5 avg`, 5, true),
   ].sort((a, b) => a.score - b.score)
 }
 

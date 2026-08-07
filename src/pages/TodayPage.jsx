@@ -171,7 +171,7 @@ export default function TodayPage() {
     }
     if (weakest && weakest.value < 60) {
       a.push({ sev: weakest.value < 40 ? 'risk' : 'short', icon: metric(weakest.key).icon,
-        text: `${weakest.label} is dragging your score (${Math.round(weakest.value)})`, to: '/health', cta: 'Health',
+        text: `${weakest.label} is dragging your score (${weakest.detail})`, to: '/health', cta: 'Health',
         metricKey: weakest.key })
     }
     if (!liveCycles.length && activeGoals.length) {
