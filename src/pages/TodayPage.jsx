@@ -79,7 +79,25 @@ export default function TodayPage() {
 
   const activeGoals = (goals.data || []).filter((g) => g.status === 'active')
   const liveCycles = (sprints.data || []).filter((s) => isSprintActive(s) && !s.archived)
-  const habitList = habits.data || []
+  // fetchHabits() pulls every non-archived habit — the same query Pulse
+  // itself uses before Pulse applies its own "due today" filter, which
+  // this bridge was never doing. `cadence` + `cadence_config.days` are
+  // Pulse's own scheduling fields (already selected in fetchHabits, just
+  // never read here): 'daily' habits are due every day; 'custom'/'weekly'
+  // habits carry an explicit days array (JS Date.getDay() indices,
+  // Sun=0..Sat=6 — confirmed against Jack's real data: a Mon/Wed/Fri habit
+  // stores days:[1,3,5]) and are only due when today matches one of them.
+  // Any cadence shape this doesn't recognize defaults to "due" rather than
+  // silently hiding a habit — Pulse's own due-today algorithm isn't
+  // available to copy verbatim from this repo, so this is a best-effort
+  // mirror of it, not a guaranteed 1:1 match.
+  const isHabitDueToday = (h) => {
+    if (h.cadence === 'daily') return true
+    const days = h.cadence_config?.days
+    if (Array.isArray(days) && days.length) return days.includes(new Date().getDay())
+    return true
+  }
+  const habitList = (habits.data || []).filter(isHabitDueToday)
 
   /* ── Today's due cycle actions, flattened across every live cycle ── */
   const dueActions = useMemo(() => {
@@ -294,13 +312,14 @@ export default function TodayPage() {
         <Card>
           <CardHead
             title="Habits"
-            sub="Carried from Pulse."
+            sub="Due today, carried from Pulse."
             right={habitList.length
               ? <Badge tone={habitsDone === habitList.length ? 'green' : 'blue'}>{habitsDone}/{habitList.length}</Badge>
               : null}
           />
           {habits.loading ? <Loading /> : !habitList.length ? (
-            <Empty icon="repeat" title="No habits in Pulse yet" />
+            <Empty icon="repeat"
+              title={(habits.data || []).length ? 'Nothing due today' : 'No habits in Pulse yet'} />
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 7, maxHeight: 300, overflowY: 'auto' }}>
               {habitList.map((h) => {
