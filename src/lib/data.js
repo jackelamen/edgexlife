@@ -124,7 +124,7 @@ export async function deleteMetricLog(id) {
 
 export const fetchSprints = (o) => cachedQuery('sprints', async () =>
   unwrap(await supabase.from('sprints')
-    .select('id,goal_id,name,outcome,start_date,end_date,week_checks,reflections,retro')
+    .select('id,goal_id,name,outcome,start_date,end_date,week_checks,reflections,retro,archived')
     .order('start_date', { ascending: false, nullsFirst: false })), { ttlMs: TTL.goals, ...o })
 
 export async function saveSprint(s) {
@@ -132,7 +132,7 @@ export async function saveSprint(s) {
     goal_id: s.goal_id, name: s.name, outcome: s.outcome || null,
     start_date: s.start_date || null, end_date: s.end_date || null,
     week_checks: s.week_checks ?? {}, reflections: s.reflections ?? {},
-    retro: s.retro ?? null, updated_at: new Date().toISOString(),
+    retro: s.retro ?? null, archived: s.archived ?? false, updated_at: new Date().toISOString(),
   }
   const { data, error } = s.id
     ? await supabase.from('sprints').update(payload).eq('id', s.id).select('id').single()
@@ -146,6 +146,16 @@ export async function deleteSprint(id) {
   const { error } = await supabase.from('sprints').delete().eq('id', id)
   if (error) throw error
   invalidate('sprints'); invalidate('sprint-')
+}
+
+/** Archive is a lightweight toggle, separate from the full saveSprint
+    payload — tucking a cycle away (or bringing it back) shouldn't require
+    re-sending week_checks/retro/etc. */
+export async function setSprintArchived(id, archived) {
+  const { error } = await supabase.from('sprints')
+    .update({ archived, updated_at: new Date().toISOString() }).eq('id', id)
+  if (error) throw error
+  invalidate('sprints')
 }
 
 export const fetchSprintPhases = (o) => cachedQuery('sprint-phases', async () =>

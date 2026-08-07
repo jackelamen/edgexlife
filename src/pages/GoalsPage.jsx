@@ -11,7 +11,7 @@ import {
   AREAS, GOAL_STATUSES, METRIC_TYPES,
   fetchGoals, saveGoal, deleteGoal, fetchVisions, saveVision,
   fetchGoalMetrics, saveMetric, deleteMetric, fetchMetricLogs, logMetric,
-  fetchSprints, saveSprint, deleteSprint, fetchSprintPhases, savePhase, deletePhase,
+  fetchSprints, saveSprint, deleteSprint, setSprintArchived, fetchSprintPhases, savePhase, deletePhase,
   fetchSprintTactics, saveTactic, deleteTactic, fetchGoalRollup, fetchSavingsGoals,
   fetchGoalTasks, fetchUnlinkedTasks, linkTaskToGoal,
   fetchHabits, linkHabitToGoal,
@@ -80,7 +80,7 @@ export default function GoalsPage() {
 
 function useLiveCycles({ sprints, phases, tactics }) {
   const t = today()
-  const live = (sprints.data || []).filter((s) => isSprintActive(s))
+  const live = (sprints.data || []).filter((s) => isSprintActive(s) && !s.archived)
   const forSprint = (sp) => ({
     phases: (phases.data || []).filter((p) => p.sprint_id === sp.id),
     tactics: (tactics.data || []).filter((x) => x.sprint_id === sp.id),
@@ -159,7 +159,7 @@ function TodayView({ goals, rollup, cycleData }) {
 
 /* ══════════════════ Cycle card (shared by Today + Cycles) ══════════════════ */
 
-function CycleCard({ sprint, phases, tactics, goal, compact, onChanged, onDelete, onEdit }) {
+function CycleCard({ sprint, phases, tactics, goal, compact, onChanged, onDelete, onEdit, onArchive, onDuplicate }) {
   const [open, setOpen] = useState(!compact)
   const [week, setWeek] = useState(sprintCurrentWeek(sprint))
   const cw = sprintCurrentWeek(sprint)
@@ -195,7 +195,8 @@ function CycleCard({ sprint, phases, tactics, goal, compact, onChanged, onDelete
         <div className="cycle-ring-section"><Ring score={score} size={72} stroke={7} sub={`wk ${week}`} /></div>
         <div className="cycle-info">
           <div className="cycle-meta">
-            {isSprintActive(sprint) && <Badge tone="green">Live</Badge>}
+            {isSprintActive(sprint) && !sprint.archived && <Badge tone="green">Live</Badge>}
+            {sprint.archived && <Badge tone="muted">Archived</Badge>}
             <span className="cycle-goal-link">{goal?.title || 'No goal'}</span>
           </div>
           <div className="cycle-name">{sprint.name}</div>
@@ -205,6 +206,10 @@ function CycleCard({ sprint, phases, tactics, goal, compact, onChanged, onDelete
           </div>
         </div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
+          {onDuplicate && <button className="btn btn-icon btn-sm" onClick={onDuplicate} title="Duplicate cycle">
+            <Icon name="content_copy" size={15} /></button>}
+          {onArchive && <button className="btn btn-icon btn-sm" onClick={onArchive} title={sprint.archived ? 'Unarchive' : 'Archive'}>
+            <Icon name={sprint.archived ? 'unarchive' : 'archive'} size={15} /></button>}
           {onEdit && <button className="btn btn-icon btn-sm" onClick={onEdit}><Icon name="edit" size={15} /></button>}
           {onDelete && <button className="btn btn-icon btn-sm" onClick={onDelete}><Icon name="delete" size={15} /></button>}
           <button className={`cycle-toggle-btn${open ? ' open' : ''}`} onClick={() => setOpen(!open)}>
@@ -624,22 +629,53 @@ function GoalEditor({ goal, onClose, onSaved }) {
 function CyclesView({ goals, cycleData }) {
   const { sprints, phases, tactics } = cycleData
   const [editing, setEditing] = useState(null)
+  const [cloneFrom, setCloneFrom] = useState(null)
+  const [filter, setFilter] = useState('active')
   const confirm = useConfirm()
-  const list = (sprints.data || []).filter((s) => !s.retro?.closed)
+  const all = sprints.data || []
+  const list = all.filter((s) => (filter === 'active' ? !s.archived : s.archived))
+  const archivedCount = all.filter((s) => s.archived).length
+
+  function closeEditor() { setEditing(null); setCloneFrom(null) }
+
+  function duplicate(s) {
+    const myPhases = (phases.data || []).filter((p) => p.sprint_id === s.id).sort((a, b) => a.phase_index - b.phase_index)
+    const myTactics = (tactics.data || []).filter((x) => x.sprint_id === s.id)
+    setCloneFrom({
+      name: `${s.name} (Copy)`, outcome: s.outcome || '', goal_id: s.goal_id,
+      phases: myPhases.length
+        ? myPhases.map((p) => ({
+            name: p.name, description: p.description || '',
+            tactics: myTactics.filter((t) => t.phase_id === p.id)
+              .map((t) => ({ text: t.text, freq: t.freq || 'daily', days: t.days || [], times_per_week: t.times_per_week || 3 })),
+          }))
+        : DEFAULT_PHASES.map((p) => ({ ...p, tactics: [] })),
+    })
+    setEditing({})
+  }
 
   return (
     <>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
-        <span style={{ fontSize: 12.5, color: 'var(--text-3)' }}>{list.length} cycles</span>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18, flexWrap: 'wrap', gap: 12 }}>
+        <div className="filter-tabs">
+          <button className={`filter-tab${filter === 'active' ? ' active' : ''}`} onClick={() => setFilter('active')}>
+            Active
+          </button>
+          <button className={`filter-tab${filter === 'archived' ? ' active' : ''}`} onClick={() => setFilter('archived')}>
+            Archived{archivedCount ? ` (${archivedCount})` : ''}
+          </button>
+        </div>
         <button className="btn btn-primary btn-sm" onClick={() => setEditing({})}>
           <Icon name="add" size={15} /> New Cycle
         </button>
       </div>
 
       {sprints.loading ? <Loading /> : !list.length ? (
-        <Card><Empty icon="loop" title="No focus cycles yet"
-          action={<button className="btn btn-primary btn-sm" onClick={() => setEditing({})}>Start one</button>}>
-          A cycle gives one goal a deadline, phases, and a set of repeatable tactics.
+        <Card><Empty icon="loop" title={filter === 'archived' ? 'Nothing archived' : 'No focus cycles yet'}
+          action={filter === 'active' && <button className="btn btn-primary btn-sm" onClick={() => setEditing({})}>Start one</button>}>
+          {filter === 'archived'
+            ? 'Cycles you tuck away show up here, still around if you want to duplicate or revisit one.'
+            : 'A cycle gives one goal a deadline, phases, and a set of repeatable tactics.'}
         </Empty></Card>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -650,6 +686,12 @@ function CyclesView({ goals, cycleData }) {
             return (
               <CycleCard key={s.id} sprint={s} phases={myPhases} tactics={myTactics} goal={goal}
                 onChanged={() => sprints.reload()} onEdit={() => setEditing(s)}
+                onDuplicate={() => duplicate(s)}
+                onArchive={async () => {
+                  await setSprintArchived(s.id, !s.archived)
+                  toast.success(s.archived ? 'Cycle unarchived' : 'Cycle archived')
+                  sprints.reload()
+                }}
                 onDelete={async () => {
                   if (!confirm.isArmed(s.id)) return confirm.arm(s.id)
                   await deleteSprint(s.id); toast.success('Cycle deleted'); sprints.reload()
@@ -659,13 +701,13 @@ function CyclesView({ goals, cycleData }) {
         </div>
       )}
 
-      <CycleEditor sprint={editing} goals={goals.data || []} onClose={() => setEditing(null)}
+      <CycleEditor sprint={editing} cloneFrom={cloneFrom} goals={goals.data || []} onClose={closeEditor}
         onSaved={() => { sprints.reload(); phases.reload(); tactics.reload() }} />
     </>
   )
 }
 
-function CycleEditor({ sprint, goals, onClose, onSaved }) {
+function CycleEditor({ sprint, cloneFrom, goals, onClose, onSaved }) {
   const open = Boolean(sprint)
   const [s, setS] = useState(null)
   const cur = s ?? (sprint?.id ? sprint : {
@@ -677,17 +719,29 @@ function CycleEditor({ sprint, goals, onClose, onSaved }) {
   const existingTactics = useAsync((f) => fetchSprintTactics({ force: f }), [sprint?.id], { enabled: Boolean(sprint?.id) })
 
   // Quick setup: skip building three phases by hand and just ask for one
-  // action, applied across the whole 12 weeks. Only offered for brand-new
-  // cycles — editing an existing one always shows its real phase
-  // structure so nothing gets silently collapsed. "Full setup" is still
-  // one click away for anyone who wants phase-by-phase control up front.
-  const [quickMode, setQuickMode] = useState(!sprint?.id)
+  // action, applied across the whole 12 weeks. Only offered for brand-new,
+  // non-cloned cycles — editing an existing one, or duplicating one that
+  // already has real phases, always shows the full structure so nothing
+  // gets silently collapsed. "Full setup" is still one click away for
+  // anyone who wants phase-by-phase control up front.
+  const [quickMode, setQuickMode] = useState(!sprint?.id && !cloneFrom)
   const [quickTactic, setQuickTactic] = useState({ text: '', freq: 'xperweek', times_per_week: 3, days: [] })
   useEffect(() => {
     if (!open) return
+    if (cloneFrom) {
+      // Duplicating an existing cycle: same goal/outcome/phases/tactics,
+      // fresh dates and a blank slate for checks/retro (those live on the
+      // sprint row itself and are never copied — only phaseDrafts, built
+      // from cloneFrom.phases, feed the save below).
+      setQuickMode(false)
+      setS({ name: cloneFrom.name, outcome: cloneFrom.outcome, goal_id: cloneFrom.goal_id,
+        start_date: today(), end_date: autoEndDate(today()) })
+      setPhaseDrafts(cloneFrom.phases)
+      return
+    }
     setQuickMode(!sprint?.id)
     setQuickTactic({ text: '', freq: 'xperweek', times_per_week: 3, days: [] })
-  }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open, cloneFrom]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useMemo(() => {
     if (!sprint?.id) { setPhaseDrafts(DEFAULT_PHASES.map((p) => ({ ...p, tactics: [] }))); return }
@@ -742,7 +796,8 @@ function CycleEditor({ sprint, goals, onClose, onSaved }) {
   const PHASE_BADGES = [['Weeks 1–4', 'blue'], ['Weeks 5–8', 'purple'], ['Weeks 9–12', 'orange']]
 
   return (
-    <Modal open={open} onClose={() => { setS(null); onClose() }} title={sprint?.id ? 'Edit Cycle' : 'New Focus Cycle'} width={700}
+    <Modal open={open} onClose={() => { setS(null); onClose() }}
+      title={sprint?.id ? 'Edit Cycle' : cloneFrom ? 'Duplicate Cycle' : 'New Focus Cycle'} width={700}
       footer={
         <>
           <button className="btn btn-secondary" onClick={() => { setS(null); onClose() }}>Cancel</button>
@@ -754,7 +809,12 @@ function CycleEditor({ sprint, goals, onClose, onSaved }) {
         </>
       }>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        {!sprint?.id && (
+        {cloneFrom && (
+          <div className="badge badge-blue" style={{ width: 'fit-content' }}>
+            <Icon name="content_copy" size={12} /> Duplicating "{cloneFrom.name.replace(/ \(Copy\)$/, '')}"
+          </div>
+        )}
+        {!sprint?.id && !cloneFrom && (
           <div>
             <div className="flex gap-1" style={{ background: 'var(--white-soft)', borderRadius: 999, padding: 3, width: 'fit-content', marginBottom: 6 }}>
               <button type="button" className={`btn btn-sm ${quickMode ? 'btn-primary' : 'btn-ghost'}`}
@@ -867,7 +927,7 @@ function CycleEditor({ sprint, goals, onClose, onSaved }) {
 /* ══════════════════ Roadmap ══════════════════ */
 
 function RoadmapView({ goals, sprints }) {
-  const dated = (sprints.data || []).filter((s) => s.start_date && s.end_date)
+  const dated = (sprints.data || []).filter((s) => s.start_date && s.end_date && !s.archived)
 
   if (sprints.loading) return <Loading />
   if (!goals.data?.length) return <Card><Empty icon="map" title="No goals yet">Add goals and cycles to see your roadmap.</Empty></Card>
@@ -1005,7 +1065,7 @@ const RETRO_RATINGS = [['1', '😞'], ['2', '😐'], ['3', '🙂'], ['4', '💪'
 function RetrosView({ goals, sprints, cycleData }) {
   const [editing, setEditing] = useState(null)
   const t = today()
-  const finished = (sprints.data || []).filter((s) => s.end_date && s.end_date < t)
+  const finished = (sprints.data || []).filter((s) => s.end_date && s.end_date < t && !s.archived)
   const isWritten = (s) => { const r = s.retro || {}; return Boolean(r.win || r.lesson || r.carry) }
   // A cycle that just crossed its end date and has no retro yet is the one
   // genuine "you finished something" event in this whole module — it used
