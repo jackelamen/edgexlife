@@ -1048,12 +1048,17 @@ function ProgressTab({ sessions }) {
   const rows = exerciseHistory(sessions, selected)
   const byWeight = mode === 'weight'
   const unit = byWeight ? ' kg' : ' reps'
-  const points = rows.map((r) => ({ label: prettyShort(r.date), value: (byWeight ? r.topWeight : r.topReps) || null }))
-  const best = rows.reduce((m, r) => Math.max(m, byWeight ? r.topWeight : r.topReps), 0)
+  // Reps mode tracks TOTAL reps that session (every rep across every set),
+  // not "best single set" — total is the one number that's always the sum
+  // of what actually got typed in, so it can't drift between "reps" one
+  // day and something that reads like a set count another day just
+  // because the set/rep split happened to vary (3 sets of 10 vs 2 of 15).
+  const points = rows.map((r) => ({ label: prettyShort(r.date), value: (byWeight ? r.topWeight : r.totalReps) || null }))
+  const best = rows.reduce((m, r) => Math.max(m, byWeight ? r.topWeight : r.totalReps), 0)
   const latest = rows[rows.length - 1]
-  const latestVal = latest ? (byWeight ? latest.topWeight : latest.topReps) : 0
+  const latestVal = latest ? (byWeight ? latest.topWeight : latest.totalReps) : 0
   const first = rows[0]
-  const firstVal = first ? (byWeight ? first.topWeight : first.topReps) : 0
+  const firstVal = first ? (byWeight ? first.topWeight : first.totalReps) : 0
   const delta = latest && first && rows.length > 1 ? latestVal - firstVal : null
 
   return (
@@ -1061,7 +1066,7 @@ function ProgressTab({ sessions }) {
       <Card style={{ marginBottom: 18 }}>
         <CardHead
           title="Exercise progress"
-          sub={byWeight ? 'Top-set weight, session by session.' : 'Best single-set reps, session by session.'}
+          sub={byWeight ? 'Top-set weight, session by session.' : 'Total reps, session by session.'}
           right={
             <div className="flex gap-1" style={{ background: 'var(--white-soft)', borderRadius: 999, padding: 3 }}>
               {['weight', 'reps'].map((m) => (
@@ -1080,7 +1085,7 @@ function ProgressTab({ sessions }) {
       </Card>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5" style={{ marginBottom: 18 }}>
-        <StatCard label={byWeight ? 'Best top set' : 'Best single set'} value={best ? `${Math.round(best)}${unit}` : '--'} sub="all-time" />
+        <StatCard label={byWeight ? 'Best top set' : 'Best session'} value={best ? `${Math.round(best)}${unit}` : '--'} sub="all-time" />
         <StatCard label="Most recent" value={latestVal ? `${Math.round(latestVal)}${unit}` : '--'} sub={latest ? pretty(latest.date) : 'not logged yet'} />
         <StatCard label="Change" value={delta != null ? `${delta >= 0 ? '+' : ''}${Math.round(delta)}${unit}` : '--'} sub="first logged to now" />
         <StatCard label="Times logged" value={rows.length} sub={selected} />
@@ -1099,15 +1104,19 @@ function ProgressTab({ sessions }) {
                       {r.setCount} set{r.setCount === 1 ? '' : 's'} &middot; {Math.round(r.volume).toLocaleString()} kg volume
                       {r.est1RM > 0 && <> &middot; est. 1RM {Math.round(r.est1RM)} kg</>}
                     </>
+                  ) : r.totalReps > 0 ? (
+                    <>{r.setCount} set{r.setCount === 1 ? '' : 's'} &middot; best set {r.topReps} reps</>
                   ) : (
-                    <>{r.setCount} set{r.setCount === 1 ? '' : 's'} &middot; {r.totalReps} reps total</>
+                    <span style={{ color: 'var(--s-risk, #c8452f)' }}>
+                      {r.setCount} set{r.setCount === 1 ? '' : 's'} logged, no reps recorded
+                    </span>
                   )}
                 </div>
               </div>
               <Badge tone="blue">
                 {byWeight
                   ? (r.topWeight ? `${Math.round(r.topWeight)} kg top set` : '—')
-                  : (r.topReps ? `${r.topReps} reps top set` : '—')}
+                  : (r.totalReps ? `${r.totalReps} reps total` : '—')}
               </Badge>
             </div>
           ))}
