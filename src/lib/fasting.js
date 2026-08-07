@@ -82,3 +82,23 @@ export function longestFast(sessions) {
   if (!done.length) return null
   return done.reduce((max, s) => Math.max(max, elapsedMs(s)), 0)
 }
+
+/* ── datetime-local <-> ISO ───────────────────────────────────
+   <input type="datetime-local"> wants "YYYY-MM-DDTHH:mm" in LOCAL time,
+   with no timezone; startedAt/endedAt are stored as real ISO instants.
+   These convert between the two without going through UTC math that
+   would shift the displayed time. */
+export function toLocalInputValue(isoString) {
+  if (!isoString) return ''
+  const d = new Date(isoString)
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+export function fromLocalInputValue(localString) {
+  if (!localString) return null
+  const [datePart, timePart] = localString.split('T')
+  const [y, mo, da] = datePart.split('-').map(Number)
+  const [h, mi] = timePart.split(':').map(Number)
+  return new Date(y, mo - 1, da, h, mi).toISOString()
+}

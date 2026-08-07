@@ -15,7 +15,7 @@ import { metric, statusFor, statusColor, METRICS, STATUS, DESIGN_RULES } from '.
 
 export function PageHeader({ kicker, title, sub, actions }) {
   return (
-    <div className="flex items-start justify-between gap-4 flex-wrap mb-6">
+    <div className="flex items-start justify-between gap-4 flex-wrap" style={{ marginBottom: 28 }}>
       <div className="page-header" style={{ marginBottom: 0 }}>
         {kicker && <div className="page-date">{kicker}</div>}
         <h1 className="page-title">{title}</h1>
@@ -36,10 +36,10 @@ export function Card({ children, pad = true, className = '', style }) {
 
 export function CardHead({ title, sub, right }) {
   return (
-    <div className="flex items-start justify-between gap-3.5 mb-3.5 flex-wrap">
+    <div className="flex items-start justify-between gap-3.5 flex-wrap" style={{ marginBottom: 20 }}>
       <div>
         <h2 style={{ fontSize: 16, fontWeight: 800 }}>{title}</h2>
-        {sub && <p style={{ fontSize: 12, color: 'var(--text-2)' }}>{sub}</p>}
+        {sub && <p style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 3 }}>{sub}</p>}
       </div>
       {right}
     </div>

@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
 import Icon from '../ui/Icon'
-import { Card, CardHead, Badge, Empty, Loading, useConfirm } from '../ui/Kit'
+import { Card, CardHead, Badge, Empty, Loading, Modal, Field, useConfirm } from '../ui/Kit'
 import { useAsync } from '../../hooks/useAsync'
 import { fetchFastingSessions, saveFastingSession, deleteFastingSession, newId } from '../../lib/data'
 import {
   FAST_METHODS, methodLabel, isActive, elapsedMs, progressPct, formatDuration,
-  weekStreak, thisWeekCount, longestFast,
+  weekStreak, thisWeekCount, longestFast, toLocalInputValue, fromLocalInputValue,
 } from '../../lib/fasting'
 import { pretty } from '../../lib/dates'
 import { metric } from '../../lib/design'
@@ -25,6 +25,7 @@ export default function FastingModule() {
   const confirm = useConfirm()
   const list = sessions.data || []
   const activeSession = list.find(isActive) || null
+  const [editing, setEditing] = useState(null)
 
   async function startFast(methodId) {
     const method = FAST_METHODS.find((m) => m.id === methodId)
@@ -57,6 +58,15 @@ export default function FastingModule() {
     catch (err) { toast.error(err.message || 'Could not delete') }
   }
 
+  async function updateSession(patch) {
+    try {
+      await saveFastingSession({ ...editing, ...patch })
+      sessions.reload()
+      setEditing(null)
+      toast.success('Fast updated')
+    } catch (err) { toast.error(err.message || 'Could not save') }
+  }
+
   if (sessions.loading) return <Loading />
 
   return (
@@ -68,7 +78,7 @@ export default function FastingModule() {
       <WeeklyStats sessions={list} />
 
       <Card>
-        <CardHead title="Fasting history" sub="Completed fasts, most recent first." />
+        <CardHead title="Fasting history" sub="Completed fasts, most recent first. Tap to edit start, end, method or notes." />
         {!list.filter((s) => s.endedAt).length ? (
           <Empty icon="schedule" title="No completed fasts yet">
             Start one above — even a 16:8 counts toward the week.
@@ -76,12 +86,75 @@ export default function FastingModule() {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {list.filter((s) => s.endedAt).map((s) => (
-              <FastRow key={s.id} session={s} confirm={confirm} onDelete={() => removeSession(s.id)} />
+              <FastRow key={s.id} session={s} confirm={confirm}
+                onEdit={() => setEditing(s)} onDelete={() => removeSession(s.id)} />
             ))}
           </div>
         )}
       </Card>
+
+      <EditFastModal session={editing} onClose={() => setEditing(null)} onSave={updateSession} />
     </>
+  )
+}
+
+/* ── Edit a completed session ────────────────────────────────
+   Fasts are logged live, but Jack starts/ends them a few minutes late or
+   early often enough that the recorded duration can be meaningfully off —
+   this lets a past session's start/end/method/notes be corrected after
+   the fact without deleting and re-creating it (which would lose its id
+   and week-streak placement). */
+function EditFastModal({ session, onClose, onSave }) {
+  const [start, setStart] = useState('')
+  const [end, setEnd] = useState('')
+  const [method, setMethod] = useState('16:8')
+  const [notes, setNotes] = useState('')
+
+  useEffect(() => {
+    if (!session) return
+    setStart(toLocalInputValue(session.startedAt))
+    setEnd(toLocalInputValue(session.endedAt))
+    setMethod(session.method || '16:8')
+    setNotes(session.notes || '')
+  }, [session])
+
+  if (!session) return null
+
+  const startedAt = fromLocalInputValue(start)
+  const endedAt = fromLocalInputValue(end)
+  const invalid = !startedAt || !endedAt || new Date(endedAt) <= new Date(startedAt)
+
+  return (
+    <Modal open={!!session} onClose={onClose} title="Edit fast" sub="Correct the start, end, method or notes for this session."
+      footer={<>
+        <button className="btn btn-secondary" onClick={onClose}>Cancel</button>
+        <button className="btn btn-primary" disabled={invalid}
+          onClick={() => onSave({ startedAt, endedAt, method, notes })}>
+          <Icon name="check" size={16} /> Save
+        </button>
+      </>}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 4 }}>
+        <Field label="Started">
+          <input type="datetime-local" value={start} onChange={(e) => setStart(e.target.value)} />
+        </Field>
+        <Field label="Ended">
+          <input type="datetime-local" value={end} onChange={(e) => setEnd(e.target.value)} />
+        </Field>
+      </div>
+      {invalid && start && end && (
+        <p style={{ fontSize: 11.5, color: 'var(--s-risk, #c8452f)', fontWeight: 700, marginBottom: 4 }}>
+          End must be after start.
+        </p>
+      )}
+      <Field label="Method">
+        <select value={method} onChange={(e) => setMethod(e.target.value)}>
+          {FAST_METHODS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+        </select>
+      </Field>
+      <Field label="Notes" hint="Optional">
+        <textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="How it went, why it ran long, etc." />
+      </Field>
+    </Modal>
   )
 }
 
@@ -253,7 +326,7 @@ const subStyle = { fontSize: 11.5, color: 'var(--text-3)', fontWeight: 600 }
 
 /* ── History row ──────────────────────────────────────────── */
 
-function FastRow({ session, confirm, onDelete }) {
+function FastRow({ session, confirm, onEdit, onDelete }) {
   const ms = elapsedMs(session)
   const hours = ms / 3600000
   const hit = session.targetHours && hours >= session.targetHours
@@ -274,6 +347,9 @@ function FastRow({ session, confirm, onDelete }) {
         <div style={{ fontSize: 11.5, color: 'var(--text-3)', fontWeight: 600 }}>{pretty(session.startedAt.slice(0, 10))}</div>
       </div>
       <Badge tone={hit ? 'green' : 'muted'}>{hit ? 'Hit target' : 'Under target'}</Badge>
+      <button className="btn-icon btn-sm" onClick={onEdit} title="Edit">
+        <Icon name="edit" size={15} />
+      </button>
       <button className="btn-icon btn-sm" onClick={() => armed ? onDelete() : confirm.arm(session.id)}
         title={armed ? 'Confirm delete' : 'Delete'}
         style={armed ? { background: 'var(--s-risk-bg)', color: 'var(--s-risk)' } : undefined}>
