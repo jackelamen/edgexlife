@@ -842,7 +842,9 @@ function HistoryTab({ sessions, onEdit, onTab }) {
   const [filter, setFilter] = useState('all')
   const confirm = useConfirm()
   const all = sessions.data || []
-  const list = filter === 'all' ? all : all.filter((s) => s.type === filter)
+  const list = (filter === 'all' ? all : all.filter((s) => s.type === filter))
+    .slice()
+    .sort((a, b) => (b.date || '').localeCompare(a.date || ''))
 
   // 13 weeks × 7 days, oldest first, matching the original heatmap.
   const cells = useMemo(() => {
