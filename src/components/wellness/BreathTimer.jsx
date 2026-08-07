@@ -1,6 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import Icon from '../ui/Icon'
 import { BREATH_PRESETS, cycleSeconds, phaseAt, MEDITATION_FADE_SECONDS, MEDITATION_AUDIO_SRC } from '../../lib/practices'
+import { metricColor } from '../../lib/design'
+
+// Breath phase colour = identity, not decoration (lib/design.js rule 1):
+// inhale/hold reads as Clarity (the metric this practice trains), exhale
+// reads as Groundedness (the metric release/letting-go maps to). Both are
+// real wellness metrics elsewhere on this page, not arbitrary lavender/mint.
+const BREATH_IN = { hex: metricColor('clarity'), glow: '123,92,214' }
+const BREATH_OUT = { hex: metricColor('grounded'), glow: '14,124,134' }
 
 /*
   Practice timer, ported from wellness.html's breath/meditation engine.
@@ -22,7 +30,7 @@ export default function BreathTimer({ onComplete }) {
   const [remaining, setRemaining] = useState(preset.minutes * 60)
   const [running, setRunning] = useState(false)
   const [phaseLabel, setPhaseLabel] = useState('Ready')
-  const [phaseView, setPhaseView] = useState({ scale: 0.12, color: '#c4b5fd', text: 'Ready', sub: 'ready' })
+  const [phaseView, setPhaseView] = useState({ scale: 0.12, color: BREATH_IN.hex, text: 'Ready', sub: 'ready' })
   const [fullscreen, setFullscreen] = useState(false)
   const [audioSync, setAudioSync] = useState(true)
 
@@ -59,14 +67,14 @@ export default function BreathTimer({ onComplete }) {
   function applyBreathVisual(phase, progress) {
     const scale = phase.from + (phase.to - phase.from) * progress
     setPhaseView({
-      scale, color: phase.key === 'out' ? '#86efac' : '#c4b5fd',
+      scale, color: phase.key === 'out' ? BREATH_OUT.hex : BREATH_IN.hex,
       text: phase.label, sub: presetRef.current.pattern,
     })
     setPhaseLabel(phase.label)
   }
 
   function applyIntroVisual(text, sub) {
-    setPhaseView({ scale: 0.12, color: '#c4b5fd', text, sub })
+    setPhaseView({ scale: 0.12, color: BREATH_IN.hex, text, sub })
   }
 
   function updateBreathGuide() {
@@ -248,10 +256,10 @@ export default function BreathTimer({ onComplete }) {
         </svg>
         <div className="breath-orb" style={{
           transform: `scale(${phaseView.scale.toFixed(3)})`,
-          background: phaseView.color === '#86efac' ? 'rgba(134,239,172,.20)' : 'rgba(196,181,253,.24)',
-          boxShadow: phaseView.color === '#86efac'
-            ? '0 0 28px rgba(134,239,172,.16), inset 0 0 28px rgba(255,255,255,.08)'
-            : '0 0 30px rgba(196,181,253,.18), inset 0 0 28px rgba(255,255,255,.10)',
+          background: phaseView.color === BREATH_OUT.hex ? `rgba(${BREATH_OUT.glow},.20)` : `rgba(${BREATH_IN.glow},.24)`,
+          boxShadow: phaseView.color === BREATH_OUT.hex
+            ? `0 0 28px rgba(${BREATH_OUT.glow},.16), inset 0 0 28px rgba(255,255,255,.08)`
+            : `0 0 30px rgba(${BREATH_IN.glow},.18), inset 0 0 28px rgba(255,255,255,.10)`,
         }} />
         <div className="breath-count">
           <strong>{phaseView.text}</strong>

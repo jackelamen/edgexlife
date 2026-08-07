@@ -17,6 +17,7 @@ import {
 } from '../lib/scores'
 import { RESET_TOOLS, suggestedReset, PRACTICE_TYPES, AFTER_STATES } from '../lib/practices'
 import { today, daysAgo, shiftDate, pretty } from '../lib/dates'
+import { STATUS } from '../lib/design'
 import BreathTimer from '../components/wellness/BreathTimer'
 
 const VIEWS = [
@@ -821,10 +822,12 @@ function TrendsView() {
   }))
   const avg = vals.length ? vals.reduce((s, x) => s + x.val, 0) / vals.length : 0
 
+  // Bar colour is a performance read (good/short/risk), which is exactly
+  // what the reserved STATUS ramp is for — see lib/design.js rule 3.
   function barColor(v) {
-    if (metric === 'stress') return v <= 2 ? '#10b981' : v <= 3 ? '#f97316' : '#ef4444'
+    if (metric === 'stress') return v <= 2 ? STATUS.good.color : v <= 3 ? STATUS.short.color : STATUS.risk.color
     const pct = v / meta.max
-    return pct >= 0.75 ? '#10b981' : pct >= 0.5 ? 'var(--accent)' : '#f97316'
+    return pct >= 0.75 ? STATUS.good.color : pct >= 0.5 ? 'var(--accent)' : STATUS.short.color
   }
 
   return (

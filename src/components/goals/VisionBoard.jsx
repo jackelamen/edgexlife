@@ -76,7 +76,7 @@ export default function VisionBoard() {
             {legacyBytes > 0 && ` · ${formatBytes(legacyBytes)} in legacy blob`}
           </span>
           <button className="btn btn-ghost btn-sm" disabled={meditLoading} onClick={startMeditation}
-            style={{ color: '#7c3aed', borderColor: 'rgba(124,58,237,.25)', background: 'rgba(124,58,237,.08)' }}>
+            style={{ color: 'var(--accent)', borderColor: 'rgba(var(--accent-rgb),.25)', background: 'rgba(var(--accent-rgb),.08)' }}>
             <Icon name="self_improvement" fill size={14} /> {meditLoading ? 'Loading…' : 'Meditate'}
           </button>
           <button className="btn btn-primary btn-sm" onClick={() => setAdding(true)}>
@@ -237,11 +237,11 @@ function Tile({ item, onDeleted, onOpen }) {
       {state === 'done' && src ? (
         <img src={src} alt={item.caption || ''} onClick={() => onOpen(src)} />
       ) : state === 'error' ? (
-        <div style={{ aspectRatio: '4/5', display: 'grid', placeItems: 'center', background: 'var(--surface-2, #f3f4f6)' }}>
+        <div style={{ aspectRatio: '4/5', display: 'grid', placeItems: 'center', background: 'var(--white-soft)' }}>
           <Icon name="broken_image" size={18} style={{ color: 'var(--text-3)' }} />
         </div>
       ) : (
-        <div style={{ aspectRatio: '4/5', display: 'grid', placeItems: 'center', background: 'var(--surface-2, #f3f4f6)' }}>
+        <div style={{ aspectRatio: '4/5', display: 'grid', placeItems: 'center', background: 'var(--white-soft)' }}>
           <Icon name="progress_activity" size={16} style={{ color: 'var(--text-3)' }} className="spin" />
         </div>
       )}

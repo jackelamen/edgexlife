@@ -406,14 +406,15 @@ export const Grid = ({ cols = 4, gap = 14, children, style }) => (
 )
 
 /* ────────────────────────────────────────────────────────────
-   Compatibility shims.
+   Compatibility shim.
 
-   Health has been ported to the original design language. Goals and
-   Wellness still use the previous component API and are scheduled for
-   their own deep pass. These shims map that older API onto the NEW
-   styles so those pages stay usable and visually consistent in the
-   meantime — they are not the long-term surface. Delete each one as its
-   module gets rebuilt.
+   Health, Goals and Wellness all now use the v3 component API directly
+   (StatCard/CoachCard/Ring/ScoreRow with metricKey, etc). Panel is the
+   one holdover still in real use — the standalone /settings route
+   (SettingsPage.jsx) isn't part of a module's deep-pass rebuild, so it
+   keeps the older wrapper. The rest of the old API (Toolbar, Seg, Scale,
+   StatTile, ScoreRing, ScoreBreakdown, NumberInput) had zero remaining
+   callers as of the Wellness/Goals v3 pass and were removed.
    ──────────────────────────────────────────────────────────── */
 
 export function Panel({ title, actions, children, className = '', bodyClass }) {
@@ -430,85 +431,5 @@ export function Panel({ title, actions, children, className = '', bodyClass }) {
       )}
       <div style={{ padding: bodyClass === '' ? '10px 18px 16px' : 18 }}>{children}</div>
     </Card>
-  )
-}
-
-export function Toolbar({ children, right }) {
-  return (
-    <div style={{
-      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      gap: 12, marginBottom: 16, flexWrap: 'wrap',
-    }}>
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>{children}</div>
-      {right && <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>{right}</div>}
-    </div>
-  )
-}
-
-export const Seg = ({ value, onChange, options }) => (
-  <Tabs value={value} onChange={onChange} options={options} />
-)
-
-export function Scale({ value, onChange, lowLabel, highLabel }) {
-  return (
-    <div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 6 }}>
-        {[1, 2, 3, 4, 5].map((n) => {
-          const on = Number(value) === n
-          return (
-            <button key={n} type="button" onClick={() => onChange(on ? null : n)}
-              style={{
-                height: 40, borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit',
-                fontSize: 14, fontWeight: 800,
-                border: `1.5px solid ${on ? 'var(--accent)' : 'var(--border-med)'}`,
-                background: on ? 'var(--accent)' : 'var(--white-soft)',
-                color: on ? '#fff' : 'var(--text-2)',
-              }}>
-              {n}
-            </button>
-          )
-        })}
-      </div>
-      {(lowLabel || highLabel) && (
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: 11, color: 'var(--text-3)', fontWeight: 600 }}>
-          <span>{lowLabel}</span><span>{highLabel}</span>
-        </div>
-      )}
-    </div>
-  )
-}
-
-export const StatTile = ({ label, value, unit, sub }) => (
-  <StatCard label={label} value={value != null && unit ? `${value}${unit}` : value} sub={sub} />
-)
-
-export const ScoreRing = ({ score, size = 128, label }) => (
-  <div style={{ display: 'inline-block' }}>
-    <Ring score={score} size={size} stroke={Math.max(8, size * 0.08)} sub={label} />
-  </div>
-)
-
-export const ScoreBreakdown = ({ components }) => (
-  <div>
-    {components.map((c) => (
-      <ScoreRow key={c.key} label={c.label} detail={c.detail} value={c.value} weight={c.weight} />
-    ))}
-  </div>
-)
-
-export function NumberInput({ value, onChange, step = 1, min = 0, max, suffix, placeholder }) {
-  return (
-    <div style={{ position: 'relative' }}>
-      <input type="number" inputMode="decimal" step={step} min={min} max={max}
-        placeholder={placeholder} value={value ?? ''}
-        onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))}
-        style={suffix ? { paddingRight: 38 } : undefined} />
-      {suffix && (
-        <span style={{
-          position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
-          fontSize: 11.5, color: 'var(--text-3)', fontWeight: 700, pointerEvents: 'none',
-        }}>{suffix}</span>
-      )}
-    </div>
   )
 }

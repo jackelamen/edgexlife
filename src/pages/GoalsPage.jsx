@@ -374,7 +374,7 @@ function GoalRoom({ goals, rollup, onEdit }) {
 function GoalCard({ goal, roll, open, onToggle, onEdit, onDelete, armed }) {
   const iconFor = { health: 'favorite', work: 'work', family: 'diversity_3', personal: 'spa' }
   return (
-    <div className={`goal-card ${goal.area}`} onClick={onToggle}>
+    <div className={`goal-card ${goal.area}`} style={{ borderLeftColor: areaColor(goal.area) }} onClick={onToggle}>
       <div className="goal-grid-body">
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
           <Badge tone="blue">{areaLabel(goal.area)}</Badge>
@@ -712,7 +712,7 @@ function CycleEditor({ sprint, goals, onClose, onSaved }) {
 
         <div className="form-section-label">Phases &amp; Weekly Actions</div>
         {phaseDrafts.map((phase, pi) => (
-          <div key={pi} className="card-inner" style={{ padding: 14, borderRadius: 12, border: '1px solid var(--border)', background: '#f9fafb' }}>
+          <div key={pi} className="card-inner" style={{ padding: 14, borderRadius: 12, border: '1px solid var(--border)', background: 'var(--white-soft)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
               <Badge tone={PHASE_BADGES[pi][1]}>{PHASE_BADGES[pi][0]}</Badge>
               <input value={phase.name} style={{ maxWidth: 160, fontSize: 13, fontWeight: 700 }}
