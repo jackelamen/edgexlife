@@ -279,6 +279,8 @@ function LogView({ settings, index, onEdit }) {
                     {l.exerciseMins ? <span className="log-chip"><Icon name="fitness_center" size={13} />{l.exerciseMins}m</span> : null}
                     {l.weight != null && <span className="log-chip"><Icon name="monitor_weight" size={13} />{l.weight}kg</span>}
                     {l.energy != null && <span className="log-chip"><Icon name="bolt" size={13} />{l.energy}/5</span>}
+                    {l.sleepQuality != null && <span className="log-chip"><Icon name="hotel" size={13} />{l.sleepQuality}/5 quality</span>}
+                    {l.pain != null && <span className="log-chip"><Icon name="sick" size={13} />{l.pain}/5 pain</span>}
                     {l.notes && (
                       <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 6, flexBasis: '100%' }}>{l.notes}</div>
                     )}
