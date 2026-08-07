@@ -1000,44 +1000,66 @@ function exerciseHistory(sessions, name) {
     .sort((a, b) => a.date.localeCompare(b.date))
     .map((s) => {
       const ex = s.exercises.find((e) => e.name === name)
-      const sets = ex.sets || []
+      // Parsed per-set data, kept raw (not just pre-aggregated into
+      // topWeight/topReps) — goal evaluation needs to know reps AND
+      // weight TOGETHER per set (a true 1RM only counts a set logged as
+      // exactly 1 rep; "reps at a weight" only counts sets at or above
+      // that weight), which topWeight/topReps alone can't answer since
+      // they're each the best of a DIFFERENT set.
+      const sets = (ex.sets || []).map((set) => ({
+        reps: parseFloat(set.reps) || 0,
+        weight: parseFloat(set.weight) || 0,
+      }))
       let topSet = null
       let topWeight = 0
       let volume = 0
       let topReps = 0
       let totalReps = 0
       for (const set of sets) {
-        const w = parseFloat(set.weight) || 0
-        const r = parseFloat(set.reps) || 0
-        volume += w * r
-        totalReps += r
-        if (r > topReps) topReps = r
-        if (w > topWeight) { topWeight = w; topSet = set }
+        volume += set.weight * set.reps
+        totalReps += set.reps
+        if (set.reps > topReps) topReps = set.reps
+        if (set.weight > topWeight) { topWeight = set.weight; topSet = set }
       }
-      const est1RMReps = parseFloat(topSet?.reps) || 0
-      const est1RM = topWeight > 0 ? topWeight * (1 + est1RMReps / 30) : 0
-      return { date: s.date, sessionId: s.id, topWeight, volume, est1RM, topReps, totalReps, setCount: sets.length }
+      const est1RM = topWeight > 0 ? topWeight * (1 + (topSet?.reps || 0) / 30) : 0
+      return { date: s.date, sessionId: s.id, sets, topWeight, volume, est1RM, topReps, totalReps, setCount: sets.length }
     })
 }
 
 /* ── Goal evaluation ─────────────────────────────────────────
-   A goal targets ONE number: top-set weight for a loaded lift, best
-   SINGLE-set reps for a bodyweight move ("15 pull-ups" means 15 in one
-   set, not summed across a session — deliberately different from the
-   Explorer's total-reps default below, which answers a different
-   question: how much work got done, vs how good is the best effort).
+   Three goal types, matching the three ways lifting progress actually
+   gets measured:
+   - oneRM: the heaviest weight lifted for a true single rep. Only counts
+     a set logged as EXACTLY 1 rep — a top-set-of-5 at some weight is not
+     a 1RM attempt, even if it was heavy.
+   - reps: best single-set rep count, regardless of weight (or no weight
+     at all — this is the bodyweight case: "15 pull-ups").
+   - repsAtWeight: best rep count achieved in any set at or above a fixed
+     weight (goal.atWeight) — "10 reps at 80kg". Different from oneRM
+     (which fixes reps=1 and asks how heavy) and from reps (which doesn't
+     care about weight at all).
    Nothing about achievement is stored — it's recomputed from real session
    history every render, so it can never drift out of sync with the log.
    Only the user's explicit "I saw it, celebrate" moment (celebratedAt)
    is persisted. */
+function goalMetric(row, mode, atWeight) {
+  if (mode === 'oneRM') {
+    return row.sets.reduce((m, s) => (s.reps === 1 && s.weight > m ? s.weight : m), 0)
+  }
+  if (mode === 'repsAtWeight') {
+    const thresh = atWeight || 0
+    return row.sets.reduce((m, s) => (s.weight >= thresh && s.reps > m ? s.reps : m), 0)
+  }
+  return row.topReps // mode === 'reps'
+}
+
 function evaluateGoal(sessions, goal) {
   const rows = exerciseHistory(sessions, goal.exercise).filter((r) => r.date >= goal.startedAt)
-  const metric = (r) => (goal.mode === 'weight' ? r.topWeight : r.topReps)
   const start = goal.startingValue || 0
   let best = start
   let achievedDate = null
   for (const r of rows) {
-    const v = metric(r)
+    const v = goalMetric(r, goal.mode, goal.atWeight)
     if (v > best) best = v
     if (!achievedDate && v >= goal.target) achievedDate = r.date
   }
@@ -1046,11 +1068,28 @@ function evaluateGoal(sessions, goal) {
   return { best, achievedDate, pct, reached: !!achievedDate }
 }
 
-/** All-time best for an exercise+mode across full history — used as the
-    starting point when a new goal is created ("where you are today"). */
-function bestEver(sessions, exercise, mode) {
+/** All-time best for an exercise+mode(+atWeight) across full history —
+    used as the starting point when a new goal is created ("where you are
+    today"). */
+function bestEver(sessions, exercise, mode, atWeight) {
   return exerciseHistory(sessions, exercise).reduce(
-    (m, r) => Math.max(m, mode === 'weight' ? r.topWeight : r.topReps), 0)
+    (m, r) => Math.max(m, goalMetric(r, mode, atWeight)), 0)
+}
+
+const GOAL_MODES = [
+  { value: 'oneRM', label: '1-rep max', unit: ' kg' },
+  { value: 'reps', label: 'Reps', unit: ' reps' },
+  { value: 'repsAtWeight', label: 'Reps at a weight', unit: ' reps' },
+]
+
+function goalUnit(mode) {
+  return GOAL_MODES.find((m) => m.value === mode)?.unit || ''
+}
+
+/** Short qualifier shown next to a goal's exercise name — the "at 80kg"
+    part for repsAtWeight, blank for the other two modes. */
+function goalQualifier(goal) {
+  return goal.mode === 'repsAtWeight' && goal.atWeight ? `at ${Math.round(goal.atWeight)} kg` : ''
 }
 
 function ProgressTab({ sessions, exGoals, db }) {
@@ -1098,19 +1137,19 @@ function ProgressTab({ sessions, exGoals, db }) {
             <div key={goal.id} className="hero-card" style={{ background: 'var(--accent)' }}>
               <div className="hero-content">
                 <div>
-                  <div className="hero-eyebrow">Goal reached &middot; {goal.exercise}</div>
-                  <div className="hero-h">
-                    {goal.mode === 'weight' ? `${Math.round(best)} kg` : `${Math.round(best)} reps`}
+                  <div className="hero-eyebrow">
+                    Goal reached &middot; {goal.exercise} {goalQualifier(goal)}
                   </div>
+                  <div className="hero-h">{Math.round(best)}{goalUnit(goal.mode)}</div>
                   <p className="hero-copy">
-                    Hit on {pretty(achievedDate)} — started {pretty(goal.startedAt)} at {goal.mode === 'weight' ? `${Math.round(goal.startingValue || 0)} kg` : `${Math.round(goal.startingValue || 0)} reps`}.
+                    Hit on {pretty(achievedDate)} — started {pretty(goal.startedAt)} at {Math.round(goal.startingValue || 0)}{goalUnit(goal.mode)}.
                   </p>
                   <div className="hero-actions">
                     <button className="btn btn-primary" onClick={() => celebrate(goal)}>
                       <Icon name="celebration" size={17} /> Celebrate
                     </button>
                     <button className="btn btn-secondary"
-                      onClick={() => { setPrefill({ exercise: goal.exercise, mode: goal.mode }); setNewGoalOpen(true) }}>
+                      onClick={() => { setPrefill({ exercise: goal.exercise, mode: goal.mode, atWeight: goal.atWeight }); setNewGoalOpen(true) }}>
                       <Icon name="add" size={16} /> Next goal
                     </button>
                   </div>
@@ -1128,7 +1167,7 @@ function ProgressTab({ sessions, exGoals, db }) {
               <Icon name="add" size={16} /> Set your first goal
             </button>
           }>
-            Pick an exercise you care about and a number to hit — weight for loaded lifts, reps for bodyweight moves.
+            Pick an exercise you care about and a number to hit — a 1-rep max, a rep count, or reps at a specific weight.
           </Empty>
         </Card>
       ) : (
@@ -1136,14 +1175,17 @@ function ProgressTab({ sessions, exGoals, db }) {
           {active.map(({ goal, best, pct }) => {
             const daysIn = Math.max(0, Math.round((new Date() - new Date(goal.startedAt + 'T12:00:00')) / 86400000))
             const armed = confirm.isArmed(goal.id)
-            const unit = goal.mode === 'weight' ? ' kg' : ' reps'
+            const unit = goalUnit(goal.mode)
+            const qualifier = goalQualifier(goal)
             return (
               <Card key={goal.id}>
                 <div className="flex items-start justify-between gap-3" style={{ marginBottom: 10 }}>
                   <div>
-                    <div style={{ fontSize: 15, fontWeight: 800 }}>{goal.exercise}</div>
+                    <div style={{ fontSize: 15, fontWeight: 800 }}>
+                      {goal.exercise}{qualifier && <span style={{ color: 'var(--text-3)', fontWeight: 700 }}> · {qualifier}</span>}
+                    </div>
                     <div style={{ fontSize: 11.5, color: 'var(--text-3)', fontWeight: 600, marginTop: 2 }}>
-                      Since {pretty(goal.startedAt)} &middot; day {daysIn}
+                      {GOAL_MODES.find((m) => m.value === goal.mode)?.label} &middot; since {pretty(goal.startedAt)} &middot; day {daysIn}
                     </div>
                   </div>
                   <button className={`btn btn-icon btn-sm${armed ? ' btn-danger' : ''}`}
@@ -1179,13 +1221,15 @@ function ProgressTab({ sessions, exGoals, db }) {
             {completed.map(({ goal, achievedDate }) => (
               <div key={goal.id} className="check-row" style={{ cursor: 'default' }}>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 700, fontSize: 13.5 }}>{goal.exercise}</div>
+                  <div style={{ fontWeight: 700, fontSize: 13.5 }}>
+                    {goal.exercise}{goalQualifier(goal) && <span style={{ color: 'var(--text-3)', fontWeight: 600 }}> · {goalQualifier(goal)}</span>}
+                  </div>
                   <div style={{ fontSize: 11.5, color: 'var(--text-3)', fontWeight: 600 }}>
                     {pretty(goal.startedAt)} &rarr; {achievedDate ? pretty(achievedDate) : '—'}
                   </div>
                 </div>
                 <Badge tone="green">
-                  {Math.round(goal.target)}{goal.mode === 'weight' ? ' kg' : ' reps'}
+                  {Math.round(goal.target)}{goalUnit(goal.mode)}
                 </Badge>
               </div>
             ))}
@@ -1208,9 +1252,16 @@ function ProgressTab({ sessions, exGoals, db }) {
   )
 }
 
+const GOAL_MODE_HINTS = {
+  oneRM: 'The heaviest weight for a true single rep. Only sets logged as exactly 1 rep count.',
+  reps: 'Your best single set, regardless of weight — pull-ups, push-ups, or any rep count you want to raise.',
+  repsAtWeight: 'The most reps you can do in one set at or above a fixed weight — e.g. "10 reps at 80kg".',
+}
+
 function NewGoalModal({ open, prefill, sessions, db, onClose, onSaved }) {
   const [exercise, setExercise] = useState('')
-  const [mode, setMode] = useState('weight')
+  const [mode, setMode] = useState('oneRM')
+  const [atWeight, setAtWeight] = useState('')
   const [target, setTarget] = useState('')
   const [startedAt, setStartedAt] = useState(today())
   const [notes, setNotes] = useState('')
@@ -1220,7 +1271,8 @@ function NewGoalModal({ open, prefill, sessions, db, onClose, onSaved }) {
     if (!open) return
     const ex = prefill?.exercise || ''
     setExercise(ex)
-    setMode(prefill?.mode || (ex ? (isBodyweightExercise(ex, sessions) ? 'reps' : 'weight') : 'weight'))
+    setMode(prefill?.mode || (ex ? (isBodyweightExercise(ex, sessions) ? 'reps' : 'oneRM') : 'oneRM'))
+    setAtWeight(prefill?.atWeight ? String(prefill.atWeight) : '')
     setTarget('')
     setStartedAt(today())
     setNotes('')
@@ -1238,13 +1290,19 @@ function NewGoalModal({ open, prefill, sessions, db, onClose, onSaved }) {
       toast.error('Pick an exercise and a target above zero.')
       return
     }
+    if (mode === 'repsAtWeight' && (!atWeight || Number(atWeight) <= 0)) {
+      toast.error('Set the weight this rep goal is measured at.')
+      return
+    }
     setSaving(true)
     try {
-      const startingValue = bestEver(sessions, exercise.trim(), mode)
+      const weightVal = mode === 'repsAtWeight' ? Number(atWeight) : null
+      const startingValue = bestEver(sessions, exercise.trim(), mode, weightVal)
       await saveExerciseGoal({
         id: newId('exgoal'),
         exercise: exercise.trim(),
         mode,
+        atWeight: weightVal,
         target: Number(target),
         startedAt,
         startingValue,
@@ -1267,20 +1325,30 @@ function NewGoalModal({ open, prefill, sessions, db, onClose, onSaved }) {
       </datalist>
 
       <SectionLabel>Tracked by</SectionLabel>
-      <div className="flex gap-1" style={{ background: 'var(--white-soft)', borderRadius: 999, padding: 3, width: 'fit-content', marginBottom: 14 }}>
-        {['weight', 'reps'].map((m) => (
-          <button key={m} className={`btn btn-sm ${mode === m ? 'btn-primary' : 'btn-ghost'}`}
-            style={{ borderRadius: 999 }} onClick={() => setMode(m)}>
-            {m === 'weight' ? 'Weight (kg)' : 'Reps (best set)'}
+      <div className="flex gap-1 flex-wrap" style={{ background: 'var(--white-soft)', borderRadius: 999, padding: 3, width: 'fit-content', marginBottom: 8 }}>
+        {GOAL_MODES.map((m) => (
+          <button key={m.value} className={`btn btn-sm ${mode === m.value ? 'btn-primary' : 'btn-ghost'}`}
+            style={{ borderRadius: 999 }} onClick={() => setMode(m.value)}>
+            {m.label}
           </button>
         ))}
       </div>
+      <p style={{ fontSize: 11.5, color: 'var(--text-3)', fontWeight: 600, marginBottom: 14, lineHeight: 1.5 }}>
+        {GOAL_MODE_HINTS[mode]}
+      </p>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 4 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: mode === 'repsAtWeight' ? '1fr 1fr 1fr' : '1fr 1fr', gap: 12, marginBottom: 4 }}>
+        {mode === 'repsAtWeight' && (
+          <div>
+            <SectionLabel>At weight (kg)</SectionLabel>
+            <input type="number" inputMode="decimal" min={1} value={atWeight}
+              onChange={(e) => setAtWeight(e.target.value)} placeholder="e.g. 80" />
+          </div>
+        )}
         <div>
-          <SectionLabel>Target ({mode === 'weight' ? 'kg' : 'reps'})</SectionLabel>
+          <SectionLabel>Target ({mode === 'oneRM' ? 'kg' : 'reps'})</SectionLabel>
           <input type="number" inputMode="decimal" min={1} value={target}
-            onChange={(e) => setTarget(e.target.value)} placeholder={mode === 'weight' ? 'e.g. 100' : 'e.g. 15'} />
+            onChange={(e) => setTarget(e.target.value)} placeholder={mode === 'oneRM' ? 'e.g. 100' : 'e.g. 15'} />
         </div>
         <div>
           <SectionLabel>Started</SectionLabel>
