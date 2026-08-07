@@ -18,11 +18,18 @@ import {
 import { today, pretty, prettyShort } from '../../lib/dates'
 import TrendChart from './TrendChart'
 
+/* No standalone "Session Log" tab — it used to be a nav destination that,
+   with no active session, was just an empty state with a "Start Quick
+   Session" button duplicating the header's Log Session action. The live
+   session-logging screen (SessionTab) still exists and still renders
+   whenever `tab === 'log'`; it's just reached by actually starting a
+   session (header button, mobile FAB, "Start Session Now" in a day's
+   plan, or editing a past session from Session Log) rather than sitting
+   in the tab bar as its own destination. */
 const TABS = [
   { value: 'plan', label: 'Plan', icon: 'calendar_month' },
-  { value: 'log', label: 'Session Log', icon: 'fitness_center' },
   { value: 'db', label: 'Database', icon: 'list_alt' },
-  { value: 'history', label: 'History', icon: 'bar_chart' },
+  { value: 'history', label: 'Session Log', icon: 'bar_chart' },
   { value: 'progress', label: 'Progress', icon: 'trending_up' },
 ]
 
