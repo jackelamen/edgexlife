@@ -1138,6 +1138,45 @@ function goalQualifier(goal) {
   return goal.mode === 'repsAtWeight' && goal.atWeight ? `at ${Math.round(goal.atWeight)} kg` : ''
 }
 
+/** A dedicated ring for goal progress. Deliberately not the Goals module's
+    `Ring` component: off-accent, Ring colors its arc with the red/amber/
+    green execution-score ramp, which is meant for performance grades —
+    distance to a personal target isn't a grade, it's identity, so this
+    always draws in the module's own accent regardless of how close pct is
+    to 100. */
+function GoalRing({ pct, size = 100, stroke = 10 }) {
+  const r = (size - stroke) / 2
+  const c = 2 * Math.PI * r
+  const val = Math.max(0, Math.min(100, pct))
+  return (
+    <div style={{ width: size, height: size, position: 'relative', flexShrink: 0 }}>
+      <svg width="100%" height="100%" viewBox={`0 0 ${size} ${size}`} style={{ transform: 'rotate(-90deg)', display: 'block' }}>
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(var(--accent-rgb),.18)" strokeWidth={stroke} />
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--accent)" strokeWidth={stroke}
+          strokeLinecap="round" strokeDasharray={c} strokeDashoffset={c * (1 - val / 100)}
+          style={{ transition: 'stroke-dashoffset 1s cubic-bezier(.4,0,.2,1)' }} />
+      </svg>
+      <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <span className="tnum" style={{ fontSize: size * 0.26, fontWeight: 800, letterSpacing: '-.02em', color: 'var(--accent-dark)' }}>
+          {Math.round(val)}%
+        </span>
+      </div>
+    </div>
+  )
+}
+
+/** Shared date math for a goal card — how many days into the goal, and how
+    many days since its last genuine improvement (not just since it was
+    created). Plain function, not a hook — called from both the featured
+    card and the secondary grid so the two stay in sync. */
+function goalMeta({ goal, lastImprovedDate }) {
+  const daysIn = Math.max(0, Math.round((new Date() - new Date(goal.startedAt + 'T12:00:00')) / 86400000))
+  const daysSincePR = lastImprovedDate
+    ? Math.max(0, Math.round((new Date() - new Date(lastImprovedDate + 'T12:00:00')) / 86400000))
+    : null
+  return { daysIn, daysSincePR }
+}
+
 function ProgressTab({ sessions, exGoals, db }) {
   const [newGoalOpen, setNewGoalOpen] = useState(false)
   const [prefill, setPrefill] = useState(null)
@@ -1149,6 +1188,19 @@ function ProgressTab({ sessions, exGoals, db }) {
   const readyToCelebrate = evaluated.filter((e) => !e.goal.celebratedAt && e.reached)
   const completed = evaluated.filter((e) => e.goal.celebratedAt)
     .sort((a, b) => (b.goal.celebratedAt || '').localeCompare(a.goal.celebratedAt || ''))
+
+  // Sorted so the goal closest to done gets featured — proximity to the
+  // target should carry real visual weight instead of every active goal
+  // rendering as an identical box regardless of how far along it is.
+  const sortedActive = useMemo(() => [...active].sort((a, b) => b.pct - a.pct), [active])
+  const featured = sortedActive[0]
+  const restActive = sortedActive.slice(1)
+
+  const prsThisMonth = useMemo(() => {
+    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 30)
+    const cutoffIso = cutoff.toISOString().slice(0, 10)
+    return evaluated.filter((e) => e.lastImprovedDate && e.lastImprovedDate >= cutoffIso).length
+  }, [evaluated])
 
   // Fires a one-time toast the first time a goal crosses 25/50/75% — the
   // only feedback in the old version was total silence until 100%, which
@@ -1198,6 +1250,14 @@ function ProgressTab({ sessions, exGoals, db }) {
         </button>
       </div>
 
+      {(active.length > 0 || readyToCelebrate.length > 0 || completed.length > 0) && (
+        <div className="grid grid-cols-3 gap-3.5" style={{ marginBottom: 18 }}>
+          <StatCard label="Active goals" value={active.length + readyToCelebrate.length} />
+          <StatCard label="Goals hit" value={completed.length} sub="all time" />
+          <StatCard label="PRs" value={prsThisMonth} sub="last 30 days" />
+        </div>
+      )}
+
       {readyToCelebrate.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
           {readyToCelebrate.map(({ goal, best, achievedDate }) => (
@@ -1246,53 +1306,101 @@ function ProgressTab({ sessions, exGoals, db }) {
           </Empty>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5" style={{ marginBottom: 18 }}>
-          {active.map(({ goal, best, pct, lastImprovedDate }) => {
-            const daysIn = Math.max(0, Math.round((new Date() - new Date(goal.startedAt + 'T12:00:00')) / 86400000))
-            const daysSincePR = lastImprovedDate
-              ? Math.max(0, Math.round((new Date() - new Date(lastImprovedDate + 'T12:00:00')) / 86400000))
-              : null
+        <>
+          {featured && (() => {
+            const { goal, best, pct } = featured
+            const { daysIn, daysSincePR } = goalMeta(featured)
             const armed = confirm.isArmed(goal.id)
             const unit = goalUnit(goal.mode)
             const qualifier = goalQualifier(goal)
             return (
-              <Card key={goal.id}>
-                <div className="flex items-start justify-between gap-3" style={{ marginBottom: 10 }}>
-                  <div>
-                    <div style={{ fontSize: 15, fontWeight: 800 }}>
-                      {goal.exercise}{qualifier && <span style={{ color: 'var(--text-3)', fontWeight: 700 }}> · {qualifier}</span>}
+              <Card style={{ marginBottom: 14, background: 'var(--accent-light)', border: 'none' }}>
+                <div className="flex items-center gap-4 flex-wrap">
+                  <GoalRing pct={pct} size={104} stroke={10} />
+                  <div style={{ flex: '1 1 220px', minWidth: 0 }}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.07em', textTransform: 'uppercase', color: 'var(--accent-dark)', opacity: .75 }}>
+                          Closest to goal
+                        </div>
+                        <div style={{ fontSize: 16, fontWeight: 800, marginTop: 2 }}>
+                          {goal.exercise}{qualifier && <span style={{ color: 'var(--accent-dark)', fontWeight: 700, opacity: .75 }}> · {qualifier}</span>}
+                        </div>
+                      </div>
+                      <button className={`btn btn-icon btn-sm${armed ? ' btn-danger' : ''}`}
+                        onClick={() => armed ? removeGoal(goal.id) : confirm.arm(goal.id)}
+                        title={armed ? 'Confirm delete' : 'Delete goal'}>
+                        <Icon name={armed ? 'check' : 'delete'} size={15} />
+                      </button>
                     </div>
-                    <div style={{ fontSize: 11.5, color: 'var(--text-3)', fontWeight: 600, marginTop: 2 }}>
+                    <div className="flex items-end gap-3 flex-wrap" style={{ marginTop: 8 }}>
+                      <span className="tnum" style={{ fontSize: 44, fontWeight: 800, letterSpacing: '-.03em', color: 'var(--accent-dark)', lineHeight: 1 }}>
+                        {Math.round(best)}{unit}
+                      </span>
+                      <span style={{ fontSize: 13.5, color: 'var(--text-2)', fontWeight: 700, marginBottom: 5 }}>
+                        target {Math.round(goal.target)}{unit}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 11.5, color: 'var(--text-2)', fontWeight: 700, marginTop: 8 }}>
                       {GOAL_MODES.find((m) => m.value === goal.mode)?.label} &middot; since {pretty(goal.startedAt)} &middot; day {daysIn}
                     </div>
+                    <div style={{ fontSize: 11.5, fontWeight: 700, marginTop: 3, color: daysSincePR != null && daysSincePR >= 14 ? 'var(--orange)' : 'var(--text-2)' }}>
+                      {daysSincePR == null ? `No PR yet — day ${daysIn} on this goal` : daysSincePR === 0 ? 'New PR today 🔥' : `Last PR ${daysSincePR}d ago`}
+                    </div>
                   </div>
-                  <button className={`btn btn-icon btn-sm${armed ? ' btn-danger' : ''}`}
-                    onClick={() => armed ? removeGoal(goal.id) : confirm.arm(goal.id)}
-                    title={armed ? 'Confirm delete' : 'Delete goal'}>
-                    <Icon name={armed ? 'check' : 'delete'} size={15} />
-                  </button>
-                </div>
-                <div className="flex items-end justify-between gap-2" style={{ marginBottom: 8 }}>
-                  <span className="tnum" style={{ fontSize: 26, fontWeight: 800, letterSpacing: '-.02em' }}>
-                    {Math.round(best)}{unit}
-                  </span>
-                  <span style={{ fontSize: 13, color: 'var(--text-3)', fontWeight: 700, marginBottom: 4 }}>
-                    target {Math.round(goal.target)}{unit}
-                  </span>
-                </div>
-                <div className="score-meter" style={{ height: 10 }}>
-                  <span style={{ width: `${pct}%`, background: 'var(--accent)' }} />
-                </div>
-                <div style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 700, marginTop: 6 }}>
-                  {Math.round(pct)}% of the way from {Math.round(goal.startingValue || 0)}{unit} to {Math.round(goal.target)}{unit}
-                </div>
-                <div style={{ fontSize: 11, color: daysSincePR != null && daysSincePR >= 14 ? 'var(--orange)' : 'var(--text-3)', fontWeight: 700, marginTop: 3 }}>
-                  {daysSincePR == null ? `No PR yet — day ${daysIn} on this goal` : daysSincePR === 0 ? 'New PR today 🔥' : `Last PR ${daysSincePR}d ago`}
                 </div>
               </Card>
             )
-          })}
-        </div>
+          })()}
+
+          {restActive.length > 0 && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5" style={{ marginBottom: 18 }}>
+              {restActive.map((e) => {
+                const { goal, best, pct } = e
+                const { daysIn, daysSincePR } = goalMeta(e)
+                const armed = confirm.isArmed(goal.id)
+                const unit = goalUnit(goal.mode)
+                const qualifier = goalQualifier(goal)
+                return (
+                  <Card key={goal.id}>
+                    <div className="flex items-start justify-between gap-3" style={{ marginBottom: 10 }}>
+                      <div>
+                        <div style={{ fontSize: 15, fontWeight: 800 }}>
+                          {goal.exercise}{qualifier && <span style={{ color: 'var(--text-3)', fontWeight: 700 }}> · {qualifier}</span>}
+                        </div>
+                        <div style={{ fontSize: 11.5, color: 'var(--text-3)', fontWeight: 600, marginTop: 2 }}>
+                          {GOAL_MODES.find((m) => m.value === goal.mode)?.label} &middot; since {pretty(goal.startedAt)} &middot; day {daysIn}
+                        </div>
+                      </div>
+                      <button className={`btn btn-icon btn-sm${armed ? ' btn-danger' : ''}`}
+                        onClick={() => armed ? removeGoal(goal.id) : confirm.arm(goal.id)}
+                        title={armed ? 'Confirm delete' : 'Delete goal'}>
+                        <Icon name={armed ? 'check' : 'delete'} size={15} />
+                      </button>
+                    </div>
+                    <div className="flex items-end justify-between gap-2" style={{ marginBottom: 8 }}>
+                      <span className="tnum" style={{ fontSize: 26, fontWeight: 800, letterSpacing: '-.02em', color: 'var(--accent)' }}>
+                        {Math.round(best)}{unit}
+                      </span>
+                      <span style={{ fontSize: 13, color: 'var(--text-3)', fontWeight: 700, marginBottom: 4 }}>
+                        target {Math.round(goal.target)}{unit}
+                      </span>
+                    </div>
+                    <div className="score-meter" style={{ height: 10 }}>
+                      <span style={{ width: `${pct}%`, background: 'var(--accent)' }} />
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 700, marginTop: 6 }}>
+                      {Math.round(pct)}% of the way from {Math.round(goal.startingValue || 0)}{unit} to {Math.round(goal.target)}{unit}
+                    </div>
+                    <div style={{ fontSize: 11, color: daysSincePR != null && daysSincePR >= 14 ? 'var(--orange)' : 'var(--text-3)', fontWeight: 700, marginTop: 3 }}>
+                      {daysSincePR == null ? `No PR yet — day ${daysIn} on this goal` : daysSincePR === 0 ? 'New PR today 🔥' : `Last PR ${daysSincePR}d ago`}
+                    </div>
+                  </Card>
+                )
+              })}
+            </div>
+          )}
+        </>
       )}
 
       {completed.length > 0 && (
