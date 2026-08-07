@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
 import Icon from '../components/ui/Icon'
 import { View } from '../components/shell/Shell'
@@ -22,7 +22,7 @@ import {
   sprintCurrentWeek, isSprintActive, phaseIdxForWeek, tacticsForWeek,
   xpwTarget, xpwDoneCount, xpwDidToday, tacticCheckpointCount, checkKey,
   execScore, avgExecScore, todayDoneTotals, scoreColor, scoreBadgeTone,
-  autoEndDate, DEFAULT_PHASES,
+  autoEndDate, DEFAULT_PHASES, goalStreak,
 } from '../lib/goals'
 import VisionBoard from '../components/goals/VisionBoard'
 import StreakChart from '../components/goals/StreakChart'
@@ -68,7 +68,7 @@ export default function GoalsPage() {
       {view === 'cycles' && <CyclesView goals={goals} cycleData={cycleData} />}
       {view === 'roadmap' && <RoadmapView goals={goals} sprints={sprints} />}
       {view === 'visions' && <VisionsView />}
-      {view === 'retros' && <RetrosView goals={goals} sprints={sprints} />}
+      {view === 'retros' && <RetrosView goals={goals} sprints={sprints} cycleData={cycleData} />}
 
       <GoalEditor goal={editGoal} onClose={() => setEditGoal(null)}
         onSaved={() => { goals.reload(); rollup.reload() }} />
@@ -100,6 +100,8 @@ function TodayView({ goals, rollup, cycleData }) {
     return { done: acc.done + r.done, total: acc.total + r.total }
   }, { done: 0, total: 0 })
 
+  const streak = useMemo(() => goalStreak(cycleData.sprints.data || []), [cycleData.sprints.data])
+
   const hour = new Date().getHours()
   const greeting = hour < 5 ? 'Still up,' : hour < 12 ? 'Good morning,' : hour < 17 ? 'Good afternoon,' : 'Good evening,'
   const todayFmt = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
@@ -116,6 +118,7 @@ function TodayView({ goals, rollup, cycleData }) {
         </div>
         <div className="hero-body">
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {streak > 0 && <span className="badge badge-orange">🔥 {streak} day streak</span>}
             <span className="badge badge-green">{live.length} live cycle{live.length === 1 ? '' : 's'}</span>
             <span className="badge badge-blue">{active.length} active goal{active.length === 1 ? '' : 's'}</span>
           </div>
@@ -123,6 +126,7 @@ function TodayView({ goals, rollup, cycleData }) {
       </div>
 
       <div className="stat-strip">
+        <StatCard label="Streak" value={streak} sub="consecutive days" />
         <StatCard label="Active goals" value={active.length} />
         <StatCard label="Live cycles" value={live.length} />
         <StatCard label="Open tasks" value={(rollup.data || []).reduce((s, r) => s + r.open_tasks, 0)} sub="in Pulse" />
@@ -405,11 +409,24 @@ function GoalDetail({ goal }) {
   const habits = useAsync((f) => fetchHabits({ force: f }))
   const [metricOpen, setMetricOpen] = useState(false)
   const [picker, setPicker] = useState(null)
+  const [logDrafts, setLogDrafts] = useState({})
   const confirm = useConfirm()
 
   const mine = (metrics.data || []).filter((m) => m.goal_id === goal.id)
   const myHabits = (habits.data || []).filter((h) => h.goal_id === goal.id)
   const latestFor = (metricId) => (logs.data || []).find((l) => l.metric_id === metricId)
+
+  // Was a native browser prompt() — jarring next to the rest of the app's
+  // UI and the most literal "data entry" moment in the module. An inline
+  // input that opens in place is the same three keystrokes with none of
+  // the popup-box feel.
+  async function commitLog(metricId) {
+    const raw = logDrafts[metricId]
+    if (raw === '' || raw == null || Number.isNaN(Number(raw))) { toast.error('Enter a number'); return }
+    await logMetric(metricId, goal.id, today(), Number(raw))
+    setLogDrafts((d) => { const n = { ...d }; delete n[metricId]; return n })
+    toast.success('Logged'); logs.reload()
+  }
 
   return (
     <div className="cycle-section" onClick={(e) => e.stopPropagation()}>
@@ -421,24 +438,50 @@ function GoalDetail({ goal }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
           {mine.map((m) => {
             const last = latestFor(m.id)
+            const drafting = logDrafts[m.id] !== undefined
+            const pct = m.target && last ? Math.max(0, Math.min(100, (Number(last.value) / Number(m.target)) * 100)) : null
             return (
-              <div key={m.id} className="mini-item">
-                <div>
-                  <strong>{m.name}</strong>
-                  <small>{m.type}{m.target ? ` · target ${m.target}` : ''}</small>
+              <div key={m.id} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div className="mini-item">
+                  <div>
+                    <strong>{m.name}</strong>
+                    <small>{m.type}{m.target ? ` · target ${m.target}` : ''}</small>
+                  </div>
+                  {last && <Badge tone="green">{last.value}</Badge>}
+                  {drafting ? (
+                    <>
+                      <input type="number" inputMode="decimal" autoFocus
+                        value={logDrafts[m.id]}
+                        placeholder="value"
+                        style={{ width: 84, fontSize: 12.5, padding: '5px 8px' }}
+                        onChange={(e) => setLogDrafts({ ...logDrafts, [m.id]: e.target.value })}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') commitLog(m.id)
+                          if (e.key === 'Escape') setLogDrafts((d) => { const n = { ...d }; delete n[m.id]; return n })
+                        }} />
+                      <button className="btn btn-icon btn-sm" onClick={() => commitLog(m.id)} aria-label="Save value">
+                        <Icon name="check" size={13} /></button>
+                      <button className="btn btn-icon btn-sm"
+                        onClick={() => setLogDrafts((d) => { const n = { ...d }; delete n[m.id]; return n })}
+                        aria-label="Cancel"><Icon name="close" size={13} /></button>
+                    </>
+                  ) : (
+                    <button className="btn btn-ghost btn-sm"
+                      onClick={() => setLogDrafts({ ...logDrafts, [m.id]: last ? String(last.value) : '' })}>
+                      Log
+                    </button>
+                  )}
+                  <button className={`btn btn-icon btn-sm${confirm.isArmed(m.id) ? ' btn-danger' : ''}`}
+                    onClick={async () => {
+                      if (!confirm.isArmed(m.id)) return confirm.arm(m.id)
+                      await deleteMetric(m.id); metrics.reload()
+                    }}><Icon name="delete" size={13} /></button>
                 </div>
-                {last && <Badge tone="green">{last.value}</Badge>}
-                <button className="btn btn-ghost btn-sm" onClick={async () => {
-                  const v = prompt(`Log a value for "${m.name}"`)
-                  if (v == null || v === '') return
-                  await logMetric(m.id, goal.id, today(), Number(v))
-                  toast.success('Logged'); logs.reload()
-                }}>Log</button>
-                <button className={`btn btn-icon btn-sm${confirm.isArmed(m.id) ? ' btn-danger' : ''}`}
-                  onClick={async () => {
-                    if (!confirm.isArmed(m.id)) return confirm.arm(m.id)
-                    await deleteMetric(m.id); metrics.reload()
-                  }}><Icon name="delete" size={13} /></button>
+                {pct != null && (
+                  <div className="score-meter" style={{ height: 6 }}>
+                    <span style={{ width: `${pct}%` }} />
+                  </div>
+                )}
               </div>
             )
           })}
@@ -543,8 +586,10 @@ function GoalEditor({ goal, onClose, onSaved }) {
           <button className="btn btn-primary" disabled={!cur.title?.trim() || saving} onClick={async () => {
             setSaving(true)
             try {
+              const justCompleted = goal?.id && goal.status !== 'completed' && cur.status === 'completed'
               await saveGoal({ ...cur, id: goal?.id })
-              toast.success(goal?.id ? 'Goal updated' : 'Goal created')
+              if (justCompleted) toast.success(`🎉 "${cur.title}" — goal completed!`, { duration: 4500 })
+              else toast.success(goal?.id ? 'Goal updated' : 'Goal created')
               setG(null); onSaved(); onClose()
             } catch (e) { toast.error(e.message) } finally { setSaving(false) }
           }}>{saving ? 'Saving…' : 'Save Goal'}</button>
@@ -631,6 +676,19 @@ function CycleEditor({ sprint, goals, onClose, onSaved }) {
   const existingPhases = useAsync((f) => fetchSprintPhases({ force: f }), [sprint?.id], { enabled: Boolean(sprint?.id) })
   const existingTactics = useAsync((f) => fetchSprintTactics({ force: f }), [sprint?.id], { enabled: Boolean(sprint?.id) })
 
+  // Quick setup: skip building three phases by hand and just ask for one
+  // action, applied across the whole 12 weeks. Only offered for brand-new
+  // cycles — editing an existing one always shows its real phase
+  // structure so nothing gets silently collapsed. "Full setup" is still
+  // one click away for anyone who wants phase-by-phase control up front.
+  const [quickMode, setQuickMode] = useState(!sprint?.id)
+  const [quickTactic, setQuickTactic] = useState({ text: '', freq: 'xperweek', times_per_week: 3, days: [] })
+  useEffect(() => {
+    if (!open) return
+    setQuickMode(!sprint?.id)
+    setQuickTactic({ text: '', freq: 'xperweek', times_per_week: 3, days: [] })
+  }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
+
   useMemo(() => {
     if (!sprint?.id) { setPhaseDrafts(DEFAULT_PHASES.map((p) => ({ ...p, tactics: [] }))); return }
     const mine = (existingPhases.data || []).filter((p) => p.sprint_id === sprint.id).sort((a, b) => a.phase_index - b.phase_index)
@@ -662,10 +720,14 @@ function CycleEditor({ sprint, goals, onClose, onSaved }) {
   async function save() {
     setSaving(true)
     try {
+      const isQuick = quickMode && !sprint?.id
+      const drafts = isQuick
+        ? DEFAULT_PHASES.map((p) => ({ ...p, tactics: quickTactic.text.trim() ? [{ ...quickTactic }] : [] }))
+        : phaseDrafts
       const sprintId = await saveSprint({ ...cur, id: sprint?.id })
       const id = sprint?.id || sprintId
-      for (let pi = 0; pi < phaseDrafts.length; pi++) {
-        const draft = phaseDrafts[pi]
+      for (let pi = 0; pi < drafts.length; pi++) {
+        const draft = drafts[pi]
         const phaseId = draft.id || await savePhase({ sprint_id: id, phase_index: pi, name: draft.name, description: draft.description })
         for (const t of draft.tactics) {
           if (!t.text?.trim()) continue
@@ -684,12 +746,29 @@ function CycleEditor({ sprint, goals, onClose, onSaved }) {
       footer={
         <>
           <button className="btn btn-secondary" onClick={() => { setS(null); onClose() }}>Cancel</button>
-          <button className="btn btn-primary" disabled={!cur.name?.trim() || !cur.goal_id || saving} onClick={save}>
+          <button className="btn btn-primary"
+            disabled={!cur.name?.trim() || !cur.goal_id || saving || (quickMode && !sprint?.id && !quickTactic.text.trim())}
+            onClick={save}>
             {saving ? 'Saving…' : 'Save Cycle'}
           </button>
         </>
       }>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {!sprint?.id && (
+          <div>
+            <div className="flex gap-1" style={{ background: 'var(--white-soft)', borderRadius: 999, padding: 3, width: 'fit-content', marginBottom: 6 }}>
+              <button type="button" className={`btn btn-sm ${quickMode ? 'btn-primary' : 'btn-ghost'}`}
+                style={{ borderRadius: 999 }} onClick={() => setQuickMode(true)}>Quick</button>
+              <button type="button" className={`btn btn-sm ${!quickMode ? 'btn-primary' : 'btn-ghost'}`}
+                style={{ borderRadius: 999 }} onClick={() => setQuickMode(false)}>Full (phases)</button>
+            </div>
+            <p style={{ fontSize: 11.5, color: 'var(--text-3)', fontWeight: 600 }}>
+              {quickMode
+                ? 'One action, applied across all 12 weeks. Switch to Full anytime to break it into phases.'
+                : 'Build out Foundation, Build, and Peak phases with their own actions up front.'}
+            </p>
+          </div>
+        )}
         <div className="grid grid-cols-2 gap-3">
           <Field label="Cycle Name"><input value={cur.name || ''} onChange={(e) => setS({ ...cur, name: e.target.value })} placeholder="Q3 Foundation Build" /></Field>
           <Field label="Goal">
@@ -710,6 +789,30 @@ function CycleEditor({ sprint, goals, onClose, onSaved }) {
           <input value={cur.outcome || ''} onChange={(e) => setS({ ...cur, outcome: e.target.value })} placeholder="e.g. Running 3× per week consistently" />
         </Field>
 
+        {quickMode && !sprint?.id ? (
+          <>
+            <Field label="What will you do, and how often?">
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                <input style={{ flex: '1 1 200px' }} value={quickTactic.text} placeholder="e.g. Go for a run"
+                  onChange={(e) => setQuickTactic({ ...quickTactic, text: e.target.value })} />
+                <select style={{ width: 110 }} value={quickTactic.freq}
+                  onChange={(e) => setQuickTactic({ ...quickTactic, freq: e.target.value })}>
+                  <option value="daily">Daily</option>
+                  <option value="xperweek">×/week</option>
+                  <option value="weekly">Weekly</option>
+                </select>
+                {quickTactic.freq === 'xperweek' && (
+                  <input type="number" min={1} max={7} style={{ width: 56 }} value={quickTactic.times_per_week || 3}
+                    onChange={(e) => setQuickTactic({ ...quickTactic, times_per_week: Number(e.target.value) })} />
+                )}
+              </div>
+            </Field>
+            <p style={{ fontSize: 11.5, color: 'var(--text-3)', fontWeight: 600, marginTop: -8 }}>
+              You can add more actions or split this into phases anytime — edit the cycle and switch to Full setup.
+            </p>
+          </>
+        ) : (
+          <>
         <div className="form-section-label">Phases &amp; Weekly Actions</div>
         {phaseDrafts.map((phase, pi) => (
           <div key={pi} className="card-inner" style={{ padding: 14, borderRadius: 12, border: '1px solid var(--border)', background: 'var(--white-soft)' }}>
@@ -754,6 +857,8 @@ function CycleEditor({ sprint, goals, onClose, onSaved }) {
             <button className="btn btn-ghost btn-xs" onClick={() => addTactic(pi)}><Icon name="add" size={14} /> Add action</button>
           </div>
         ))}
+          </>
+        )}
       </div>
     </Modal>
   )
@@ -897,10 +1002,18 @@ function VisionsView() {
 const RETRO_OUTCOMES = [['yes', 'Yes, fully'], ['mostly', 'Mostly'], ['partial', 'Partially'], ['no', 'Not really']]
 const RETRO_RATINGS = [['1', '😞'], ['2', '😐'], ['3', '🙂'], ['4', '💪'], ['5', '🔥']]
 
-function RetrosView({ goals, sprints }) {
+function RetrosView({ goals, sprints, cycleData }) {
   const [editing, setEditing] = useState(null)
   const t = today()
   const finished = (sprints.data || []).filter((s) => s.end_date && s.end_date < t)
+  const isWritten = (s) => { const r = s.retro || {}; return Boolean(r.win || r.lesson || r.carry) }
+  // A cycle that just crossed its end date and has no retro yet is the one
+  // genuine "you finished something" event in this whole module — it used
+  // to render exactly like every other card, just with grayer placeholder
+  // text. Pulling it out into a hero card gives that moment the fanfare
+  // the workout goals' celebration banner already gets.
+  const needsRetro = finished.filter((s) => !isWritten(s))
+  const written = finished.filter(isWritten)
 
   return (
     <>
@@ -909,29 +1022,58 @@ function RetrosView({ goals, sprints }) {
           When a cycle's end date passes it shows up here for a retrospective.
         </Empty></Card>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          {finished.map((s) => {
-            const goal = (goals.data || []).find((g) => g.id === s.goal_id)
-            const r = s.retro || {}
-            const written = r.win || r.lesson || r.carry
-            return (
-              <Card key={s.id}>
-                <CardHead title={s.name} sub={`${goal?.title || ''} · ended ${pretty(s.end_date)}`}
-                  right={<button className="btn btn-ghost btn-sm" onClick={() => setEditing(s)}>
-                    <Icon name="edit" size={14} /> {written ? 'Edit' : 'Write retro'}</button>} />
-                {!written ? (
-                  <p style={{ fontSize: 12.5, color: 'var(--text-3)' }}>No retrospective written.</p>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <RetroBit label="Biggest win" text={r.win} />
-                    <RetroBit label="Biggest lesson" text={r.lesson} />
-                    <RetroBit label="Carrying forward" text={r.carry} />
+        <>
+          {needsRetro.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
+              {needsRetro.map((s) => {
+                const goal = (goals.data || []).find((g) => g.id === s.goal_id)
+                const myPhases = (cycleData?.phases?.data || []).filter((p) => p.sprint_id === s.id)
+                const myTactics = (cycleData?.tactics?.data || []).filter((x) => x.sprint_id === s.id)
+                const avg = avgExecScore(myPhases, myTactics, s)
+                return (
+                  <div key={s.id} className="hero-card" style={{ background: areaColor(goal?.area) || 'var(--accent)' }}>
+                    <div className="hero-content">
+                      <div>
+                        <div className="hero-eyebrow">Cycle complete 🎉</div>
+                        <div className="hero-h" style={{ fontSize: 26 }}>{s.name}</div>
+                        <p className="hero-copy">
+                          {goal?.title ? `${goal.title} · ` : ''}ran {pretty(s.start_date)} → {pretty(s.end_date)}
+                          {avg != null ? ` · averaged ${avg}% execution` : ''}.
+                        </p>
+                        <div className="hero-actions">
+                          <button className="btn btn-primary" onClick={() => setEditing(s)}>
+                            <Icon name="edit" size={16} /> Write the retro
+                          </button>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                )}
-              </Card>
-            )
-          })}
-        </div>
+                )
+              })}
+            </div>
+          )}
+
+          {written.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {written.map((s) => {
+                const goal = (goals.data || []).find((g) => g.id === s.goal_id)
+                const r = s.retro || {}
+                return (
+                  <Card key={s.id}>
+                    <CardHead title={s.name} sub={`${goal?.title || ''} · ended ${pretty(s.end_date)}`}
+                      right={<button className="btn btn-ghost btn-sm" onClick={() => setEditing(s)}>
+                        <Icon name="edit" size={14} /> Edit</button>} />
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <RetroBit label="Biggest win" text={r.win} />
+                      <RetroBit label="Biggest lesson" text={r.lesson} />
+                      <RetroBit label="Carrying forward" text={r.carry} />
+                    </div>
+                  </Card>
+                )
+              })}
+            </div>
+          )}
+        </>
       )}
 
       <RetroEditor sprint={editing} onClose={() => setEditing(null)} onSaved={() => sprints.reload()} />

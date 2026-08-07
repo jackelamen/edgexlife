@@ -192,3 +192,54 @@ export const DEFAULT_PHASES = [
   { name: 'Build', description: '' },
   { name: 'Peak', description: '' },
 ]
+
+/* ── Day streak ─────────────────────────────────────────────
+   The Today view had no single "you've shown up N days running" number —
+   only a per-cycle execution-score ring, which only moves once a week is
+   over. week_checks doesn't store absolute dates for daily/custom
+   tactics (just a week number + day index relative to that sprint's own
+   grid), so a real date has to be reconstructed from the sprint's
+   start_date. xperweek checks already store the ISO date they were
+   completed on. weekly/onetime checks are a bare boolean with no date
+   attached and can't contribute to a day-level streak — that's a known,
+   acceptable gap (they're the least common tactic type). */
+export function completedCheckDates(sprints) {
+  const dates = new Set()
+  for (const sp of sprints || []) {
+    if (!sp.start_date) continue
+    const start = new Date(sp.start_date + 'T12:00:00')
+    const weeks = sp.week_checks || {}
+    for (const wkStr of Object.keys(weeks)) {
+      const week = Number(wkStr)
+      const checks = weeks[wkStr] || {}
+      for (const key of Object.keys(checks)) {
+        const val = checks[key]
+        if (!val) continue
+        if (typeof val === 'string') { dates.add(val); continue } // xperweek stores the ISO date
+        const m = key.match(/_(\d)$/) // daily/custom: `${tacticId}_${dayIdx}`
+        if (!m) continue
+        const d = new Date(start)
+        d.setDate(d.getDate() + (week - 1) * 7 + Number(m[1]))
+        dates.add(d.toISOString().slice(0, 10))
+      }
+    }
+  }
+  return dates
+}
+
+/** Consecutive days, ending today (or yesterday if nothing's checked off
+    yet today so a fresh morning doesn't read as a broken streak), with at
+    least one completed tactic across every cycle. */
+export function goalStreak(sprints) {
+  const dates = completedCheckDates(sprints)
+  const t = localDateKey()
+  let n = 0
+  const d = new Date()
+  for (;;) {
+    const iso = d.toISOString().slice(0, 10)
+    if (dates.has(iso)) { n++; d.setDate(d.getDate() - 1) }
+    else if (n === 0 && iso === t) d.setDate(d.getDate() - 1)
+    else break
+  }
+  return n
+}
