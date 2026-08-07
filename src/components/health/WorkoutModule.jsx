@@ -13,7 +13,7 @@ import {
 import {
   WK_TYPES, DEFAULT_EXERCISE_DB, WK_TEMPLATES, bodypartLabel,
   DAY_SHORT, DAY_FULL, weekDates, sessionVolume, sessionSetCount, fmtDuration,
-  parseWorkoutCSV, WORKOUT_CSV_TEMPLATE,
+  parseWorkoutCSV, WORKOUT_CSV_TEMPLATE, isBodyweightExercise,
 } from '../../lib/workout'
 import { today, pretty, prettyShort } from '../../lib/dates'
 import TrendChart from './TrendChart'
@@ -973,11 +973,17 @@ function HistoryTab({ sessions, onEdit, onTab }) {
 
 /* ═══════════════ Progress ═══════════════ */
 
-/* One row per session that included this exercise, oldest first — top-set
-   weight is the "am I getting stronger" signal (heaviest set that day
-   beats total volume for tracking strength over time, since volume swings
-   with rep ranges and how many exercises got done). Estimated 1RM uses the
-   Epley formula off the top set, shown as a secondary reference only. */
+/* One row per session that included this exercise, oldest first. Tracks
+   BOTH signals regardless of exercise — the caller picks which one to
+   chart based on mode:
+   - topWeight/volume/est1RM: the loaded-exercise "am I getting stronger"
+     signal (top-set weight beats total volume for this since volume
+     swings with rep ranges and how many exercises got done that day).
+     Est. 1RM uses the Epley formula off the top set.
+   - topReps/totalReps: the bodyweight-exercise equivalent — weight isn't
+     the lever for a push-up or pull-up, reps are. topReps is the best
+     single set that session (the direct analog of top-set weight),
+     totalReps is every rep across all sets (the analog of volume). */
 function exerciseHistory(sessions, name) {
   return sessions
     .filter((s) => (s.exercises || []).some((e) => e.name === name))
@@ -989,15 +995,19 @@ function exerciseHistory(sessions, name) {
       let topSet = null
       let topWeight = 0
       let volume = 0
+      let topReps = 0
+      let totalReps = 0
       for (const set of sets) {
         const w = parseFloat(set.weight) || 0
         const r = parseFloat(set.reps) || 0
         volume += w * r
+        totalReps += r
+        if (r > topReps) topReps = r
         if (w > topWeight) { topWeight = w; topSet = set }
       }
-      const topReps = parseFloat(topSet?.reps) || 0
-      const est1RM = topWeight > 0 ? topWeight * (1 + topReps / 30) : 0
-      return { date: s.date, sessionId: s.id, topWeight, volume, est1RM, setCount: sets.length }
+      const est1RMReps = parseFloat(topSet?.reps) || 0
+      const est1RM = topWeight > 0 ? topWeight * (1 + est1RMReps / 30) : 0
+      return { date: s.date, sessionId: s.id, topWeight, volume, est1RM, topReps, totalReps, setCount: sets.length }
     })
 }
 
@@ -1012,9 +1022,18 @@ function ProgressTab({ sessions }) {
   }, [sessions])
 
   const [selected, setSelected] = useState('')
+  const [mode, setMode] = useState('weight') // 'weight' | 'reps'
   useEffect(() => {
     if (exerciseNames.length && !exerciseNames.includes(selected)) setSelected(exerciseNames[0])
   }, [exerciseNames]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Default to reps for known/likely bodyweight moves, but let it be
+  // overridden per exercise — some things (weighted pull-ups, a loaded
+  // plank) are genuinely tracked either way depending on how they were
+  // logged, and auto-detection is a starting point, not a rule.
+  useEffect(() => {
+    if (selected) setMode(isBodyweightExercise(selected, sessions) ? 'reps' : 'weight')
+  }, [selected]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!exerciseNames.length) {
     return (
@@ -1027,26 +1046,43 @@ function ProgressTab({ sessions }) {
   }
 
   const rows = exerciseHistory(sessions, selected)
-  const points = rows.map((r) => ({ label: prettyShort(r.date), value: r.topWeight || null }))
-  const best = rows.reduce((m, r) => Math.max(m, r.topWeight), 0)
+  const byWeight = mode === 'weight'
+  const unit = byWeight ? ' kg' : ' reps'
+  const points = rows.map((r) => ({ label: prettyShort(r.date), value: (byWeight ? r.topWeight : r.topReps) || null }))
+  const best = rows.reduce((m, r) => Math.max(m, byWeight ? r.topWeight : r.topReps), 0)
   const latest = rows[rows.length - 1]
+  const latestVal = latest ? (byWeight ? latest.topWeight : latest.topReps) : 0
   const first = rows[0]
-  const delta = latest && first && rows.length > 1 ? latest.topWeight - first.topWeight : null
+  const firstVal = first ? (byWeight ? first.topWeight : first.topReps) : 0
+  const delta = latest && first && rows.length > 1 ? latestVal - firstVal : null
 
   return (
     <>
       <Card style={{ marginBottom: 18 }}>
-        <CardHead title="Exercise progress" sub="Top-set weight, session by session." />
+        <CardHead
+          title="Exercise progress"
+          sub={byWeight ? 'Top-set weight, session by session.' : 'Best single-set reps, session by session.'}
+          right={
+            <div className="flex gap-1" style={{ background: 'var(--white-soft)', borderRadius: 999, padding: 3 }}>
+              {['weight', 'reps'].map((m) => (
+                <button key={m} className={`btn btn-sm ${mode === m ? 'btn-primary' : 'btn-ghost'}`}
+                  style={{ borderRadius: 999 }} onClick={() => setMode(m)}>
+                  {m === 'weight' ? 'Weight' : 'Reps'}
+                </button>
+              ))}
+            </div>
+          }
+        />
         <select value={selected} onChange={(e) => setSelected(e.target.value)} style={{ marginBottom: 16, maxWidth: 340 }}>
           {exerciseNames.map((n) => <option key={n} value={n}>{n}</option>)}
         </select>
-        <TrendChart points={points} unit=" kg" format={(v) => Math.round(v).toString()} />
+        <TrendChart points={points} unit={unit} format={(v) => Math.round(v).toString()} />
       </Card>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5" style={{ marginBottom: 18 }}>
-        <StatCard label="Best top set" value={best ? `${Math.round(best)} kg` : '--'} sub="all-time" />
-        <StatCard label="Most recent" value={latest?.topWeight ? `${Math.round(latest.topWeight)} kg` : '--'} sub={latest ? pretty(latest.date) : 'not logged yet'} />
-        <StatCard label="Change" value={delta != null ? `${delta >= 0 ? '+' : ''}${Math.round(delta)} kg` : '--'} sub="first logged to now" />
+        <StatCard label={byWeight ? 'Best top set' : 'Best single set'} value={best ? `${Math.round(best)}${unit}` : '--'} sub="all-time" />
+        <StatCard label="Most recent" value={latestVal ? `${Math.round(latestVal)}${unit}` : '--'} sub={latest ? pretty(latest.date) : 'not logged yet'} />
+        <StatCard label="Change" value={delta != null ? `${delta >= 0 ? '+' : ''}${Math.round(delta)}${unit}` : '--'} sub="first logged to now" />
         <StatCard label="Times logged" value={rows.length} sub={selected} />
       </div>
 
@@ -1058,11 +1094,21 @@ function ProgressTab({ sessions }) {
               <div style={{ flex: 1 }}>
                 <div style={{ fontWeight: 700, fontSize: 13.5 }}>{pretty(r.date)}</div>
                 <div style={{ fontSize: 11.5, color: 'var(--text-3)', fontWeight: 600 }}>
-                  {r.setCount} set{r.setCount === 1 ? '' : 's'} &middot; {Math.round(r.volume).toLocaleString()} kg volume
-                  {r.est1RM > 0 && <> &middot; est. 1RM {Math.round(r.est1RM)} kg</>}
+                  {byWeight ? (
+                    <>
+                      {r.setCount} set{r.setCount === 1 ? '' : 's'} &middot; {Math.round(r.volume).toLocaleString()} kg volume
+                      {r.est1RM > 0 && <> &middot; est. 1RM {Math.round(r.est1RM)} kg</>}
+                    </>
+                  ) : (
+                    <>{r.setCount} set{r.setCount === 1 ? '' : 's'} &middot; {r.totalReps} reps total</>
+                  )}
                 </div>
               </div>
-              <Badge tone="blue">{r.topWeight ? `${Math.round(r.topWeight)} kg top set` : '—'}</Badge>
+              <Badge tone="blue">
+                {byWeight
+                  ? (r.topWeight ? `${Math.round(r.topWeight)} kg top set` : '—')
+                  : (r.topReps ? `${r.topReps} reps top set` : '—')}
+              </Badge>
             </div>
           ))}
         </div>

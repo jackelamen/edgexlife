@@ -33,6 +33,36 @@ export const WK_TEMPLATES = {
 
 export const bodypartLabel = (k) => (k === 'FullBody' ? 'Full Body' : k)
 
+/* Exercises where the meaningful "getting stronger" signal is reps, not
+   load — curated from DEFAULT_EXERCISE_DB's own bodyweight movements.
+   Matched by exact name so a session's exercise entries (free-typed or
+   picked from the DB) line up without a schema change to the DB itself. */
+export const BODYWEIGHT_EXERCISES = new Set([
+  'Push-Up', 'Pull-Up', 'Dips', 'Plank', 'Side Plank', 'Dead Bug',
+  'Hanging Knee Raise', 'Burpee', 'Bear Crawl', 'Chin-Up', 'Air Squat',
+])
+
+/** True if an exercise's progress should be tracked by reps rather than
+    weight — either it's a known bodyweight movement, or every logged set
+    for it across all sessions has no weight recorded (covers exercises
+    Jack adds himself that aren't in the curated list above). Only ever
+    used as a DEFAULT; the Progress tab lets it be overridden per exercise
+    since some moves (weighted pull-ups, a loaded plank) are genuinely
+    tracked either way depending on how they were logged. */
+export function isBodyweightExercise(name, sessions) {
+  if (BODYWEIGHT_EXERCISES.has(name)) return true
+  let sawAnySet = false
+  for (const s of sessions) {
+    const ex = (s.exercises || []).find((e) => e.name === name)
+    if (!ex) continue
+    for (const set of ex.sets || []) {
+      sawAnySet = true
+      if ((parseFloat(set.weight) || 0) > 0) return false
+    }
+  }
+  return sawAnySet
+}
+
 export const DAY_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 export const DAY_FULL = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
