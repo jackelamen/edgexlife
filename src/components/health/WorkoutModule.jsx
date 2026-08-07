@@ -13,14 +13,17 @@ import {
 import {
   WK_TYPES, DEFAULT_EXERCISE_DB, WK_TEMPLATES, bodypartLabel,
   DAY_SHORT, DAY_FULL, weekDates, sessionVolume, sessionSetCount, fmtDuration,
+  parseWorkoutCSV, WORKOUT_CSV_TEMPLATE,
 } from '../../lib/workout'
-import { today, pretty } from '../../lib/dates'
+import { today, pretty, prettyShort } from '../../lib/dates'
+import TrendChart from './TrendChart'
 
 const TABS = [
   { value: 'plan', label: 'Plan', icon: 'calendar_month' },
   { value: 'log', label: 'Session Log', icon: 'fitness_center' },
   { value: 'db', label: 'Database', icon: 'list_alt' },
   { value: 'history', label: 'History', icon: 'bar_chart' },
+  { value: 'progress', label: 'Progress', icon: 'trending_up' },
 ]
 
 export default function WorkoutModule() {
@@ -99,6 +102,7 @@ export default function WorkoutModule() {
       )}
       {tab === 'db' && <DatabaseTab db={db} onSaved={() => dbRaw.reload()} />}
       {tab === 'history' && <HistoryTab sessions={sessions} onEdit={setSession} onTab={setTab} />}
+      {tab === 'progress' && <ProgressTab sessions={sessions.data || []} />}
 
       <button className="mob-fab" onClick={() => startSession(null, true)} aria-label="Log session">
         <Icon name="play_arrow" size={26} fill />
@@ -133,6 +137,9 @@ function sessionToPlanDay(session, existing) {
 
 function PlanTab({ plan, weekOffset, db, goals, sessions, onStart }) {
   const [editDate, setEditDate] = useState(null)
+  const [importPreview, setImportPreview] = useState(null) // { days, errors } | null
+  const [importing, setImporting] = useState(false)
+  const fileInputRef = useRef(null)
   const dates = useMemo(() => weekDates(weekOffset), [weekOffset])
   const t = today()
 
@@ -157,8 +164,63 @@ function PlanTab({ plan, weekOffset, db, goals, sessions, onStart }) {
     return out
   }, [dates, plan.data, sessions])
 
+  function onFileSelected(e) {
+    const file = e.target.files?.[0]
+    e.target.value = '' // allow re-selecting the same file after a fix
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => {
+      const { days, errors } = parseWorkoutCSV(String(reader.result || ''))
+      if (!Object.keys(days).length) {
+        toast.error(errors[0] || 'Nothing to import — check the CSV format.')
+        return
+      }
+      setImportPreview({ days, errors })
+    }
+    reader.onerror = () => toast.error('Could not read that file.')
+    reader.readAsText(file)
+  }
+
+  function downloadTemplate() {
+    const blob = new Blob([WORKOUT_CSV_TEMPLATE], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'workout-plan-template.csv'
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  async function confirmImport() {
+    if (!importPreview) return
+    setImporting(true)
+    try {
+      const entries = Object.entries(importPreview.days)
+      for (const [date, day] of entries) {
+        await savePlanDay(date, day)
+      }
+      toast.success(`Imported ${entries.length} day${entries.length === 1 ? '' : 's'}`)
+      plan.reload()
+      setImportPreview(null)
+    } catch (e) {
+      toast.error(e.message || 'Import failed partway through — check what saved and retry the rest.')
+    } finally {
+      setImporting(false)
+    }
+  }
+
   return (
     <>
+      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginBottom: 10 }}>
+        <input ref={fileInputRef} type="file" accept=".csv,text/csv" style={{ display: 'none' }} onChange={onFileSelected} />
+        <button className="btn btn-secondary btn-sm" onClick={downloadTemplate}>
+          <Icon name="download" size={15} /> Download CSV template
+        </button>
+        <button className="btn btn-secondary btn-sm" onClick={() => fileInputRef.current?.click()}>
+          <Icon name="upload_file" size={15} /> Import CSV
+        </button>
+      </div>
+
       <div className="plan-week">
         {dates.map((date, i) => {
           const day = effectiveByDate[date]
@@ -245,7 +307,49 @@ function PlanTab({ plan, weekOffset, db, goals, sessions, onStart }) {
         onClose={() => setEditDate(null)}
         onStart={(d) => { setEditDate(null); onStart(d) }}
       />
+
+      <ImportPreviewModal preview={importPreview} importing={importing}
+        onClose={() => setImportPreview(null)} onConfirm={confirmImport} />
     </>
+  )
+}
+
+function ImportPreviewModal({ preview, importing, onClose, onConfirm }) {
+  if (!preview) return null
+  const entries = Object.entries(preview.days).sort(([a], [b]) => a.localeCompare(b))
+  return (
+    <Modal open={!!preview} onClose={onClose} title="Import CSV"
+      sub={`${entries.length} day${entries.length === 1 ? '' : 's'} found. This replaces any existing plan for these dates.`}
+      footer={<>
+        <button className="btn btn-secondary" onClick={onClose}>Cancel</button>
+        <button className="btn btn-primary" disabled={importing} onClick={onConfirm}>
+          <Icon name="upload_file" size={16} /> {importing ? 'Importing…' : `Import ${entries.length} day${entries.length === 1 ? '' : 's'}`}
+        </button>
+      </>}>
+      {preview.errors.length > 0 && (
+        <div style={{
+          background: 'var(--s-risk-bg, #f9e3df)', color: 'var(--s-risk, #c8452f)', borderRadius: 10,
+          padding: '10px 12px', fontSize: 12, fontWeight: 600, marginBottom: 12, lineHeight: 1.5,
+        }}>
+          {preview.errors.map((e, i) => <div key={i}>{e}</div>)}
+        </div>
+      )}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 320, overflowY: 'auto' }}>
+        {entries.map(([date, day]) => (
+          <div key={date} className="check-row" style={{ cursor: 'default' }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 700, fontSize: 13.5 }}>{pretty(date)}</div>
+              <div style={{ fontSize: 11.5, color: 'var(--text-3)', fontWeight: 600 }}>
+                {day.rest ? 'Rest day' : `${day.type} · ${day.exercises.length} exercise${day.exercises.length === 1 ? '' : 's'}`}
+              </div>
+            </div>
+            {!day.rest && day.exercises.length > 0 && (
+              <Badge tone="blue">{day.exercises.map((e) => e.name).slice(0, 2).join(', ')}{day.exercises.length > 2 ? '…' : ''}</Badge>
+            )}
+          </div>
+        ))}
+      </div>
+    </Modal>
   )
 }
 
@@ -862,6 +966,106 @@ function HistoryTab({ sessions, onEdit, onTab }) {
             })}
           </div>
         )}
+      </Card>
+    </>
+  )
+}
+
+/* ═══════════════ Progress ═══════════════ */
+
+/* One row per session that included this exercise, oldest first — top-set
+   weight is the "am I getting stronger" signal (heaviest set that day
+   beats total volume for tracking strength over time, since volume swings
+   with rep ranges and how many exercises got done). Estimated 1RM uses the
+   Epley formula off the top set, shown as a secondary reference only. */
+function exerciseHistory(sessions, name) {
+  return sessions
+    .filter((s) => (s.exercises || []).some((e) => e.name === name))
+    .slice()
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map((s) => {
+      const ex = s.exercises.find((e) => e.name === name)
+      const sets = ex.sets || []
+      let topSet = null
+      let topWeight = 0
+      let volume = 0
+      for (const set of sets) {
+        const w = parseFloat(set.weight) || 0
+        const r = parseFloat(set.reps) || 0
+        volume += w * r
+        if (w > topWeight) { topWeight = w; topSet = set }
+      }
+      const topReps = parseFloat(topSet?.reps) || 0
+      const est1RM = topWeight > 0 ? topWeight * (1 + topReps / 30) : 0
+      return { date: s.date, sessionId: s.id, topWeight, volume, est1RM, setCount: sets.length }
+    })
+}
+
+function ProgressTab({ sessions }) {
+  const exerciseNames = useMemo(() => {
+    const counts = new Map()
+    sessions.forEach((s) => (s.exercises || []).forEach((e) => {
+      if (!e.name?.trim()) return
+      counts.set(e.name, (counts.get(e.name) || 0) + 1)
+    }))
+    return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([name]) => name)
+  }, [sessions])
+
+  const [selected, setSelected] = useState('')
+  useEffect(() => {
+    if (exerciseNames.length && !exerciseNames.includes(selected)) setSelected(exerciseNames[0])
+  }, [exerciseNames]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!exerciseNames.length) {
+    return (
+      <Card>
+        <Empty icon="trending_up" title="No exercises logged yet">
+          Finish a session with real exercises and they'll show up here to track over time.
+        </Empty>
+      </Card>
+    )
+  }
+
+  const rows = exerciseHistory(sessions, selected)
+  const points = rows.map((r) => ({ label: prettyShort(r.date), value: r.topWeight || null }))
+  const best = rows.reduce((m, r) => Math.max(m, r.topWeight), 0)
+  const latest = rows[rows.length - 1]
+  const first = rows[0]
+  const delta = latest && first && rows.length > 1 ? latest.topWeight - first.topWeight : null
+
+  return (
+    <>
+      <Card style={{ marginBottom: 18 }}>
+        <CardHead title="Exercise progress" sub="Top-set weight, session by session." />
+        <select value={selected} onChange={(e) => setSelected(e.target.value)} style={{ marginBottom: 16, maxWidth: 340 }}>
+          {exerciseNames.map((n) => <option key={n} value={n}>{n}</option>)}
+        </select>
+        <TrendChart points={points} unit=" kg" format={(v) => Math.round(v).toString()} />
+      </Card>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5" style={{ marginBottom: 18 }}>
+        <StatCard label="Best top set" value={best ? `${Math.round(best)} kg` : '--'} sub="all-time" />
+        <StatCard label="Most recent" value={latest?.topWeight ? `${Math.round(latest.topWeight)} kg` : '--'} sub={latest ? pretty(latest.date) : 'not logged yet'} />
+        <StatCard label="Change" value={delta != null ? `${delta >= 0 ? '+' : ''}${Math.round(delta)} kg` : '--'} sub="first logged to now" />
+        <StatCard label="Times logged" value={rows.length} sub={selected} />
+      </div>
+
+      <Card>
+        <CardHead title="Recent sessions" sub={`Every logged session that included ${selected}.`} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {rows.slice().reverse().slice(0, 15).map((r) => (
+            <div key={r.sessionId} className="check-row" style={{ cursor: 'default' }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 700, fontSize: 13.5 }}>{pretty(r.date)}</div>
+                <div style={{ fontSize: 11.5, color: 'var(--text-3)', fontWeight: 600 }}>
+                  {r.setCount} set{r.setCount === 1 ? '' : 's'} &middot; {Math.round(r.volume).toLocaleString()} kg volume
+                  {r.est1RM > 0 && <> &middot; est. 1RM {Math.round(r.est1RM)} kg</>}
+                </div>
+              </div>
+              <Badge tone="blue">{r.topWeight ? `${Math.round(r.topWeight)} kg top set` : '—'}</Badge>
+            </div>
+          ))}
+        </div>
       </Card>
     </>
   )

@@ -69,6 +69,106 @@ export function sessionSetCount(session) {
     n + (ex.sets || []).filter((s) => s.done).length, 0)
 }
 
+/* ── CSV import for the Plan grid ──────────────────────────────
+   Lets a whole week (or more) be planned in one upload instead of one day
+   at a time through DayModal. Expected columns (header row required, any
+   order): date, type, exercise, sets, reps, weight, rest, notes. Multiple
+   rows share a date to build that day's exercise list; a row with
+   rest=true (or yes/1/y) marks the whole day as rest regardless of any
+   exercise columns on that row. No CSV library is used — the format is
+   simple enough that a small hand-rolled parser avoids adding a
+   dependency the app doesn't otherwise need. */
+
+export const WORKOUT_CSV_TEMPLATE =
+`date,type,exercise,sets,reps,weight,rest,notes
+2026-08-10,Strength,Barbell Bench Press,4,8,60,,Focus on form
+2026-08-10,Strength,Barbell Row,4,10,50,,
+2026-08-11,Cardio,Run,,,,,"30 min easy pace"
+2026-08-12,,,,,,true,Rest day
+`
+
+/** RFC4180-ish row splitter: handles quoted fields, embedded commas, and
+    "" as an escaped quote. Good enough for a hand-edited or Excel/Sheets
+    export without pulling in a CSV library. */
+function parseCSVRows(text) {
+  const rows = []
+  let row = [], field = '', inQuotes = false
+  const s = String(text).replace(/\r\n/g, '\n')
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i]
+    if (inQuotes) {
+      if (c === '"') {
+        if (s[i + 1] === '"') { field += '"'; i++ } else inQuotes = false
+      } else field += c
+    } else if (c === '"') inQuotes = true
+    else if (c === ',') { row.push(field); field = '' }
+    else if (c === '\n') { row.push(field); rows.push(row); row = []; field = '' }
+    else field += c
+  }
+  if (field.length || row.length) { row.push(field); rows.push(row) }
+  return rows.filter((r) => !(r.length === 1 && r[0].trim() === ''))
+}
+
+/** Parses CSV text into { days, errors }. `days` is keyed by date, in the
+    exact shape savePlanDay expects — ready to upsert one call per date. */
+export function parseWorkoutCSV(text) {
+  const rows = parseCSVRows(text)
+  if (!rows.length) return { days: {}, errors: ['File is empty.'] }
+
+  const header = rows[0].map((h) => h.trim().toLowerCase())
+  const col = (name) => header.indexOf(name)
+  const iDate = col('date'), iType = col('type'), iExercise = col('exercise'),
+    iSets = col('sets'), iReps = col('reps'), iWeight = col('weight'),
+    iRest = col('rest'), iNotes = col('notes')
+
+  if (iDate === -1) return { days: {}, errors: ['CSV must have a "date" column (YYYY-MM-DD).'] }
+
+  const days = {}
+  const errors = []
+
+  for (let r = 1; r < rows.length; r++) {
+    const row = rows[r]
+    if (!row.length || row.every((c) => !c.trim())) continue
+
+    const date = (row[iDate] || '').trim()
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      errors.push(`Row ${r + 1}: "${date || '(blank)'}" isn't a valid date (want YYYY-MM-DD) — skipped.`)
+      continue
+    }
+
+    const isRest = iRest !== -1 && /^(true|yes|1|y)$/i.test((row[iRest] || '').trim())
+    const typeRaw = iType !== -1 ? (row[iType] || '').trim() : ''
+    const type = WK_TYPES.find((t) => t.id.toLowerCase() === typeRaw.toLowerCase())?.id || null
+    const notes = iNotes !== -1 ? (row[iNotes] || '').trim() : ''
+    const exerciseName = iExercise !== -1 ? (row[iExercise] || '').trim() : ''
+
+    if (!days[date]) days[date] = { type: null, exercises: [], notes: '', rest: false, goalIds: [] }
+    const day = days[date]
+
+    if (isRest) day.rest = true
+    if (type && !day.type) day.type = type
+    if (notes && !day.notes) day.notes = notes
+
+    if (exerciseName && !isRest) {
+      day.exercises.push({
+        name: exerciseName,
+        sets: iSets !== -1 && row[iSets]?.trim() ? Math.max(1, parseInt(row[iSets], 10) || 3) : 3,
+        reps: iReps !== -1 ? (row[iReps] || '').trim() : '',
+        weight: iWeight !== -1 ? (row[iWeight] || '').trim() : '',
+      })
+    } else if (!exerciseName && !isRest) {
+      errors.push(`Row ${r + 1}: no exercise and not marked rest — skipped.`)
+    }
+  }
+
+  Object.values(days).forEach((d) => {
+    if (!d.type) d.type = 'Other'
+    if (d.rest) d.exercises = []
+  })
+
+  return { days, errors }
+}
+
 export const fmtDuration = (secs) => {
   const s = Math.max(0, Math.floor(secs || 0))
   const h = Math.floor(s / 3600)
