@@ -9,6 +9,7 @@ import {
   fetchWorkoutPlan, savePlanDay, clearPlanDay, fetchExerciseDB, saveExerciseDB,
   fetchWorkoutSessions, saveWorkoutSession, deleteWorkoutSession,
   addExerciseMinutes, fetchGoals, newId,
+  fetchExerciseGoals, saveExerciseGoal, deleteExerciseGoal,
 } from '../../lib/data'
 import {
   WK_TYPES, DEFAULT_EXERCISE_DB, WK_TEMPLATES, bodypartLabel,
@@ -42,6 +43,7 @@ export default function WorkoutModule() {
   const sessions = useAsync((f) => fetchWorkoutSessions({ force: f }))
   const dbRaw = useAsync((f) => fetchExerciseDB({ force: f }))
   const goals = useAsync((f) => fetchGoals({ force: f }))
+  const exGoals = useAsync((f) => fetchExerciseGoals({ force: f }))
 
   const db = dbRaw.data || DEFAULT_EXERCISE_DB
   const healthGoals = (goals.data || []).filter((g) => g.area === 'health' && g.status === 'active')
@@ -109,7 +111,7 @@ export default function WorkoutModule() {
       )}
       {tab === 'db' && <DatabaseTab db={db} onSaved={() => dbRaw.reload()} />}
       {tab === 'history' && <HistoryTab sessions={sessions} onEdit={setSession} onTab={setTab} />}
-      {tab === 'progress' && <ProgressTab sessions={sessions.data || []} />}
+      {tab === 'progress' && <ProgressTab sessions={sessions.data || []} exGoals={exGoals} db={db} />}
 
       <button className="mob-fab" onClick={() => startSession(null, true)} aria-label="Log session">
         <Icon name="play_arrow" size={26} fill />
@@ -1018,7 +1020,292 @@ function exerciseHistory(sessions, name) {
     })
 }
 
-function ProgressTab({ sessions }) {
+/* ── Goal evaluation ─────────────────────────────────────────
+   A goal targets ONE number: top-set weight for a loaded lift, best
+   SINGLE-set reps for a bodyweight move ("15 pull-ups" means 15 in one
+   set, not summed across a session — deliberately different from the
+   Explorer's total-reps default below, which answers a different
+   question: how much work got done, vs how good is the best effort).
+   Nothing about achievement is stored — it's recomputed from real session
+   history every render, so it can never drift out of sync with the log.
+   Only the user's explicit "I saw it, celebrate" moment (celebratedAt)
+   is persisted. */
+function evaluateGoal(sessions, goal) {
+  const rows = exerciseHistory(sessions, goal.exercise).filter((r) => r.date >= goal.startedAt)
+  const metric = (r) => (goal.mode === 'weight' ? r.topWeight : r.topReps)
+  const start = goal.startingValue || 0
+  let best = start
+  let achievedDate = null
+  for (const r of rows) {
+    const v = metric(r)
+    if (v > best) best = v
+    if (!achievedDate && v >= goal.target) achievedDate = r.date
+  }
+  const span = goal.target - start
+  const pct = span > 0 ? Math.max(0, Math.min(100, ((best - start) / span) * 100)) : (best >= goal.target ? 100 : 0)
+  return { best, achievedDate, pct, reached: !!achievedDate }
+}
+
+/** All-time best for an exercise+mode across full history — used as the
+    starting point when a new goal is created ("where you are today"). */
+function bestEver(sessions, exercise, mode) {
+  return exerciseHistory(sessions, exercise).reduce(
+    (m, r) => Math.max(m, mode === 'weight' ? r.topWeight : r.topReps), 0)
+}
+
+function ProgressTab({ sessions, exGoals, db }) {
+  const [newGoalOpen, setNewGoalOpen] = useState(false)
+  const [prefill, setPrefill] = useState(null)
+  const confirm = useConfirm()
+
+  const list = exGoals.data || []
+  const evaluated = useMemo(() => list.map((g) => ({ goal: g, ...evaluateGoal(sessions, g) })), [list, sessions])
+  const active = evaluated.filter((e) => !e.goal.celebratedAt && !e.reached)
+  const readyToCelebrate = evaluated.filter((e) => !e.goal.celebratedAt && e.reached)
+  const completed = evaluated.filter((e) => e.goal.celebratedAt)
+    .sort((a, b) => (b.goal.celebratedAt || '').localeCompare(a.goal.celebratedAt || ''))
+
+  async function celebrate(goal) {
+    try {
+      await saveExerciseGoal({ ...goal, celebratedAt: new Date().toISOString() })
+      exGoals.reload()
+      toast.success('Goal reached! 🎉')
+    } catch (e) { toast.error(e.message) }
+  }
+
+  async function removeGoal(id) {
+    try { await deleteExerciseGoal(id); exGoals.reload() }
+    catch (e) { toast.error(e.message) }
+  }
+
+  return (
+    <>
+      <div className="flex items-start justify-between gap-3 flex-wrap" style={{ marginBottom: 16 }}>
+        <div>
+          <h2 style={{ fontSize: 18, fontWeight: 800 }}>Goals</h2>
+          <p style={{ fontSize: 12.5, color: 'var(--text-2)', marginTop: 3 }}>
+            Pick an exercise, set a target, track it from the day you started until you hit it.
+          </p>
+        </div>
+        <button className="btn btn-primary btn-sm" onClick={() => { setPrefill(null); setNewGoalOpen(true) }}>
+          <Icon name="add" size={16} /> New Goal
+        </button>
+      </div>
+
+      {readyToCelebrate.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
+          {readyToCelebrate.map(({ goal, best, achievedDate }) => (
+            <div key={goal.id} className="hero-card" style={{ background: 'var(--accent)' }}>
+              <div className="hero-content">
+                <div>
+                  <div className="hero-eyebrow">Goal reached &middot; {goal.exercise}</div>
+                  <div className="hero-h">
+                    {goal.mode === 'weight' ? `${Math.round(best)} kg` : `${Math.round(best)} reps`}
+                  </div>
+                  <p className="hero-copy">
+                    Hit on {pretty(achievedDate)} — started {pretty(goal.startedAt)} at {goal.mode === 'weight' ? `${Math.round(goal.startingValue || 0)} kg` : `${Math.round(goal.startingValue || 0)} reps`}.
+                  </p>
+                  <div className="hero-actions">
+                    <button className="btn btn-primary" onClick={() => celebrate(goal)}>
+                      <Icon name="celebration" size={17} /> Celebrate
+                    </button>
+                    <button className="btn btn-secondary"
+                      onClick={() => { setPrefill({ exercise: goal.exercise, mode: goal.mode }); setNewGoalOpen(true) }}>
+                      <Icon name="add" size={16} /> Next goal
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {!active.length && !readyToCelebrate.length ? (
+        <Card style={{ marginBottom: 18 }}>
+          <Empty icon="flag" title="No active goals" action={
+            <button className="btn btn-primary btn-sm" onClick={() => { setPrefill(null); setNewGoalOpen(true) }}>
+              <Icon name="add" size={16} /> Set your first goal
+            </button>
+          }>
+            Pick an exercise you care about and a number to hit — weight for loaded lifts, reps for bodyweight moves.
+          </Empty>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5" style={{ marginBottom: 18 }}>
+          {active.map(({ goal, best, pct }) => {
+            const daysIn = Math.max(0, Math.round((new Date() - new Date(goal.startedAt + 'T12:00:00')) / 86400000))
+            const armed = confirm.isArmed(goal.id)
+            const unit = goal.mode === 'weight' ? ' kg' : ' reps'
+            return (
+              <Card key={goal.id}>
+                <div className="flex items-start justify-between gap-3" style={{ marginBottom: 10 }}>
+                  <div>
+                    <div style={{ fontSize: 15, fontWeight: 800 }}>{goal.exercise}</div>
+                    <div style={{ fontSize: 11.5, color: 'var(--text-3)', fontWeight: 600, marginTop: 2 }}>
+                      Since {pretty(goal.startedAt)} &middot; day {daysIn}
+                    </div>
+                  </div>
+                  <button className={`btn btn-icon btn-sm${armed ? ' btn-danger' : ''}`}
+                    onClick={() => armed ? removeGoal(goal.id) : confirm.arm(goal.id)}
+                    title={armed ? 'Confirm delete' : 'Delete goal'}>
+                    <Icon name={armed ? 'check' : 'delete'} size={15} />
+                  </button>
+                </div>
+                <div className="flex items-end justify-between gap-2" style={{ marginBottom: 8 }}>
+                  <span className="tnum" style={{ fontSize: 26, fontWeight: 800, letterSpacing: '-.02em' }}>
+                    {Math.round(best)}{unit}
+                  </span>
+                  <span style={{ fontSize: 13, color: 'var(--text-3)', fontWeight: 700, marginBottom: 4 }}>
+                    target {Math.round(goal.target)}{unit}
+                  </span>
+                </div>
+                <div className="score-meter" style={{ height: 10 }}>
+                  <span style={{ width: `${pct}%`, background: 'var(--accent)' }} />
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 700, marginTop: 6 }}>
+                  {Math.round(pct)}% of the way from {Math.round(goal.startingValue || 0)}{unit} to {Math.round(goal.target)}{unit}
+                </div>
+              </Card>
+            )
+          })}
+        </div>
+      )}
+
+      {completed.length > 0 && (
+        <Card style={{ marginBottom: 24 }}>
+          <CardHead title="Completed goals" sub="Every goal you've hit and celebrated." />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {completed.map(({ goal, achievedDate }) => (
+              <div key={goal.id} className="check-row" style={{ cursor: 'default' }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 700, fontSize: 13.5 }}>{goal.exercise}</div>
+                  <div style={{ fontSize: 11.5, color: 'var(--text-3)', fontWeight: 600 }}>
+                    {pretty(goal.startedAt)} &rarr; {achievedDate ? pretty(achievedDate) : '—'}
+                  </div>
+                </div>
+                <Badge tone="green">
+                  {Math.round(goal.target)}{goal.mode === 'weight' ? ' kg' : ' reps'}
+                </Badge>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      <div style={{ borderTop: '1px solid var(--border)', paddingTop: 20, marginTop: 8 }}>
+        <h3 style={{ fontSize: 14, fontWeight: 800, color: 'var(--text-2)', marginBottom: 3 }}>Explore any exercise</h3>
+        <p style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 14 }}>
+          A secondary view — every exercise you've logged, with a chart, whether or not it has a goal.
+        </p>
+        <ExerciseExplorer sessions={sessions} />
+      </div>
+
+      <NewGoalModal open={newGoalOpen} prefill={prefill} sessions={sessions} db={db}
+        onClose={() => setNewGoalOpen(false)}
+        onSaved={() => { setNewGoalOpen(false); exGoals.reload() }} />
+    </>
+  )
+}
+
+function NewGoalModal({ open, prefill, sessions, db, onClose, onSaved }) {
+  const [exercise, setExercise] = useState('')
+  const [mode, setMode] = useState('weight')
+  const [target, setTarget] = useState('')
+  const [startedAt, setStartedAt] = useState(today())
+  const [notes, setNotes] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (!open) return
+    const ex = prefill?.exercise || ''
+    setExercise(ex)
+    setMode(prefill?.mode || (ex ? (isBodyweightExercise(ex, sessions) ? 'reps' : 'weight') : 'weight'))
+    setTarget('')
+    setStartedAt(today())
+    setNotes('')
+  }, [open, prefill]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const exerciseOptions = useMemo(() => {
+    const names = new Set()
+    sessions.forEach((s) => (s.exercises || []).forEach((e) => e.name?.trim() && names.add(e.name)))
+    Object.values(db || {}).forEach((list) => list.forEach((n) => names.add(n)))
+    return [...names].sort()
+  }, [sessions, db])
+
+  async function save() {
+    if (!exercise.trim() || !target || Number(target) <= 0) {
+      toast.error('Pick an exercise and a target above zero.')
+      return
+    }
+    setSaving(true)
+    try {
+      const startingValue = bestEver(sessions, exercise.trim(), mode)
+      await saveExerciseGoal({
+        id: newId('exgoal'),
+        exercise: exercise.trim(),
+        mode,
+        target: Number(target),
+        startedAt,
+        startingValue,
+        celebratedAt: null,
+        createdAt: new Date().toISOString(),
+        notes,
+      })
+      toast.success('Goal set')
+      onSaved()
+    } catch (e) { toast.error(e.message) } finally { setSaving(false) }
+  }
+
+  return (
+    <Modal open={open} onClose={onClose} title="New goal" sub="One number, one exercise, tracked from today until you hit it.">
+      <SectionLabel>Exercise</SectionLabel>
+      <input list="goal-exercise-options" value={exercise} onChange={(e) => setExercise(e.target.value)}
+        placeholder="e.g. Barbell Bench Press, Pull-Up" style={{ marginBottom: 14 }} />
+      <datalist id="goal-exercise-options">
+        {exerciseOptions.map((n) => <option key={n} value={n} />)}
+      </datalist>
+
+      <SectionLabel>Tracked by</SectionLabel>
+      <div className="flex gap-1" style={{ background: 'var(--white-soft)', borderRadius: 999, padding: 3, width: 'fit-content', marginBottom: 14 }}>
+        {['weight', 'reps'].map((m) => (
+          <button key={m} className={`btn btn-sm ${mode === m ? 'btn-primary' : 'btn-ghost'}`}
+            style={{ borderRadius: 999 }} onClick={() => setMode(m)}>
+            {m === 'weight' ? 'Weight (kg)' : 'Reps (best set)'}
+          </button>
+        ))}
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 4 }}>
+        <div>
+          <SectionLabel>Target ({mode === 'weight' ? 'kg' : 'reps'})</SectionLabel>
+          <input type="number" inputMode="decimal" min={1} value={target}
+            onChange={(e) => setTarget(e.target.value)} placeholder={mode === 'weight' ? 'e.g. 100' : 'e.g. 15'} />
+        </div>
+        <div>
+          <SectionLabel>Started</SectionLabel>
+          <input type="date" value={startedAt} onChange={(e) => setStartedAt(e.target.value)} />
+        </div>
+      </div>
+
+      <SectionLabel>Notes</SectionLabel>
+      <textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)}
+        placeholder="Optional — why this goal, what the plan is." style={{ marginBottom: 16 }} />
+
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+        <button className="btn btn-primary" disabled={saving} onClick={save}>
+          <Icon name="flag" size={16} /> {saving ? 'Saving…' : 'Set goal'}
+        </button>
+        <button className="btn btn-secondary btn-sm" onClick={onClose}>Cancel</button>
+      </div>
+    </Modal>
+  )
+}
+
+/* ── Explorer (secondary) ────────────────────────────────────
+   The original single-exercise chart, kept as-is but demoted below Goals
+   — a browse tool for anything logged, goal or no goal. */
+function ExerciseExplorer({ sessions }) {
   const exerciseNames = useMemo(() => {
     const counts = new Map()
     sessions.forEach((s) => (s.exercises || []).forEach((e) => {

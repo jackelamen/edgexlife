@@ -401,6 +401,26 @@ export async function addWorkoutSession(session) {
   invalidate('workout-sessions')
 }
 
+/* ── Exercise goals ───────────────────────────────────────
+   Same shape as fasting/workout sessions: a capped jsonb array,
+   upsert-by-id. A goal targets one exercise with a single number — a
+   weight for loaded lifts, a rep count for bodyweight moves — tracked
+   from the day it was started until it's hit.
+   Goal: { id, exercise, mode: 'weight'|'reps', target, startedAt,
+     startingValue, achievedAt|null, celebratedAt|null, createdAt, notes } */
+export const fetchExerciseGoals = (o) => cachedQuery('exercise-goals',
+  async () => (await rpc('life_get_exercise_goals', { p_limit: 200 })) || [], { ttlMs: TTL.health, ...o })
+
+export async function saveExerciseGoal(goal) {
+  await rpc('life_save_exercise_goal', { p_goal: goal })
+  invalidate('exercise-goals')
+}
+
+export async function deleteExerciseGoal(id) {
+  await rpc('life_delete_exercise_goal', { p_id: id })
+  invalidate('exercise-goals')
+}
+
 /**
  * Finishing a session feeds its minutes back into that day's health log, so
  * training shows up in the Health Score. Mirrors wkAdjustHealthExerciseMinutes
