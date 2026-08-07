@@ -92,7 +92,7 @@ export default function WorkoutModule() {
       )}
       {tab === 'log' && (
         <SessionTab
-          session={session} setSession={setSession} db={db} goals={healthGoals}
+          session={session} setSession={setSession} db={db} goals={healthGoals} plan={plan}
           onStart={startSession}
           onFinished={() => { sessions.reload(); setSession(null); setTab('history') }}
         />
@@ -107,6 +107,28 @@ export default function WorkoutModule() {
   )
 }
 
+/* Shared shape-conversion: a session's per-set exercises -> the plan's
+   {name, sets:<count>, reps, weight} shape, using the first set as the
+   representative reps/weight. Used both to backfill plan.data on finish()
+   and to derive a display-only "what actually happened" day when a day
+   was logged straight from Log Session without ever being planned. */
+function sessionToPlanDay(session, existing) {
+  return {
+    type: session.type || existing?.type || 'Other',
+    exercises: session.exercises?.length
+      ? session.exercises.map((ex) => ({
+          name: ex.name,
+          sets: ex.sets?.length || 3,
+          reps: ex.sets?.[0]?.reps || '',
+          weight: ex.sets?.[0]?.weight || '',
+        }))
+      : (existing?.exercises || []),
+    notes: existing?.notes || session.notes || '',
+    rest: false,
+    goalIds: Array.from(new Set([...(existing?.goalIds || []), ...(session.goalIds || [])])),
+  }
+}
+
 /* ═══════════════ Plan ═══════════════ */
 
 function PlanTab({ plan, weekOffset, db, goals, sessions, onStart }) {
@@ -119,11 +141,27 @@ function PlanTab({ plan, weekOffset, db, goals, sessions, onStart }) {
   const totalVol = weekSessions.reduce((n, s) => n + sessionVolume(s), 0)
   const planned = dates.filter((d) => plan.data?.[d] && !plan.data[d].rest).length
 
+  // A day with a REAL saved plan uses it as-is. A day with no plan but at
+  // least one logged session is displayed and made copyable too — a session
+  // logged via "Log Session" (bypassing the planner entirely) never wrote
+  // to plan.data before, so that day silently stayed "+ Add" forever even
+  // once real training happened. Nothing is written here; this is purely
+  // what the Plan grid and "Copy from another day" read from.
+  const effectiveByDate = useMemo(() => {
+    const out = {}
+    for (const d of dates) {
+      if (plan.data?.[d]) { out[d] = plan.data[d]; continue }
+      const daySessions = sessions.filter((s) => s.date === d)
+      if (daySessions.length) out[d] = sessionToPlanDay(daySessions[daySessions.length - 1])
+    }
+    return out
+  }, [dates, plan.data, sessions])
+
   return (
     <>
       <div className="plan-week">
         {dates.map((date, i) => {
-          const day = plan.data?.[date]
+          const day = effectiveByDate[date]
           const isToday = date === t
           const type = WK_TYPES.find((w) => w.id === day?.type)
           return (
@@ -201,6 +239,7 @@ function PlanTab({ plan, weekOffset, db, goals, sessions, onStart }) {
       <DayModal
         date={editDate}
         plan={plan}
+        effectiveByDate={effectiveByDate}
         db={db}
         allDates={dates}
         onClose={() => setEditDate(null)}
@@ -210,9 +249,13 @@ function PlanTab({ plan, weekOffset, db, goals, sessions, onStart }) {
   )
 }
 
-function DayModal({ date, plan, db, allDates, onClose, onStart }) {
+function DayModal({ date, plan, effectiveByDate, db, allDates, onClose, onStart }) {
   const open = Boolean(date)
-  const existing = date ? plan.data?.[date] : null
+  // Prefill from the REAL plan if one exists, otherwise from whatever was
+  // actually logged that day (effectiveByDate) — so opening a day that was
+  // only ever "Log Session"-ed shows what happened instead of a blank form,
+  // and hitting Save on it turns that into a real saved plan.
+  const existing = date ? (plan.data?.[date] || effectiveByDate?.[date]) : null
 
   const [type, setType] = useState(null)
   const [exercises, setExercises] = useState([])
@@ -325,13 +368,13 @@ function DayModal({ date, plan, db, allDates, onClose, onStart }) {
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <select value={copyFrom} onChange={(e) => setCopyFrom(e.target.value)} style={{ flex: 1, fontSize: 13 }}>
             <option value="">— pick a day to copy —</option>
-            {allDates.filter((d) => d !== date && plan.data?.[d]).map((d, i) => (
-              <option key={d} value={d}>{DAY_FULL[allDates.indexOf(d)]} — {plan.data[d].type}</option>
+            {allDates.filter((d) => d !== date && effectiveByDate?.[d]).map((d, i) => (
+              <option key={d} value={d}>{DAY_FULL[allDates.indexOf(d)]} — {effectiveByDate[d].type}</option>
             ))}
           </select>
           <button className="btn btn-secondary btn-sm" disabled={!copyFrom}
             onClick={() => {
-              const src = plan.data?.[copyFrom]
+              const src = effectiveByDate?.[copyFrom]
               if (!src) return
               setType(src.type); setExercises(src.exercises || [])
               setNotes(src.notes || ''); setRest(Boolean(src.rest))
@@ -362,9 +405,26 @@ function DayModal({ date, plan, db, allDates, onClose, onStart }) {
   )
 }
 
+/*
+  A session logged via "Log Session" (quick-start, bypassing the Plan
+  grid entirely) used to only write to the sessions table — plan.data[date]
+  stayed undefined forever, so that day kept showing "+ Add" on the Plan
+  tab and never appeared in any "Copy from another day" list even after
+  real workouts were logged. This backfills the plan for that date from
+  what was actually done, so the Plan grid and Copy-from-day both reflect
+  reality regardless of whether the day was pre-planned first. Converts
+  the session's per-set shape ({name, sets:[{reps,weight,done}]}) into the
+  plan's shape ({name, sets:<count>, reps, weight}) using the first set's
+  values as the representative rep/weight for that exercise. */
+async function syncPlanFromSession(session, plan) {
+  const existing = plan?.data?.[session.date]
+  await savePlanDay(session.date, sessionToPlanDay(session, existing))
+  plan?.reload?.()
+}
+
 /* ═══════════════ Live session ═══════════════ */
 
-function SessionTab({ session, setSession, db, goals, onStart, onFinished }) {
+function SessionTab({ session, setSession, db, goals, plan, onStart, onFinished }) {
   const [secs, setSecs] = useState(0)
   const [running, setRunning] = useState(false)
   const [openEx, setOpenEx] = useState(0)
@@ -409,6 +469,7 @@ function SessionTab({ session, setSession, db, goals, onStart, onFinished }) {
     try {
       await saveWorkoutSession(cleaned)
       await addExerciseMinutes(cleaned.date, Math.round(secs / 60), cleaned.type)
+      await syncPlanFromSession(cleaned, plan)
       toast.success('Session saved')
       onFinished()
     } catch (e) { toast.error(e.message) }
