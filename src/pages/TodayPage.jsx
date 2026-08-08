@@ -17,6 +17,7 @@ import { healthDetails, clarityDetails, healthLabel, weakestComponent } from '..
 import {
   isSprintActive, sprintCurrentWeek, tacticsForWeek,
   checkKey, tacticKeyId, todayDayIdx, xpwTarget, xpwDoneCount, xpwDidToday,
+  effectiveCustomDays, originalDayFor,
 } from '../lib/goals'
 import { MODULES, STATUS, metric } from '../lib/design'
 import { today, daysAgo, pretty } from '../lib/dates'
@@ -114,8 +115,13 @@ export default function TodayPage() {
         if (freq === 'daily') {
           out.push({ sp, tac, wk, dayIdx, done: Boolean(checks[checkKey(tac, dayIdx)]), kind: 'day' })
         } else if (freq === 'custom') {
-          if ((tac.days || []).includes(dayIdx)) {
-            out.push({ sp, tac, wk, dayIdx, done: Boolean(checks[checkKey(tac, dayIdx)]), kind: 'day' })
+          // Swap-aware: today is due if it's a native day that wasn't
+          // moved away, or the destination of a swap from another day
+          // this week. The checkmark itself always lives under the
+          // ORIGINAL day's key (see lib/goals.js effectiveCustomDays).
+          if (effectiveCustomDays(tac, sp, wk).includes(dayIdx)) {
+            const origDay = originalDayFor(tac, sp, wk, dayIdx)
+            out.push({ sp, tac, wk, dayIdx: origDay, done: Boolean(checks[checkKey(tac, origDay)]), kind: 'day' })
           }
         } else if (freq === 'xperweek') {
           const n = xpwTarget(tac), c = xpwDoneCount(tac, checks)

@@ -69,6 +69,70 @@ export function tacticsForWeek(phases, tactics, week) {
 /** The stable identity used as a checks-object key — see saveTactic in data.js. */
 export const tacticKeyId = (t) => t.local_id || t.id
 
+/* ── Day swaps ──────────────────────────────────────────────
+   A custom-day tactic (say, MWF) has one obligation attached to each of
+   its native days. Day swaps let a specific week reassign one of those
+   obligations to a different day — "F got busy, I'll do it Saturday
+   instead" — WITHOUT touching the tactic's default schedule going
+   forward, and without rewriting history: completion is still recorded
+   under the ORIGINAL day's checkKey (see checkKey above), only the day it
+   visually shows up on for that one week changes. This means execScore
+   (week-level, day-blind) needs no changes at all — an obligation is
+   still "1 of N possible checkpoints," full stop, regardless of which
+   calendar day displays it. Only the day-specific reads (today's due
+   list, the dot row) need to consult a swap.
+
+   Storage shape, on sprint.day_swaps: { [week]: { [tacticKeyId]: {
+   [fromDayIdx]: toDayIdx } } } — snake_case column used directly as the
+   JS property, same pattern as week_checks/archived, no camelCase
+   mapping layer. */
+
+function swapMapFor(sprint, week, tactic) {
+  const raw = (sprint.day_swaps || {})[week]?.[tacticKeyId(tactic)] || {}
+  const map = {}
+  for (const k of Object.keys(raw)) map[Number(k)] = Number(raw[k])
+  return map
+}
+
+/** This week's custom-day list with any active swaps applied, in the same
+    order as tactic.days — the day each dot/obligation visually sits on.
+    Completion is still keyed by the ORIGINAL day (tactic.days[i]), never
+    by this display day, so callers that need to read/write a checkmark
+    should zip the two arrays together rather than using this alone. */
+export function effectiveCustomDays(tactic, sprint, week) {
+  const swaps = swapMapFor(sprint, week, tactic)
+  return (tactic.days || []).map((d) => (d in swaps ? swaps[d] : d))
+}
+
+/** Inverse lookup for "what original obligation, if any, is showing up on
+    `displayDay` today" — used where the caller starts from today's day
+    index rather than iterating the tactic's own days (Mission Control's
+    due-today list). Returns null if `displayDay` is itself a native day
+    that got swapped away (nothing displays there this week). */
+export function originalDayFor(tactic, sprint, week, displayDay) {
+  const swaps = swapMapFor(sprint, week, tactic)
+  const hit = Object.keys(swaps).find((k) => swaps[k] === displayDay)
+  if (hit != null) return Number(hit)
+  return displayDay in swaps ? null : displayDay
+}
+
+/** Pure data transform: returns a new day_swaps object with `tactic`'s
+    `fromDay` in `week` pointed at `toDay`. Passing `toDay == null` (or
+    equal to `fromDay`) clears the swap and reverts that day to its native
+    schedule. Callers pass the result straight to saveSprint. */
+export function withDaySwap(sprint, week, tactic, fromDay, toDay) {
+  const all = { ...(sprint.day_swaps || {}) }
+  const wk = { ...(all[week] || {}) }
+  const forTactic = { ...(wk[tacticKeyId(tactic)] || {}) }
+  if (toDay == null || toDay === fromDay) delete forTactic[fromDay]
+  else forTactic[fromDay] = toDay
+  if (Object.keys(forTactic).length) wk[tacticKeyId(tactic)] = forTactic
+  else delete wk[tacticKeyId(tactic)]
+  if (Object.keys(wk).length) all[week] = wk
+  else delete all[week]
+  return all
+}
+
 export const xpwTarget = (t) => Math.max(1, parseInt(t.times_per_week) || 1)
 export function xpwDoneCount(t, checks) {
   const n = xpwTarget(t)
@@ -168,7 +232,14 @@ export function todayDoneTotals(phases, tactics, sp) {
     if (freq === 'daily') {
       total++; if (checks[checkKey(t, todayIdx)]) done++
     } else if (freq === 'custom') {
-      if ((t.days || []).includes(todayIdx)) { total++; if (checks[checkKey(t, todayIdx)]) done++ }
+      // Swap-aware: today counts as due either because it's a native day
+      // that wasn't moved away, or because another day's obligation was
+      // swapped onto today this week. Either way the checkmark itself
+      // still lives under the ORIGINAL day's key.
+      if (effectiveCustomDays(t, sp, wk).includes(todayIdx)) {
+        const origDay = originalDayFor(t, sp, wk, todayIdx)
+        total++; if (checks[checkKey(t, origDay)]) done++
+      }
     } else if (freq === 'xperweek') {
       const n = xpwTarget(t), c = xpwDoneCount(t, checks)
       const didToday = xpwDidToday(t, checks)

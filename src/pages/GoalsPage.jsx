@@ -22,7 +22,7 @@ import {
   sprintCurrentWeek, isSprintActive, phaseIdxForWeek, tacticsForWeek,
   xpwTarget, xpwDoneCount, xpwDidToday, tacticCheckpointCount, checkKey,
   execScore, avgExecScore, todayDoneTotals, scoreColor, scoreBadgeTone,
-  autoEndDate, DEFAULT_PHASES, goalStreak,
+  autoEndDate, DEFAULT_PHASES, goalStreak, effectiveCustomDays, withDaySwap,
 } from '../lib/goals'
 import VisionBoard from '../components/goals/VisionBoard'
 import StreakChart from '../components/goals/StreakChart'
@@ -189,6 +189,15 @@ function CycleCard({ sprint, phases, tactics, goal, compact, onChanged, onDelete
     onChanged()
   }
 
+  // Custom-day tactics only: move one day's obligation onto a different
+  // day for THIS week, without touching the tactic's default schedule.
+  // Completion history stays keyed by the original day (see lib/goals.js).
+  async function swapDay(t, fromDay, toDay) {
+    const day_swaps = withDaySwap(sprint, week, t, fromDay, toDay)
+    await saveSprint({ ...sprint, day_swaps })
+    onChanged()
+  }
+
   return (
     <div className="cycle-card" style={{ borderLeftColor: areaColor(goal?.area) }}>
       <div className="cycle-header">
@@ -247,8 +256,10 @@ function CycleCard({ sprint, phases, tactics, goal, compact, onChanged, onDelete
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {weekTactics.map((t) => (
-                <TacticRow key={t.id} tactic={t} checks={checks} onToggleDay={(d) => toggle(t, d)}
-                  onToggleXpw={(i) => toggleXpw(t, i)} />
+                <TacticRow key={t.id} tactic={t} checks={checks} sprint={sprint} week={week}
+                  onToggleDay={(d) => toggle(t, d)}
+                  onToggleXpw={(i) => toggleXpw(t, i)}
+                  onSwapDay={(fromDay, toDay) => swapDay(t, fromDay, toDay)} />
               ))}
             </div>
           )}
@@ -260,37 +271,85 @@ function CycleCard({ sprint, phases, tactics, goal, compact, onChanged, onDelete
   )
 }
 
-function TacticRow({ tactic: t, checks, onToggleDay, onToggleXpw }) {
+function TacticRow({ tactic: t, checks, sprint, week, onToggleDay, onToggleXpw, onSwapDay }) {
   const n = tacticCheckpointCount(t)
+  const [swapping, setSwapping] = useState(false)
+  const isCustom = t.freq === 'custom'
+  const effDays = isCustom ? effectiveCustomDays(t, sprint, week) : []
+  const anySwapped = isCustom && effDays.some((d, i) => d !== (t.days || [])[i])
+
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-      <div style={{ minWidth: 0, flex: '1 1 220px' }}>
-        <div style={{ fontSize: 13.5, fontWeight: 700 }}>{t.text}</div>
-        <div style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 600 }}>
-          {t.freq === 'xperweek' ? `${xpwDoneCount(t, checks)}/${n} this week` :
-            t.freq === 'custom' ? (t.days || []).map((d) => DAY_LABELS[d]).join(', ') :
-            t.freq}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+        <div style={{ minWidth: 0, flex: '1 1 220px' }}>
+          <div style={{ fontSize: 13.5, fontWeight: 700 }}>{t.text}</div>
+          <div style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+            {t.freq === 'xperweek' ? `${xpwDoneCount(t, checks)}/${n} this week` :
+              isCustom ? effDays.map((d) => DAY_LABELS[d]).join(', ') :
+              t.freq}
+            {anySwapped && <span className="badge badge-orange" style={{ fontSize: 9.5, padding: '1px 6px' }}>swapped this wk</span>}
+            {isCustom && (
+              <button type="button" className="btn btn-ghost btn-xs" style={{ padding: '1px 5px' }}
+                onClick={() => setSwapping((v) => !v)} title="Swap a day for this week">
+                <Icon name="swap_horiz" size={12} />
+              </button>
+            )}
+          </div>
+        </div>
+        <div className="wk-dot-row">
+          {t.freq === 'daily' && DAY_LABELS.map((lbl, d) => (
+            <button key={d} className={`wk-dot${checks[checkKey(t, d)] ? ' done' : ''}${d === todayDayIdx() ? ' current' : ''}`}
+              onClick={() => onToggleDay(d)} title={lbl}>{lbl[0]}</button>
+          ))}
+          {isCustom && (t.days || []).map((origDay, i) => {
+            const dispDay = effDays[i]
+            return (
+              <button key={origDay} className={`wk-dot${checks[checkKey(t, origDay)] ? ' done' : ''}${dispDay === todayDayIdx() ? ' current' : ''}`}
+                onClick={() => onToggleDay(origDay)}
+                title={dispDay !== origDay ? `${DAY_LABELS[origDay]} → ${DAY_LABELS[dispDay]}` : DAY_LABELS[origDay]}>
+                {DAY_LABELS[dispDay][0]}
+              </button>
+            )
+          })}
+          {t.freq === 'xperweek' && Array.from({ length: xpwTarget(t) }).map((_, i) => (
+            <button key={i} className={`wk-dot${checks[`${t.local_id || t.id}_${i}`] ? ' done' : ''}`}
+              onClick={() => onToggleXpw(i)} title={`${i + 1}`}>{i + 1}</button>
+          ))}
+          {(t.freq === 'weekly' || t.freq === 'onetime') && (
+            <button className={`wk-dot${checks[t.local_id || t.id] ? ' done' : ''}`} onClick={() => onToggleDay(null)}>
+              <Icon name="check" size={13} />
+            </button>
+          )}
         </div>
       </div>
-      <div className="wk-dot-row">
-        {t.freq === 'daily' && DAY_LABELS.map((lbl, d) => (
-          <button key={d} className={`wk-dot${checks[checkKey(t, d)] ? ' done' : ''}${d === todayDayIdx() ? ' current' : ''}`}
-            onClick={() => onToggleDay(d)} title={lbl}>{lbl[0]}</button>
-        ))}
-        {t.freq === 'custom' && (t.days || []).map((d) => (
-          <button key={d} className={`wk-dot${checks[checkKey(t, d)] ? ' done' : ''}${d === todayDayIdx() ? ' current' : ''}`}
-            onClick={() => onToggleDay(d)} title={DAY_LABELS[d]}>{DAY_LABELS[d][0]}</button>
-        ))}
-        {t.freq === 'xperweek' && Array.from({ length: xpwTarget(t) }).map((_, i) => (
-          <button key={i} className={`wk-dot${checks[`${t.local_id || t.id}_${i}`] ? ' done' : ''}`}
-            onClick={() => onToggleXpw(i)} title={`${i + 1}`}>{i + 1}</button>
-        ))}
-        {(t.freq === 'weekly' || t.freq === 'onetime') && (
-          <button className={`wk-dot${checks[t.local_id || t.id] ? ' done' : ''}`} onClick={() => onToggleDay(null)}>
-            <Icon name="check" size={13} />
-          </button>
-        )}
-      </div>
+
+      {isCustom && swapping && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '8px 10px', borderRadius: 10,
+          background: 'var(--white-soft)', border: '1px solid var(--border)' }}>
+          <div style={{ fontSize: 10.5, color: 'var(--text-3)', fontWeight: 700 }}>
+            Something came up? Move a day to a different slot for week {week} only.
+          </div>
+          {(t.days || []).map((origDay, i) => {
+            const dispDay = effDays[i]
+            // Can't land two of this tactic's own obligations on the same
+            // day — exclude days the OTHER slots are currently displaying.
+            const taken = new Set(effDays.filter((_, j) => j !== i))
+            const options = DAY_LABELS.map((_, d) => d).filter((d) => d === origDay || d === dispDay || !taken.has(d))
+            return (
+              <div key={origDay} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 12, fontWeight: 700, width: 40 }}>{DAY_LABELS[origDay]}</span>
+                <Icon name="arrow_forward" size={13} style={{ color: 'var(--text-3)' }} />
+                <select style={{ fontSize: 12, padding: '3px 6px', flex: 1 }} value={dispDay}
+                  onChange={(e) => onSwapDay(origDay, Number(e.target.value))}>
+                  {options.map((d) => (
+                    <option key={d} value={d}>{DAY_LABELS[d]}{d === origDay ? ' (default)' : ''}</option>
+                  ))}
+                </select>
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
