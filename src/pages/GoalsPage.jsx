@@ -360,6 +360,11 @@ function GoalRoom({ goals, rollup, onEdit }) {
   const [filter, setFilter] = useState('active')
   const [open, setOpen] = useState(null)
   const confirm = useConfirm()
+  // Savings Targets (from the Finance app) stays wired — fetchSavingsGoals
+  // is still called and SHOW_SAVINGS flips the panel back on — just not
+  // rendered yet. Jack: "that will come later, I'm not ready for that one
+  // yet." Remove the flag once Finance data is ready to surface here.
+  const SHOW_SAVINGS = false
   const savings = useAsync((f) => fetchSavingsGoals({ force: f }))
 
   const list = (goals.data || []).filter((g) => (filter === 'all' ? true : g.status === filter))
@@ -417,31 +422,33 @@ function GoalRoom({ goals, rollup, onEdit }) {
         </div>
       )}
 
-      <Card>
-        <CardHead title="Savings Targets" sub="From your Finance app — shown here, edited there." />
-        {savings.loading ? <Loading /> : !(savings.data || []).length ? (
-          <Empty icon="savings" title="No savings goals yet" />
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {savings.data.map((s) => {
-              const pct = s.target ? Math.min(100, Math.round((s.current / s.target) * 100)) : 0
-              return (
-                <div key={s.id} className="mini-item" style={{ alignItems: 'flex-start' }}>
-                  <div style={{ flex: 1 }}>
-                    <strong>{s.name}</strong>
-                    <div className="prog-track" style={{ marginTop: 8, marginBottom: 4 }}>
-                      <div className="prog-fill green" style={{ width: `${pct}%` }} />
+      {SHOW_SAVINGS && (
+        <Card>
+          <CardHead title="Savings Targets" sub="From your Finance app — shown here, edited there." />
+          {savings.loading ? <Loading /> : !(savings.data || []).length ? (
+            <Empty icon="savings" title="No savings goals yet" />
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {savings.data.map((s) => {
+                const pct = s.target ? Math.min(100, Math.round((s.current / s.target) * 100)) : 0
+                return (
+                  <div key={s.id} className="mini-item" style={{ alignItems: 'flex-start' }}>
+                    <div style={{ flex: 1 }}>
+                      <strong>{s.name}</strong>
+                      <div className="prog-track" style={{ marginTop: 8, marginBottom: 4 }}>
+                        <div className="prog-fill green" style={{ width: `${pct}%` }} />
+                      </div>
+                      <small>${Number(s.current || 0).toLocaleString()} / ${Number(s.target || 0).toLocaleString()}
+                        {s.due_date ? ` · due ${pretty(s.due_date)}` : ''}</small>
                     </div>
-                    <small>${Number(s.current || 0).toLocaleString()} / ${Number(s.target || 0).toLocaleString()}
-                      {s.due_date ? ` · due ${pretty(s.due_date)}` : ''}</small>
+                    <Badge tone={pct >= 100 ? 'green' : 'blue'}>{pct}%</Badge>
                   </div>
-                  <Badge tone={pct >= 100 ? 'green' : 'blue'}>{pct}%</Badge>
-                </div>
-              )
-            })}
-          </div>
-        )}
-      </Card>
+                )
+              })}
+            </div>
+          )}
+        </Card>
+      )}
     </>
   )
 }
