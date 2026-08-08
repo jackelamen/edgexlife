@@ -149,18 +149,31 @@ function TodayView({ goals, rollup, cycleData, onStartCycle }) {
             <span style={{ width: `${todayPct}%`, background: '#fff' }} />
           </div>
         )}
+        {/* Second Stop: what the headline number is actually about, not just
+            a repeat of it. Also gives the hero a reason to hold the width it
+            has — previously the whole right two-thirds sat empty once the
+            three duplicate badges were removed from here. */}
+        {featured && (
+          <p style={{ fontSize: 13, fontWeight: 600, opacity: .82, marginTop: 14, maxWidth: 420 }}>
+            {live.length > 1 ? 'Up next: ' : ''}<strong>{featured.sp.name}</strong>
+            {featured.goal?.title ? ` · ${featured.goal.title}` : ''}
+          </p>
+        )}
       </div>
 
-      {/* Real fill (rule 2: fill = quantity) instead of the hero's badges
-          being repeated verbatim as plain-figure tiles right underneath —
-          each tile below now says something the hero didn't already say. */}
+      {/* Three tiles, matching .stat-strip's fixed 3-column grid — a 4th
+          tile here used to wrap onto its own row alone with two-thirds of
+          the row empty beside it (the actual source of "feels unbalanced").
+          Live cycles + active goals are folded into one tile's sub-line
+          instead of getting a whole card each. Real fill (rule 2) replaces
+          the hero's old badges, which just repeated these same numbers. */}
       <div className="stat-strip">
         <StatCard label="Today" value={todayTotals.total ? `${todayTotals.done}/${todayTotals.total}` : '—'}
           sub="actions done" icon="today" pct={todayPct} color={MODULES.goals.color} tint={MODULES.goals.tint} />
         <StatCard label="Streak" value={streak} sub={streak === 1 ? 'day' : 'days'} icon="local_fire_department"
           pct={streak > 0 ? streakPct : null} color={MODULES.goals.color} tint={MODULES.goals.tint} />
-        <StatCard label="Live cycles" value={live.length} />
-        <StatCard label="Active goals" value={active.length} />
+        <StatCard label="Live cycles" value={live.length}
+          sub={`${active.length} active goal${active.length === 1 ? '' : 's'}`} />
       </div>
 
       {cycleData.sprints.loading ? (
