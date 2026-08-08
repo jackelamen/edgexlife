@@ -18,7 +18,7 @@ import {
 } from '../lib/data'
 import { today, pretty, prettyShort } from '../lib/dates'
 import {
-  AREA_META, areaLabel, areaColor, DAY_LABELS, todayDayIdx,
+  areaLabel, areaColor, DAY_LABELS, todayDayIdx,
   sprintCurrentWeek, isSprintActive, phaseIdxForWeek, tacticsForWeek,
   xpwTarget, xpwDoneCount, xpwDidToday, tacticCheckpointCount, checkKey,
   execScore, avgExecScore, todayDoneTotals, scoreColor, scoreBadgeTone,
@@ -27,19 +27,26 @@ import {
 import VisionBoard from '../components/goals/VisionBoard'
 import StreakChart from '../components/goals/StreakChart'
 import DonutChart from '../components/goals/DonutChart'
+import { MODULES } from '../lib/design'
 
 const VIEWS = [
-  { value: 'today', label: 'Today' },
-  { value: 'goals', label: 'Goals' },
-  { value: 'cycles', label: 'Cycles' },
-  { value: 'roadmap', label: 'Roadmap' },
-  { value: 'visions', label: 'Visions' },
-  { value: 'retros', label: 'Retros' },
+  { value: 'today', label: 'Today', sub: "What's due today, and how the week is going." },
+  { value: 'goals', label: 'Goals', sub: 'Every active goal, by life area, with what feeds it.' },
+  { value: 'cycles', label: 'Cycles', sub: '12-week focus cycles — phases, actions, execution.' },
+  { value: 'roadmap', label: 'Roadmap', sub: 'Every cycle plotted against the calendar.' },
+  { value: 'visions', label: 'Visions', sub: 'The future state you’re building toward, by area.' },
+  { value: 'retros', label: 'Retros', sub: 'What a finished cycle taught you.' },
 ]
 
 export default function GoalsPage() {
   const [view, setView] = useState('today')
   const [editGoal, setEditGoal] = useState(null)
+  // A "start a cycle" request from anywhere in the module (Today's empty
+  // state, a goal card with no live cycle) lands here: switch to Cycles and
+  // hand it a token + optional goal to pre-fill, rather than each caller
+  // needing to know about CyclesView's own local editor state.
+  const [cycleIntent, setCycleIntent] = useState(null) // { token, goalId }
+  const startCycle = (goalId) => setCycleIntent({ token: Date.now(), goalId: goalId || null })
 
   const goals = useAsync((f) => fetchGoals({ force: f }))
   const rollup = useAsync((f) => fetchGoalRollup({ force: f }))
@@ -48,13 +55,14 @@ export default function GoalsPage() {
   const tactics = useAsync((f) => fetchSprintTactics({ force: f }))
 
   const cycleData = { sprints, phases, tactics }
+  const activeView = VIEWS.find((v) => v.value === view)
 
   return (
     <View>
       <PageHeader
         kicker="Goals"
-        title={VIEWS.find((v) => v.value === view)?.label}
-        sub="Vision, cycles, and the promises that deserve a plan."
+        title={activeView?.label}
+        sub={activeView?.sub}
         actions={
           <button className="btn btn-primary btn-sm" onClick={() => setEditGoal({})}>
             <Icon name="add" size={15} /> New Goal
@@ -63,9 +71,10 @@ export default function GoalsPage() {
       />
       <Tabs value={view} onChange={setView} options={VIEWS} />
 
-      {view === 'today' && <TodayView goals={goals} rollup={rollup} cycleData={cycleData} />}
-      {view === 'goals' && <GoalRoom goals={goals} rollup={rollup} onEdit={setEditGoal} />}
-      {view === 'cycles' && <CyclesView goals={goals} cycleData={cycleData} />}
+      {view === 'today' && <TodayView goals={goals} rollup={rollup} cycleData={cycleData} onStartCycle={() => { setView('cycles'); startCycle() }} />}
+      {view === 'goals' && <GoalRoom goals={goals} rollup={rollup} sprints={sprints} onEdit={setEditGoal}
+        onStartCycle={(goalId) => { setView('cycles'); startCycle(goalId) }} />}
+      {view === 'cycles' && <CyclesView goals={goals} cycleData={cycleData} cycleIntent={cycleIntent} />}
       {view === 'roadmap' && <RoadmapView goals={goals} sprints={sprints} />}
       {view === 'visions' && <VisionsView />}
       {view === 'retros' && <RetrosView goals={goals} sprints={sprints} cycleData={cycleData} />}
@@ -90,17 +99,36 @@ function useLiveCycles({ sprints, phases, tactics }) {
 
 /* ══════════════════ Today ══════════════════ */
 
-function TodayView({ goals, rollup, cycleData }) {
+function TodayView({ goals, rollup, cycleData, onStartCycle }) {
   const { live, forSprint } = useLiveCycles(cycleData)
   const active = (goals.data || []).filter((g) => g.status === 'active')
 
-  const todayTotals = live.reduce((acc, sp) => {
+  // Per-cycle today totals, computed once and reused both for the combined
+  // headline number and to decide which cycle gets featured below — a cycle
+  // that still owes something today outranks one that's already clean.
+  const perCycle = live.map((sp) => {
     const { phases, tactics } = forSprint(sp)
-    const r = todayDoneTotals(phases, tactics, sp)
-    return { done: acc.done + r.done, total: acc.total + r.total }
-  }, { done: 0, total: 0 })
+    const goal = (goals.data || []).find((g) => g.id === sp.goal_id)
+    const totals = todayDoneTotals(phases, tactics, sp)
+    return { sp, phases, tactics, goal, totals }
+  })
+  const todayTotals = perCycle.reduce((acc, c) => (
+    { done: acc.done + c.totals.done, total: acc.total + c.totals.total }
+  ), { done: 0, total: 0 })
+  const todayPct = todayTotals.total ? Math.round((todayTotals.done / todayTotals.total) * 100) : null
+
+  // Most-owed cycle first (still due today > already clean > nothing due),
+  // so the one thing worth opening by default is the one with real work in
+  // it — not just whichever cycle happens to sort first alphabetically.
+  const sorted = [...perCycle].sort((a, b) => {
+    const owedA = a.totals.total - a.totals.done, owedB = b.totals.total - b.totals.done
+    return owedB - owedA
+  })
+  const featured = sorted[0]
+  const rest = sorted.slice(1)
 
   const streak = useMemo(() => goalStreak(cycleData.sprints.data || []), [cycleData.sprints.data])
+  const streakPct = Math.min(100, Math.round((streak / 7) * 100))
 
   const hour = new Date().getHours()
   const greeting = hour < 5 ? 'Still up,' : hour < 12 ? 'Good morning,' : hour < 17 ? 'Good afternoon,' : 'Good evening,'
@@ -116,20 +144,23 @@ function TodayView({ goals, rollup, cycleData }) {
             todayTotals.done === todayTotals.total ? 'Clean day — everything checked off.' :
             `${todayTotals.done} of ${todayTotals.total} actions done today.`}
         </div>
-        <div className="hero-body">
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {streak > 0 && <span className="badge badge-orange">🔥 {streak} day streak</span>}
-            <span className="badge badge-green">{live.length} live cycle{live.length === 1 ? '' : 's'}</span>
-            <span className="badge badge-blue">{active.length} active goal{active.length === 1 ? '' : 's'}</span>
+        {todayTotals.total > 0 && (
+          <div className="score-meter" style={{ height: 8, background: 'rgba(255,255,255,.22)', marginTop: 12, maxWidth: 320 }}>
+            <span style={{ width: `${todayPct}%`, background: '#fff' }} />
           </div>
-        </div>
+        )}
       </div>
 
+      {/* Real fill (rule 2: fill = quantity) instead of the hero's badges
+          being repeated verbatim as plain-figure tiles right underneath —
+          each tile below now says something the hero didn't already say. */}
       <div className="stat-strip">
-        <StatCard label="Streak" value={streak} sub="consecutive days" />
-        <StatCard label="Active goals" value={active.length} />
+        <StatCard label="Today" value={todayTotals.total ? `${todayTotals.done}/${todayTotals.total}` : '—'}
+          sub="actions done" icon="today" pct={todayPct} color={MODULES.goals.color} tint={MODULES.goals.tint} />
+        <StatCard label="Streak" value={streak} sub={streak === 1 ? 'day' : 'days'} icon="local_fire_department"
+          pct={streak > 0 ? streakPct : null} color={MODULES.goals.color} tint={MODULES.goals.tint} />
         <StatCard label="Live cycles" value={live.length} />
-        <StatCard label="Open tasks" value={(rollup.data || []).reduce((s, r) => s + r.open_tasks, 0)} sub="in Pulse" />
+        <StatCard label="Active goals" value={active.length} />
       </div>
 
       {cycleData.sprints.loading ? (
@@ -137,20 +168,25 @@ function TodayView({ goals, rollup, cycleData }) {
       ) : !live.length ? (
         <Card>
           <Empty icon="rocket_launch" title="Nothing in motion yet"
-            action={<button className="btn btn-primary btn-sm" onClick={() => {}}>Start a Cycle</button>}>
+            action={<button className="btn btn-primary btn-sm" onClick={onStartCycle}>Start a Cycle</button>}>
             Start a 12-week Focus Cycle and your daily actions will show up here.
           </Empty>
         </Card>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          {live.map((sp) => {
-            const { phases, tactics } = forSprint(sp)
-            const goal = (goals.data || []).find((g) => g.id === sp.goal_id)
-            return (
-              <CycleCard key={sp.id} sprint={sp} phases={phases} tactics={tactics} goal={goal}
-                compact onChanged={() => cycleData.sprints.reload()} />
-            )
-          })}
+          <CycleCard key={featured.sp.id} sprint={featured.sp} phases={featured.phases} tactics={featured.tactics}
+            goal={featured.goal} compact={false} onChanged={() => cycleData.sprints.reload()} />
+          {rest.length > 0 && (
+            <>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.06em', marginTop: 2 }}>
+                Also live
+              </div>
+              {rest.map((c) => (
+                <CycleCard key={c.sp.id} sprint={c.sp} phases={c.phases} tactics={c.tactics} goal={c.goal}
+                  compact onChanged={() => cycleData.sprints.reload()} />
+              ))}
+            </>
+          )}
         </div>
       )}
     </>
@@ -208,7 +244,9 @@ function CycleCard({ sprint, phases, tactics, goal, compact, onChanged, onDelete
             genuine performance read, so off-accent correctly falls back to
             the reserved status ramp (red/amber/green) rather than the
             module accent. */}
-        <div className="cycle-ring-section"><Ring score={score} size={72} stroke={7} sub={`wk ${week}`} onAccent={false} /></div>
+        <div className="cycle-ring-section" title="Execution — checkpoints hit ÷ checkpoints possible, this week">
+          <Ring score={score} size={72} stroke={7} sub={`wk ${week}`} onAccent={false} />
+        </div>
         <div className="cycle-info">
           <div className="cycle-meta">
             {isSprintActive(sprint) && !sprint.archived && <Badge tone="green">Live</Badge>}
@@ -237,7 +275,12 @@ function CycleCard({ sprint, phases, tactics, goal, compact, onChanged, onDelete
       {open && (
         <div className="cycle-section">
           <div className="cycle-section-title">
-            <span>Week {week} of 12</span>
+            <span>
+              Week {week} of 12
+              <span style={{ fontWeight: 600, color: 'var(--text-3)', marginLeft: 8, fontSize: 11 }}>
+                · {score == null ? 'nothing to check yet' : `${score}% of this week's actions checked off`}
+              </span>
+            </span>
             <div style={{ display: 'flex', gap: 4 }}>
               <button className="btn btn-icon btn-sm" onClick={() => setWeek(Math.max(1, week - 1))}>
                 <Icon name="chevron_left" size={15} />
@@ -297,17 +340,19 @@ function TacticRow({ tactic: t, checks, sprint, week, onToggleDay, onToggleXpw, 
           </div>
         </div>
         <div className="wk-dot-row">
+          {/* Two letters (Mo/Tu/We/Th/Fr/Sa/Su), not one — a single initial
+              can't tell Tue from Thu or Sat from Sun apart at a glance. */}
           {t.freq === 'daily' && DAY_LABELS.map((lbl, d) => (
             <button key={d} className={`wk-dot${checks[checkKey(t, d)] ? ' done' : ''}${d === todayDayIdx() ? ' current' : ''}`}
-              onClick={() => onToggleDay(d)} title={lbl}>{lbl[0]}</button>
+              style={{ fontSize: 9.5 }} onClick={() => onToggleDay(d)} title={lbl}>{lbl.slice(0, 2)}</button>
           ))}
           {isCustom && (t.days || []).map((origDay, i) => {
             const dispDay = effDays[i]
             return (
               <button key={origDay} className={`wk-dot${checks[checkKey(t, origDay)] ? ' done' : ''}${dispDay === todayDayIdx() ? ' current' : ''}`}
-                onClick={() => onToggleDay(origDay)}
+                style={{ fontSize: 9.5 }} onClick={() => onToggleDay(origDay)}
                 title={dispDay !== origDay ? `${DAY_LABELS[origDay]} → ${DAY_LABELS[dispDay]}` : DAY_LABELS[origDay]}>
-                {DAY_LABELS[dispDay][0]}
+                {DAY_LABELS[dispDay].slice(0, 2)}
               </button>
             )
           })}
@@ -356,7 +401,7 @@ function TacticRow({ tactic: t, checks, sprint, week, onToggleDay, onToggleXpw, 
 
 /* ══════════════════ Goal Room ══════════════════ */
 
-function GoalRoom({ goals, rollup, onEdit }) {
+function GoalRoom({ goals, rollup, sprints, onEdit, onStartCycle }) {
   const [filter, setFilter] = useState('active')
   const [open, setOpen] = useState(null)
   const confirm = useConfirm()
@@ -411,6 +456,8 @@ function GoalRoom({ goals, rollup, onEdit }) {
         <div className="goals-grid" style={{ marginBottom: 24 }}>
           {list.map((g) => (
             <GoalCard key={g.id} goal={g} roll={rollupBy[g.id]}
+              hasCycle={(sprints?.data || []).some((s) => s.goal_id === g.id)}
+              onStartCycle={() => onStartCycle?.(g.id)}
               open={open === g.id} onToggle={() => setOpen(open === g.id ? null : g.id)}
               onEdit={() => onEdit(g)}
               onDelete={async () => {
@@ -453,17 +500,30 @@ function GoalRoom({ goals, rollup, onEdit }) {
   )
 }
 
-function GoalCard({ goal, roll, open, onToggle, onEdit, onDelete, armed }) {
+function GoalCard({ goal, roll, hasCycle, onStartCycle, open, onToggle, onEdit, onDelete, armed }) {
   const iconFor = { health: 'favorite', work: 'work', family: 'diversity_3', personal: 'spa' }
   return (
     <div className={`goal-card ${goal.area}`} style={{ borderLeftColor: areaColor(goal.area) }} onClick={onToggle}>
       <div className="goal-grid-body">
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-          <Badge tone="blue">{areaLabel(goal.area)}</Badge>
+          {/* Area badge now takes its colour from the same areaColor() the
+              card's own border-left uses — previously this said "blue" for
+              every single area, which fought the border-left colour and
+              made the area-colour system look decorative rather than real. */}
+          <span className="badge" style={{ background: areaColor(goal.area), color: '#fff' }}>{areaLabel(goal.area)}</span>
           {goal.status !== 'active' && <Badge tone="muted">{goal.status}</Badge>}
         </div>
         <h3 style={{ fontSize: 16, fontWeight: 800, marginBottom: 6, lineHeight: 1.3 }}>{goal.title}</h3>
         {goal.why && <p style={{ fontSize: 12.5, color: 'var(--text-2)', lineHeight: 1.55, marginBottom: 12 }}>{goal.why}</p>}
+        {/* A brand-new goal used to just sit here with nothing to do next —
+            the goal→cycle gap flagged in the critique. A goal with zero
+            cycles gets an explicit next step instead of silence. */}
+        {!hasCycle && goal.status === 'active' && (
+          <button className="btn btn-secondary btn-sm" style={{ width: '100%', justifyContent: 'center', marginBottom: 12 }}
+            onClick={(e) => { e.stopPropagation(); onStartCycle() }}>
+            <Icon name="add_circle" size={14} /> No cycle yet — start one
+          </button>
+        )}
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, fontSize: 12, color: 'var(--text-3)', marginTop: 'auto' }}>
           <span><Icon name="checklist" size={14} /> {roll?.open_tasks ?? 0}</span>
           <span><Icon name="repeat" size={14} /> {roll?.habits ?? 0}</span>
@@ -478,6 +538,16 @@ function GoalCard({ goal, roll, open, onToggle, onEdit, onDelete, armed }) {
       {open && <GoalDetail goal={goal} />}
     </div>
   )
+}
+
+// A bare "10000" next to a Currency metric or "target 80" next to a
+// Percentage one gives no unit at all, even though the type picker offers
+// both — this is the difference between a tracker and an instrument.
+function fmtMetricValue(type, val) {
+  if (val == null || val === '') return val
+  if (type === 'Currency') return `$${Number(val).toLocaleString()}`
+  if (type === 'Percentage') return `${val}%`
+  return val
 }
 
 function GoalDetail({ goal }) {
@@ -523,9 +593,9 @@ function GoalDetail({ goal }) {
                 <div className="mini-item">
                   <div>
                     <strong>{m.name}</strong>
-                    <small>{m.type}{m.target ? ` · target ${m.target}` : ''}</small>
+                    <small>{m.type}{m.target ? ` · target ${fmtMetricValue(m.type, m.target)}` : ''}</small>
                   </div>
-                  {last && <Badge tone="green">{last.value}</Badge>}
+                  {last && <Badge tone="green">{fmtMetricValue(m.type, last.value)}</Badge>}
                   {drafting ? (
                     <>
                       <input type="number" inputMode="decimal" autoFocus
@@ -699,7 +769,7 @@ function GoalEditor({ goal, onClose, onSaved }) {
 
 /* ══════════════════ Cycles ══════════════════ */
 
-function CyclesView({ goals, cycleData }) {
+function CyclesView({ goals, cycleData, cycleIntent }) {
   const { sprints, phases, tactics } = cycleData
   const [editing, setEditing] = useState(null)
   const [cloneFrom, setCloneFrom] = useState(null)
@@ -708,6 +778,15 @@ function CyclesView({ goals, cycleData }) {
   const all = sprints.data || []
   const list = all.filter((s) => (filter === 'active' ? !s.archived : s.archived))
   const archivedCount = all.filter((s) => s.archived).length
+
+  // A "start a cycle" request from elsewhere in the module (Today's empty
+  // state, a goal card with no cycle) lands as a {token, goalId} signal —
+  // open the New Cycle editor, pre-filled with that goal if one was given.
+  useEffect(() => {
+    if (!cycleIntent) return
+    setCloneFrom(null)
+    setEditing({})
+  }, [cycleIntent?.token]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function closeEditor() { setEditing(null); setCloneFrom(null) }
 
@@ -775,16 +854,21 @@ function CyclesView({ goals, cycleData }) {
       )}
 
       <CycleEditor sprint={editing} cloneFrom={cloneFrom} goals={goals.data || []} onClose={closeEditor}
+        seedGoalId={cycleIntent?.goalId}
         onSaved={() => { sprints.reload(); phases.reload(); tactics.reload() }} />
     </>
   )
 }
 
-function CycleEditor({ sprint, cloneFrom, goals, onClose, onSaved }) {
+function CycleEditor({ sprint, cloneFrom, goals, seedGoalId, onClose, onSaved }) {
   const open = Boolean(sprint)
   const [s, setS] = useState(null)
+  // seedGoalId comes from "start a cycle" being triggered against a
+  // specific goal (Today's empty state doesn't have one; a goal card's
+  // "No cycle yet" button does) — pre-fills the goal picker instead of
+  // defaulting to whichever goal happens to be first in the list.
   const cur = s ?? (sprint?.id ? sprint : {
-    name: '', outcome: '', goal_id: goals[0]?.id || '', start_date: today(), end_date: autoEndDate(today()),
+    name: '', outcome: '', goal_id: seedGoalId || goals[0]?.id || '', start_date: today(), end_date: autoEndDate(today()),
   })
   const [phaseDrafts, setPhaseDrafts] = useState(DEFAULT_PHASES.map((p) => ({ ...p, tactics: [] })))
   const [saving, setSaving] = useState(false)
@@ -799,6 +883,13 @@ function CycleEditor({ sprint, cloneFrom, goals, onClose, onSaved }) {
   // anyone who wants phase-by-phase control up front.
   const [quickMode, setQuickMode] = useState(!sprint?.id && !cloneFrom)
   const [quickTactic, setQuickTactic] = useState({ text: '', freq: 'xperweek', times_per_week: 3, days: [] })
+  // Quick mode's real friction wasn't the toggle, it was that Name and
+  // Outcome still demanded attention up front even though neither is
+  // required to save. Both start collapsed for a brand-new quick cycle —
+  // Name gets derived automatically, Outcome is opt-in — and either can be
+  // expanded with one click for anyone who wants to fill them in by hand.
+  const [showName, setShowName] = useState(false)
+  const [showOutcome, setShowOutcome] = useState(false)
   useEffect(() => {
     if (!open) return
     if (cloneFrom) {
@@ -814,9 +905,15 @@ function CycleEditor({ sprint, cloneFrom, goals, onClose, onSaved }) {
     }
     setQuickMode(!sprint?.id)
     setQuickTactic({ text: '', freq: 'xperweek', times_per_week: 3, days: [] })
+    setShowName(false); setShowOutcome(false)
   }, [open, cloneFrom]) // eslint-disable-line react-hooks/exhaustive-deps
+  const isQuickNew = quickMode && !sprint?.id && !cloneFrom
 
-  useMemo(() => {
+  // Was `useMemo` doing a setState during render — works today but is a
+  // React anti-pattern that will misbehave under StrictMode/concurrent
+  // rendering. It only exists to react to sprint/existingPhases/existingTactics
+  // changing, which is exactly what useEffect is for.
+  useEffect(() => {
     if (!sprint?.id) { setPhaseDrafts(DEFAULT_PHASES.map((p) => ({ ...p, tactics: [] }))); return }
     const mine = (existingPhases.data || []).filter((p) => p.sprint_id === sprint.id).sort((a, b) => a.phase_index - b.phase_index)
     if (!mine.length) return
@@ -824,7 +921,7 @@ function CycleEditor({ sprint, cloneFrom, goals, onClose, onSaved }) {
       id: p.id, name: p.name, description: p.description || '',
       tactics: (existingTactics.data || []).filter((t) => t.phase_id === p.id),
     })))
-  }, [sprint?.id, existingPhases.data, existingTactics.data]) // eslint-disable-line
+  }, [sprint?.id, existingPhases.data, existingTactics.data]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function addTactic(pi) {
     const next = [...phaseDrafts]
@@ -851,7 +948,16 @@ function CycleEditor({ sprint, cloneFrom, goals, onClose, onSaved }) {
       const drafts = isQuick
         ? DEFAULT_PHASES.map((p) => ({ ...p, tactics: quickTactic.text.trim() ? [{ ...quickTactic }] : [] }))
         : phaseDrafts
-      const sprintId = await saveSprint({ ...cur, id: sprint?.id })
+      // A name is bookkeeping, not a decision — quick mode never made the
+      // user type one, so derive one from the goal + the single action
+      // whenever it was left blank (still fully editable via "Name it
+      // myself" before this point).
+      let payload = cur
+      if (isQuick && !cur.name?.trim()) {
+        const goalTitle = goals.find((g) => g.id === cur.goal_id)?.title || 'Cycle'
+        payload = { ...cur, name: `${goalTitle} — ${quickTactic.text.trim()}`.slice(0, 80) }
+      }
+      const sprintId = await saveSprint({ ...payload, id: sprint?.id })
       const id = sprint?.id || sprintId
       for (let pi = 0; pi < drafts.length; pi++) {
         const draft = drafts[pi]
@@ -875,7 +981,7 @@ function CycleEditor({ sprint, cloneFrom, goals, onClose, onSaved }) {
         <>
           <button className="btn btn-secondary" onClick={() => { setS(null); onClose() }}>Cancel</button>
           <button className="btn btn-primary"
-            disabled={!cur.name?.trim() || !cur.goal_id || saving || (quickMode && !sprint?.id && !quickTactic.text.trim())}
+            disabled={saving || !cur.goal_id || (isQuickNew ? !quickTactic.text.trim() : !cur.name?.trim())}
             onClick={save}>
             {saving ? 'Saving…' : 'Save Cycle'}
           </button>
@@ -903,7 +1009,15 @@ function CycleEditor({ sprint, cloneFrom, goals, onClose, onSaved }) {
           </div>
         )}
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Cycle Name"><input value={cur.name || ''} onChange={(e) => setS({ ...cur, name: e.target.value })} placeholder="Q3 Foundation Build" /></Field>
+          {(!isQuickNew || showName) ? (
+            <Field label="Cycle Name"><input autoFocus={isQuickNew} value={cur.name || ''} onChange={(e) => setS({ ...cur, name: e.target.value })} placeholder="Q3 Foundation Build" /></Field>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => setShowName(true)}>
+                <Icon name="edit" size={13} /> Name it myself <span style={{ color: 'var(--text-3)', fontWeight: 500 }}>(otherwise auto-named)</span>
+              </button>
+            </div>
+          )}
           <Field label="Goal">
             <select value={cur.goal_id || ''} onChange={(e) => setS({ ...cur, goal_id: e.target.value })}>
               <option value="">Choose a goal…</option>
@@ -918,9 +1032,15 @@ function CycleEditor({ sprint, cloneFrom, goals, onClose, onSaved }) {
           </Field>
           <Field label="End Date (auto)"><input type="date" value={cur.end_date || ''} readOnly style={{ opacity: .5 }} /></Field>
         </div>
-        <Field label="What does success look like at week 12?">
-          <input value={cur.outcome || ''} onChange={(e) => setS({ ...cur, outcome: e.target.value })} placeholder="e.g. Running 3× per week consistently" />
-        </Field>
+        {(!isQuickNew || showOutcome) ? (
+          <Field label="What does success look like at week 12?">
+            <input value={cur.outcome || ''} onChange={(e) => setS({ ...cur, outcome: e.target.value })} placeholder="e.g. Running 3× per week consistently" />
+          </Field>
+        ) : (
+          <button type="button" className="btn btn-ghost btn-xs" style={{ width: 'fit-content' }} onClick={() => setShowOutcome(true)}>
+            <Icon name="add" size={12} /> Add success criteria (optional)
+          </button>
+        )}
 
         {quickMode && !sprint?.id ? (
           <>
@@ -1081,9 +1201,19 @@ function RoadmapView({ goals, sprints }) {
 function VisionsView() {
   const visions = useAsync((f) => fetchVisions({ force: f }))
   const [editing, setEditing] = useState(null)
+  // Was an uncontrolled <textarea> read via document.getElementById at save
+  // time — Cancel, or just navigating away, silently discarded whatever was
+  // typed with no warning, in the longest-form writing this module has.
+  // A real draft in state means the value can't be lost underneath you.
+  const [draft, setDraft] = useState('')
 
   const byArea = {}
   ;(visions.data || []).forEach((v) => { byArea[v.area] = v })
+
+  function startEditing(area) {
+    setDraft(byArea[area]?.content || '')
+    setEditing(area)
+  }
 
   return (
     <>
@@ -1094,21 +1224,23 @@ function VisionsView() {
           return (
             <Card key={area}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                <Badge tone="green">{areaLabel(area)}</Badge>
+                {/* Was tone="green" for all four areas — every card looked
+                    like the same category. Now matches the real per-area
+                    colour used everywhere else (goal cards, roadmap, donut). */}
+                <span className="badge" style={{ background: areaColor(area), color: '#fff' }}>{areaLabel(area)}</span>
                 {!isEditing && (
-                  <button className="btn btn-ghost btn-icon btn-sm" onClick={() => setEditing(area)}>
+                  <button className="btn btn-ghost btn-icon btn-sm" onClick={() => startEditing(area)}>
                     <Icon name="edit" size={14} />
                   </button>
                 )}
               </div>
               {isEditing ? (
                 <>
-                  <textarea defaultValue={v?.content || ''} id={`vision-${area}`} autoFocus
+                  <textarea value={draft} autoFocus onChange={(e) => setDraft(e.target.value)}
                     placeholder='"I move through life with real energy..."' />
                   <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                     <button className="btn btn-primary btn-sm" onClick={async () => {
-                      const val = document.getElementById(`vision-${area}`).value
-                      await saveVision(area, val)
+                      await saveVision(area, draft)
                       toast.success('Vision saved'); visions.reload(); setEditing(null)
                     }}>Save</button>
                     <button className="btn btn-secondary btn-sm" onClick={() => setEditing(null)}>Cancel</button>
@@ -1116,7 +1248,7 @@ function VisionsView() {
                 </>
               ) : (
                 <p className="visions-statement" style={{ fontSize: 15, fontStyle: v?.content ? 'italic' : 'normal', color: v?.content ? 'var(--text-2)' : 'var(--text-3)', cursor: 'pointer' }}
-                  onClick={() => setEditing(area)}>
+                  onClick={() => startEditing(area)}>
                   {v?.content || 'Write the future state. Click to add.'}
                 </p>
               )}

@@ -53,24 +53,32 @@ export function CardHead({ title, sub, right }) {
  * metric, everywhere). `pct` drives BOTH the fill height (quantity) and
  * the status pill (the only status-coloured element on the tile).
  *
- * Passing no metricKey/pct degrades to a plain figure card, which is what
- * counts like "3 live cycles" want — they aren't measured against a target,
- * so colouring them would be decoration.
+ * `color`/`tint` are an escape hatch for tiles that have a real fill ratio
+ * but no entry in the METRICS registry (e.g. a module-level "today's
+ * actions done" tile) — they override the metricKey lookup so the tile can
+ * still use rule 2 (fill = quantity) without inventing a fake metric
+ * identity. Prefer metricKey when a real METRICS entry exists.
+ *
+ * Passing none of metricKey/pct/color degrades to a plain figure card,
+ * which is correct for counts like "3 live cycles" — they aren't measured
+ * against a target, so colouring them would be decoration.
  */
-export function StatCard({ label, value, sub, metricKey, pct, icon }) {
+export function StatCard({ label, value, sub, metricKey, pct, icon, color, tint }) {
   const m = metricKey ? metric(metricKey) : null
+  const fillColor = color || m?.color
+  const fillTint = tint || m?.tint
   const status = pct == null ? null : statusFor(pct)
   const glyph = icon || m?.icon
 
   return (
     <div className="stat-card">
-      {m && pct != null && (
-        <div className="tile-fill" style={{ height: `${Math.min(100, Math.max(0, pct))}%`, background: m.tint }} />
+      {fillTint && pct != null && (
+        <div className="tile-fill" style={{ height: `${Math.min(100, Math.max(0, pct))}%`, background: fillTint }} />
       )}
       <div className="tile-top">
         {glyph ? (
-          <div className="tile-ic" style={{ background: m ? m.tint : 'var(--white-soft)' }}>
-            <Icon name={glyph} size={18} style={{ color: m ? m.color : 'var(--text-2)' }} />
+          <div className="tile-ic" style={{ background: fillTint || 'var(--white-soft)' }}>
+            <Icon name={glyph} size={18} style={{ color: fillColor || 'var(--text-2)' }} />
           </div>
         ) : <span />}
         {status && (

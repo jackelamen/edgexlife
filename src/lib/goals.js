@@ -9,11 +9,21 @@
   (sprint_phases, sprint_tactics with phase_index) joined in JS instead.
 */
 
+import { AREA_COLORS } from './design'
+
+// Colour is sourced from lib/design.js's AREA_COLORS, not hardcoded here.
+// The old hex (health #26C281, family #EF5350) sat almost on top of the
+// RESERVED status ramp (STATUS.good/STATUS.risk in design.js) — a health-area
+// badge and a "goal is on track" badge were nearly the same green, and a
+// family-area badge and an "at risk" badge were nearly the same red. That's
+// a real violation of design.js's own rule 3, not just a taste mismatch.
+// Reading through AREA_COLORS fixes it at the one place every consumer
+// (GoalsPage, VisionBoard) already reads from.
 export const AREA_META = {
-  health: { label: 'Health', color: '#26C281' },
-  work: { label: 'Career', color: '#29B6F6' },   // schema calls it "work", original UI called it "Career"
-  family: { label: 'Family', color: '#EF5350' },
-  personal: { label: 'Personal', color: '#F59E0B' },
+  health: { label: 'Health', color: AREA_COLORS.health },
+  work: { label: 'Career', color: AREA_COLORS.work },   // schema calls it "work", original UI called it "Career"
+  family: { label: 'Family', color: AREA_COLORS.family },
+  personal: { label: 'Personal', color: AREA_COLORS.personal },
 }
 export const areaLabel = (id) => AREA_META[id]?.label || id
 export const areaColor = (id) => AREA_META[id]?.color || '#7C4DFF'
