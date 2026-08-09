@@ -14,7 +14,7 @@ import {
   fetchChecks, setRoutineCheck, newId,
 } from '../lib/data'
 import {
-  healthDetails, healthLabel, weakestComponent, healthDrivers, METRIC_ADVICE,
+  healthDetails, healthLabel, weakestComponent, healthDrivers, METRIC_ADVICE, MOVEMENT_BONUS_POINTS,
 } from '../lib/scores'
 import { currentStreak, longestStreak, milestoneHit } from '../lib/streaks'
 import { today, daysAgo, pretty, prettyShort } from '../lib/dates'
@@ -103,7 +103,18 @@ function TodayView({ settings, index, onEdit, onNavFasting }) {
   const sleepPct = pctOf(log?.sleepHours, settings?.sleepTarget ?? 7.5)
   const stepsPct = pctOf(log?.steps, settings?.stepTarget ?? 10000)
   const waterPct = pctOf(log?.water, settings?.waterTarget ?? 2)
-  const exPct = pctOf(log?.exerciseMins, (settings?.weeklyExerciseTarget ?? 150) / 5)
+
+  // Movement is a bonus, not a weighted tile (see lib/scores.js) — toggled
+  // right here rather than requiring the full log editor, same one-tap
+  // pattern as the Routines checkboxes below. Works even before today has
+  // any other fields logged: saveHealthLog merges onto the day's log
+  // rather than replacing it, so this alone is enough to create one.
+  async function toggleExercised() {
+    try {
+      await saveHealthLog(t, { exercisedToday: !log?.exercisedToday })
+      logs.reload(); recent.reload()
+    } catch (e) { toast.error(e.message) }
+  }
 
   // Map each of the last 14 days to its score (null where unlogged).
   const byDate = {}
@@ -148,9 +159,6 @@ function TodayView({ settings, index, onEdit, onNavFasting }) {
         <StatCard metricKey="water" label="Water" pct={waterPct}
           value={log?.water != null ? `${log.water}L` : '--'}
           sub={settings ? `of ${settings.waterTarget}L target` : ''} />
-        <StatCard metricKey="exercise" label="Movement" pct={exPct}
-          value={log?.exerciseMins != null ? `${log.exerciseMins}m` : '--'}
-          sub="daily share of weekly target" />
         <StatCard metricKey="nutrition" label="Nutrition" pct={log?.nutritionScore != null ? log.nutritionScore * 10 : null}
           value={log?.nutritionScore != null ? `${log.nutritionScore}/10` : '--'}
           sub={log?.isFastingDay ? 'fasting day' : "today's rating"} />
@@ -171,6 +179,20 @@ function TodayView({ settings, index, onEdit, onNavFasting }) {
               Capture sleep, steps, hydration, energy, sleep quality, nutrition and pain to see the breakdown.
             </Empty>
           )}
+
+          {/* Movement lives outside the weighted list on purpose — it's a
+              flat bonus (lib/scores.js MOVEMENT_BONUS_POINTS), not one more
+              thing averaged in, so it gets its own row instead of a
+              ScoreRow. Works with no log yet today, same as the routine
+              checkboxes below. */}
+          <label className={`habit-row${log?.exercisedToday ? ' done' : ''}`}
+            style={{ cursor: 'pointer', marginTop: details ? 12 : 0 }}>
+            <input type="checkbox" checked={Boolean(log?.exercisedToday)} onChange={toggleExercised} />
+            <span style={{ fontWeight: 700, flex: 1 }}>Exercised today</span>
+            <Badge tone={log?.exercisedToday ? 'green' : 'muted'}>
+              {log?.exercisedToday ? `+${MOVEMENT_BONUS_POINTS} bonus applied` : `+${MOVEMENT_BONUS_POINTS} if checked`}
+            </Badge>
+          </label>
 
           <div style={{
             display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
@@ -292,6 +314,7 @@ function LogView({ settings, index, onEdit }) {
                   </div>
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                     {l.isFastingDay && <Badge tone="blue">Fasting day</Badge>}
+                    {l.exercisedToday && <Badge tone="green">+{MOVEMENT_BONUS_POINTS} exercised</Badge>}
                     {l.sleepHours != null && <span className="log-chip"><Icon name="bedtime" size={13} />{l.sleepHours}h</span>}
                     {l.steps != null && <span className="log-chip"><Icon name="steps" size={13} />{l.steps.toLocaleString()}</span>}
                     {l.water != null && <span className="log-chip"><Icon name="water_drop" size={13} />{l.water}L</span>}
@@ -364,8 +387,8 @@ function LogEditor({ date, settings, onClose, onSaved }) {
     setForm(l ? { ...l } : {
       date, sleepHours: null, sleepQuality: null, steps: null, water: null,
       weight: null, energy: null, pain: null, exerciseMins: null,
-      exerciseTypes: [], nutritionScore: null, nutritionNotes: '',
-      isFastingDay: false, notes: '',
+      exerciseTypes: [], exercisedToday: false, nutritionScore: null,
+      nutritionNotes: '', isFastingDay: false, notes: '',
     })
   }, [open, existing.data, date])
 
@@ -380,6 +403,7 @@ function LogEditor({ date, settings, onClose, onSaved }) {
         sleepHours: f.sleepHours, sleepQuality: f.sleepQuality, steps: f.steps,
         water: f.water, weight: f.weight, energy: f.energy, pain: f.pain,
         exerciseMins: f.exerciseMins, exerciseTypes: f.exerciseTypes || [],
+        exercisedToday: Boolean(f.exercisedToday),
         nutritionScore: f.nutritionScore, nutritionNotes: f.nutritionNotes || '',
         isFastingDay: Boolean(f.isFastingDay),
         notes: f.notes || '',
@@ -421,8 +445,16 @@ function LogEditor({ date, settings, onClose, onSaved }) {
 
           <div style={{ marginTop: 20 }}>
             <SectionLabel>Movement</SectionLabel>
+            <label className="habit-row" style={{ cursor: 'pointer', marginBottom: 12 }}>
+              <input type="checkbox" checked={Boolean(f.exercisedToday)}
+                onChange={(e) => set('exercisedToday', e.target.checked)} />
+              <span style={{ fontWeight: 700, flex: 1 }}>Exercised today</span>
+              <span style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 600 }}>
+                +{MOVEMENT_BONUS_POINTS} bonus — never subtracted if unchecked
+              </span>
+            </label>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14 }}>
-              <Field label="Exercise (min)">
+              <Field label="Exercise (min)" hint="Optional — not scored">
                 <input type="number" step="5" value={f.exerciseMins ?? ''}
                   onChange={(e) => set('exerciseMins', e.target.value === '' ? null : Number(e.target.value))} />
               </Field>

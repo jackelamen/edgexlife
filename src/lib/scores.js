@@ -4,30 +4,36 @@
   here, every past score silently re-reads differently, so don't.
 
   Health Score  (health.html readinessDetails, updated 2026-08-09)
-    sleep .24  steps .15  water .11  energy .20  sleepQuality .15
-    nutrition .15  minus (pain * 7), clamped 0–100
+    weighted base: sleep .24  steps .15  water .11  energy .20  sleepQuality
+    .15  nutrition .15, minus (pain * 7) — then Movement, BELOW, adds up to
+    MOVEMENT_BONUS_POINTS on top. Clamped 0–100 only at the very end.
 
-  2026-08-09, twice: an `exercise`/Movement component (with rest-day
-  handling) was added here and reverted the same day — Steps and
-  exerciseMins (still shown, unscored) already cover movement, so a
-  dedicated Movement line was redundant. The freed 15% weight now scores
-  `nutritionScore`, a self-rated 1–10 entered on the same log (see
-  LogEditor in HealthPage.jsx) — a genuinely new, ungathered-elsewhere
-  signal rather than a restatement of something already tracked. If
-  exercise is ever reconsidered, the rest-day design from that attempt is
-  worth reusing: read `plan.data[date]?.rest` from fetchWorkoutPlan
-  (lib/data.js) and treat a confirmed rest day as fully met rather than a
-  miss, so a planned rest day doesn't read as a failure.
+  Movement is intentionally NOT one of the six weighted components above —
+  it's a flat bonus, added after the weighted base is computed, worth
+  MOVEMENT_BONUS_POINTS if `log.exercisedToday` is checked and worth
+  exactly 0 (never negative) if it isn't. This was a deliberate ask: a
+  weighted "% of exerciseMins target" component was tried twice before
+  (2026-08-09) and reverted both times, partly because Steps already
+  covers movement, and partly because ANY weighted component necessarily
+  penalizes an unlogged/rest day — which is the wrong shape for something
+  that should only ever help. A pure additive bonus can't do that: leaving
+  the box unchecked is neutral, not a miss, by construction rather than by
+  a rest-day exception that needs its own plumbing (contrast with the
+  rest-day design from the reverted attempt, still described in git
+  history if that approach is ever wanted for a different component).
 
-  `isFastingDay` (a plain boolean on the same log) and `nutritionNotes`
-  (free-text reasoning behind the rating) are captured alongside nutrition
-  but deliberately NOT part of the score formula — same principle as
-  Fasting's own module-level note: "did you fast" is context for reading
-  the number, not an input to it.
+  `nutritionScore` (1–10, self-rated) fills the weighted slot exercise used
+  to occupy. `isFastingDay` and `nutritionNotes` ride along on the same log
+  but are deliberately NOT scored — context for reading the number, not an
+  input to it, same principle as Fasting's own module-level note.
 
   Clarity Score (wellness.html clarityDetails)
     mood .22  stressEase .24  clarity .28  grounded .26
 */
+
+/** Flat points added to the base score when `exercisedToday` is checked.
+    Never subtracted when unchecked — see the header note above for why. */
+export const MOVEMENT_BONUS_POINTS = 5
 
 const n = (v, fallback = 0) => {
   const x = parseFloat(v)
@@ -101,11 +107,22 @@ export function healthDetails(log, settings) {
       advice: 'De-load today: mobility, easy walking, or rest instead of forcing intensity.' },
   ]
 
-  const score = Math.max(0, Math.min(100, Math.round(
-    sleep * 0.24 + steps * 0.15 + water * 0.11 + energy * 0.20 + quality * 0.15 + nutrition * 0.15 - pain * 7
-  )))
+  const base = sleep * 0.24 + steps * 0.15 + water * 0.11 + energy * 0.20 + quality * 0.15 + nutrition * 0.15 - pain * 7
+  const exercised = Boolean(log.exercisedToday)
+  const bonusAwarded = exercised ? MOVEMENT_BONUS_POINTS : 0
+  const score = Math.max(0, Math.min(100, Math.round(base + bonusAwarded)))
 
-  return { score, components }
+  // Not in `components` — it isn't a weighted driver, it's a flat add-on,
+  // and mixing it into that list would make it look like it's averaged in
+  // like everything else (and could get picked as the "weakest lever",
+  // which makes no sense for something that only ever helps). UI reads
+  // this separately; see the "Movement" row in HealthPage's TodayView.
+  const bonus = {
+    key: 'exercise', label: 'Movement', checked: exercised,
+    points: MOVEMENT_BONUS_POINTS, awarded: bonusAwarded,
+  }
+
+  return { score, components, bonus }
 }
 
 export function healthLabel(score) {

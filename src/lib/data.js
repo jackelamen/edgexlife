@@ -288,6 +288,10 @@ function normalizeHealthLog(date, p) {
     steps: num(p.steps), weight: num(p.weight), water: num(p.water),
     energy: num(p.energy), pain: num(p.pain), exerciseMins: num(p.exerciseMins),
     exerciseTypes: Array.isArray(types) ? types : [types].filter(Boolean),
+    // Bonus-only signal for the score (lib/scores.js MOVEMENT_BONUS_POINTS)
+    // — separate from exerciseMins/exerciseTypes above, which stay
+    // unscored, informational minute/type tracking either way.
+    exercisedToday: Boolean(p.exercisedToday),
     // `nutrition` (legacy, freeform) is unrelated to the two below — it was
     // never surfaced in this app's UI, kept only so old imported data isn't
     // silently dropped. `nutritionScore`/`nutritionNotes`/`isFastingDay`
