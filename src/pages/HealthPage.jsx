@@ -11,7 +11,7 @@ import { useAsync } from '../hooks/useAsync'
 import {
   fetchHealthIndex, fetchHealthLogs, fetchHealthSettings, saveHealthLog,
   deleteHealthLog, saveHealthSettings, fetchRoutines, saveRoutines,
-  fetchChecks, setRoutineCheck, newId,
+  fetchChecks, setRoutineCheck, newId, fetchWorkoutPlan, restDatesFromPlan, savePlanDay,
 } from '../lib/data'
 import {
   healthDetails, healthLabel, weakestComponent, healthDrivers, METRIC_ADVICE,
@@ -38,6 +38,12 @@ export default function HealthPage() {
 
   const settings = useAsync((f) => fetchHealthSettings({ force: f }))
   const index = useAsync((f) => fetchHealthIndex({ force: f }))
+  // Fetched once here, at the module root, and threaded down to every view
+  // that computes a Health Score — the whole point of the rest-day flag is
+  // that a date marked `rest: true` in the workout plan (WorkoutModule)
+  // reads as a met exercise target instead of a miss (see lib/scores.js).
+  const workoutPlan = useAsync((f) => fetchWorkoutPlan({ force: f }))
+  const restDates = useMemo(() => restDatesFromPlan(workoutPlan.data), [workoutPlan.data])
 
   return (
     <View>
@@ -56,19 +62,20 @@ export default function HealthPage() {
 
       <Tabs value={view} onChange={setView} options={VIEWS} />
 
-      {view === 'today' && <TodayView settings={settings.data} index={index} onEdit={setEditDate} onNavFasting={() => setView('fasting')} />}
-      {view === 'log' && <LogView settings={settings.data} index={index} onEdit={setEditDate} />}
+      {view === 'today' && <TodayView settings={settings.data} index={index} restDates={restDates} onEdit={setEditDate} onNavFasting={() => setView('fasting')} />}
+      {view === 'log' && <LogView settings={settings.data} index={index} restDates={restDates} onEdit={setEditDate} />}
       {view === 'workout' && <WorkoutModule />}
       {view === 'fasting' && <FastingModule />}
       {view === 'routines' && <RoutinesView />}
-      {view === 'trends' && <TrendsView settings={settings.data} index={index} />}
+      {view === 'trends' && <TrendsView settings={settings.data} index={index} restDates={restDates} />}
       {view === 'settings' && <SettingsView settings={settings} />}
 
       <LogEditor
         date={editDate}
         settings={settings.data}
+        restDates={restDates}
         onClose={() => setEditDate(null)}
-        onSaved={() => index.reload()}
+        onSaved={() => { index.reload(); workoutPlan.reload() }}
       />
     </View>
   )
@@ -76,7 +83,7 @@ export default function HealthPage() {
 
 /* ═══════════════ Today ═══════════════ */
 
-function TodayView({ settings, index, onEdit, onNavFasting }) {
+function TodayView({ settings, index, restDates, onEdit, onNavFasting }) {
   const t = today()
   const logs = useAsync((f) => fetchHealthLogs(t, t, { force: f }), [t])
   const routines = useAsync((f) => fetchRoutines({ force: f }))
@@ -91,7 +98,8 @@ function TodayView({ settings, index, onEdit, onNavFasting }) {
   const longest = useMemo(() => longestStreak(index.data || []), [index.data])
 
   const log = (logs.data || [])[0] || null
-  const details = log ? healthDetails(log, settings) : null
+  const isRest = restDates?.has(t)
+  const details = log ? healthDetails(log, settings, isRest) : null
   const [title, copy] = healthLabel(details?.score ?? null)
   const weakest = weakestComponent(details)
   const todayChecks = checks.data?.[t] || {}
@@ -99,15 +107,17 @@ function TodayView({ settings, index, onEdit, onNavFasting }) {
   const done = list.filter((r) => todayChecks[r.id]).length
 
   // Percent-of-target per metric — drives both tile fill and status pill.
+  // The Movement tile mirrors the score's own rest-day logic: a confirmed
+  // rest day shows full (100%), same as the "exercise" score component.
   const pctOf = (v, target) => (v == null || !target ? null : Math.min(100, (v / target) * 100))
   const sleepPct = pctOf(log?.sleepHours, settings?.sleepTarget ?? 7.5)
   const stepsPct = pctOf(log?.steps, settings?.stepTarget ?? 10000)
   const waterPct = pctOf(log?.water, settings?.waterTarget ?? 2)
-  const exPct = pctOf(log?.exerciseMins, (settings?.weeklyExerciseTarget ?? 150) / 5)
+  const exPct = isRest ? 100 : pctOf(log?.exerciseMins, (settings?.weeklyExerciseTarget ?? 150) / 7)
 
   // Map each of the last 14 days to its score (null where unlogged).
   const byDate = {}
-  ;(recent.data || []).forEach((l) => { byDate[l.date] = healthDetails(l, settings)?.score ?? null })
+  ;(recent.data || []).forEach((l) => { byDate[l.date] = healthDetails(l, settings, restDates?.has(l.date))?.score ?? null })
   const dots = Array.from({ length: 14 }).map((_, idx) => byDate[daysAgo(13 - idx)] ?? null)
   const onTrack = dots.filter((d) => d != null && d >= 85).length
 
@@ -149,8 +159,8 @@ function TodayView({ settings, index, onEdit, onNavFasting }) {
           value={log?.water != null ? `${log.water}L` : '--'}
           sub={settings ? `of ${settings.waterTarget}L target` : ''} />
         <StatCard metricKey="exercise" label="Movement" pct={exPct}
-          value={log?.exerciseMins != null ? `${log.exerciseMins}m` : '--'}
-          sub="daily share of weekly target" />
+          value={isRest ? 'Rest' : log?.exerciseMins != null ? `${log.exerciseMins}m` : '--'}
+          sub={isRest ? 'marked as rest in Workouts' : 'daily share of weekly target'} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5">
@@ -242,7 +252,7 @@ const WINDOWS = [
   { value: 30, label: '30 days' }, { value: 90, label: '90 days' }, { value: 365, label: '1 year' },
 ]
 
-function LogView({ settings, index, onEdit }) {
+function LogView({ settings, index, restDates, onEdit }) {
   const [days, setDays] = useState(90)
   const from = daysAgo(days)
   const to = today()
@@ -275,7 +285,8 @@ function LogView({ settings, index, onEdit }) {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {logs.data.map((l) => {
-              const score = healthDetails(l, settings)?.score
+              const isRest = restDates?.has(l.date)
+              const score = healthDetails(l, settings, isRest)?.score
               return (
                 <div key={l.date} style={{
                   display: 'grid', gridTemplateColumns: '1.1fr 2fr auto', gap: 14, alignItems: 'center',
@@ -288,6 +299,7 @@ function LogView({ settings, index, onEdit }) {
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {isRest && <Badge tone="blue">Rest day</Badge>}
                     {l.sleepHours != null && <span className="log-chip"><Icon name="bedtime" size={13} />{l.sleepHours}h</span>}
                     {l.steps != null && <span className="log-chip"><Icon name="steps" size={13} />{l.steps.toLocaleString()}</span>}
                     {l.water != null && <span className="log-chip"><Icon name="water_drop" size={13} />{l.water}L</span>}
@@ -341,10 +353,12 @@ function RangeField({ label, value, onChange, low, high }) {
   )
 }
 
-function LogEditor({ date, settings, onClose, onSaved }) {
+function LogEditor({ date, settings, restDates, onClose, onSaved }) {
   const open = Boolean(date)
   const existing = useAsync((f) => fetchHealthLogs(date, date, { force: f }), [date], { enabled: open })
+  const plan = useAsync((f) => fetchWorkoutPlan({ force: f }), [], { enabled: open })
   const [form, setForm] = useState(null)
+  const [rest, setRest] = useState(false)
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -357,9 +371,18 @@ function LogEditor({ date, settings, onClose, onSaved }) {
     })
   }, [open, existing.data, date])
 
+  // Rest-day state starts from whatever the workout plan already says for
+  // this date (in case it was set from the Workouts tab), then falls back
+  // to the passed-down index while that finishes loading — either way, the
+  // toggle here and the one in Workouts stay in sync on the same field.
+  useEffect(() => {
+    if (!open) { setRest(false); return }
+    setRest(Boolean(plan.data?.[date]?.rest ?? restDates?.has(date)))
+  }, [open, date, plan.data, restDates])
+
   const f = form
   const set = (k, v) => setForm({ ...f, [k]: v })
-  const preview = f ? healthDetails(f, settings)?.score : null
+  const preview = f ? healthDetails(f, settings, rest)?.score : null
 
   async function save() {
     setSaving(true)
@@ -370,6 +393,21 @@ function LogEditor({ date, settings, onClose, onSaved }) {
         exerciseMins: f.exerciseMins, exerciseTypes: f.exerciseTypes || [],
         notes: f.notes || '',
       })
+      // Keep the workout-plan's rest flag in sync with the toggle below —
+      // merge onto whatever that day's plan entry already has (type,
+      // exercises, notes, goalIds) rather than overwriting it, since a day
+      // can carry a plan AND get marked rest from here.
+      const existingDay = plan.data?.[date]
+      const wasRest = Boolean(existingDay?.rest)
+      if (rest !== wasRest) {
+        await savePlanDay(date, {
+          type: existingDay?.type || 'Other',
+          exercises: rest ? [] : (existingDay?.exercises || []),
+          notes: existingDay?.notes || '',
+          goalIds: existingDay?.goalIds || [],
+          rest,
+        })
+      }
       // Milestone check happens right here, once, off a freshly-forced index
       // read — not in a render effect, which would refire every time the
       // page opens on a streak that happens to equal a milestone.
@@ -407,17 +445,26 @@ function LogEditor({ date, settings, onClose, onSaved }) {
 
           <div style={{ marginTop: 20 }}>
             <SectionLabel>Movement</SectionLabel>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14 }}>
-              <Field label="Exercise (min)">
-                <input type="number" step="5" value={f.exerciseMins ?? ''}
-                  onChange={(e) => set('exerciseMins', e.target.value === '' ? null : Number(e.target.value))} />
-              </Field>
-              <Field label="Type" hint="Comma separated">
-                <input value={(f.exerciseTypes || []).join(', ')}
-                  placeholder="run, lifting"
-                  onChange={(e) => set('exerciseTypes', e.target.value.split(',').map((s) => s.trim()).filter(Boolean))} />
-              </Field>
-            </div>
+            <label className="habit-row" style={{ cursor: 'pointer', marginBottom: 12 }}>
+              <input type="checkbox" checked={rest} onChange={(e) => setRest(e.target.checked)} />
+              <span style={{ fontWeight: 700, flex: 1 }}>Rest day</span>
+              <span style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 600 }}>
+                Counts as a met Movement target
+              </span>
+            </label>
+            {!rest && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14 }}>
+                <Field label="Exercise (min)">
+                  <input type="number" step="5" value={f.exerciseMins ?? ''}
+                    onChange={(e) => set('exerciseMins', e.target.value === '' ? null : Number(e.target.value))} />
+                </Field>
+                <Field label="Type" hint="Comma separated">
+                  <input value={(f.exerciseTypes || []).join(', ')}
+                    placeholder="run, lifting"
+                    onChange={(e) => set('exerciseTypes', e.target.value.split(',').map((s) => s.trim()).filter(Boolean))} />
+                </Field>
+              </div>
+            )}
           </div>
 
           <div style={{ marginTop: 20 }}>
@@ -538,7 +585,7 @@ const METRICS = [
   { value: 'energy', label: 'Energy', unit: '/5' },
 ]
 
-function TrendsView({ settings, index }) {
+function TrendsView({ settings, index, restDates }) {
   const [days, setDays] = useState(90)
   const [metric, setMetric] = useState('score')
   const from = daysAgo(days)
@@ -547,12 +594,12 @@ function TrendsView({ settings, index }) {
 
   const rows = logs.data || []
   const series = useMemo(() => [...rows].reverse(), [rows])
-  const drivers = useMemo(() => (rows.length ? healthDrivers(rows, settings) : []), [rows, settings])
+  const drivers = useMemo(() => (rows.length ? healthDrivers(rows, settings, restDates) : []), [rows, settings, restDates])
 
   const meta = METRICS.find((m) => m.value === metric)
   const points = series.map((l) => ({
     label: prettyShort(l.date),
-    value: metric === 'score' ? healthDetails(l, settings)?.score ?? null : l[metric] ?? null,
+    value: metric === 'score' ? healthDetails(l, settings, restDates?.has(l.date))?.score ?? null : l[metric] ?? null,
   }))
   const target = meta?.targetKey ? settings?.[meta.targetKey] : null
 

@@ -1,11 +1,29 @@
 /*
   Score engines — ported verbatim from the original modules so the numbers
   EdgeX Life shows are continuous with your history. If you change a weight
-  here, every past score silently re-reads differently, so don't.
+  here, every past score silently re-reads differently, so don't (2026-08-09
+  exception below is a deliberate, one-time, user-requested change — see
+  the note on the `exercise` component).
 
-  Health Score  (health.html readinessDetails)
-    sleep .28  steps .18  water .14  energy .22  sleepQuality .18
-    minus (pain * 7), clamped 0–100
+  Health Score  (health.html readinessDetails, updated 2026-08-09)
+    sleep .24  steps .15  water .11  energy .20  sleepQuality .15
+    exercise .15  minus (pain * 7), clamped 0–100
+
+  Exercise is new as of 2026-08-09. It didn't exist in the original formula
+  at all — exerciseMins was captured on every log but never scored, so a
+  hard training day and a day of nothing scored identically. Folding it in
+  meant deciding what a REST day should do to the number: a rest day isn't
+  a missed workout, and scoring it as 0/target would falsely tank the score
+  on a day that's supposed to be low-effort by design. So this component
+  reads a `restDay` flag (sourced from that date's workout-plan entry,
+  `plan.data[date]?.rest === true` — see WorkoutModule.jsx, the one place
+  in the app that already lets you mark a day as rest) and treats a
+  confirmed rest day as fully met (100), not as a miss. A day with nothing
+  logged and NO rest flag still reads as a miss — that's not a bug, that's
+  the honest reading of "we don't know if this was rest or forgotten."
+  Every call site that computes a score therefore now needs to know, per
+  date, whether that date was marked a rest day; see fetchWorkoutPlan in
+  lib/data.js, which every caller now fetches alongside the log data.
 
   Clarity Score (wellness.html clarityDetails)
     mood .22  stressEase .24  clarity .28  grounded .26
@@ -22,18 +40,27 @@ const i = (v, fallback = 0) => {
 
 /* ── Health ──────────────────────────────────────────────── */
 
-export function healthScore(log, settings) {
+export function healthScore(log, settings, restDay = false) {
   if (!log) return null
-  return healthDetails(log, settings).score
+  return healthDetails(log, settings, restDay).score
 }
 
-export function healthDetails(log, settings) {
+/**
+ * `restDay`: true when this log's date is marked `rest: true` in that
+ * date's workout-plan entry (see the file header for why). Defaults to
+ * false so every existing call site that doesn't yet know about rest days
+ * keeps working — it just means those call sites read a rest day as a
+ * miss on the exercise component until they're updated to pass it in.
+ */
+export function healthDetails(log, settings, restDay = false) {
   if (!log) return null
   const s = {
     sleepTarget: settings?.sleepTarget ?? 7.5,
     stepTarget: settings?.stepTarget ?? 10000,
     waterTarget: settings?.waterTarget ?? 2,
+    weeklyExerciseTarget: settings?.weeklyExerciseTarget ?? 150,
   }
+  const dailyExerciseTarget = s.weeklyExerciseTarget / 7
 
   const sleep = Math.min(100, (n(log.sleepHours) / s.sleepTarget) * 100)
   const steps = Math.min(100, (i(log.steps) / s.stepTarget) * 100)
@@ -42,23 +69,27 @@ export function healthDetails(log, settings) {
   const quality = (i(log.sleepQuality, 3) / 5) * 100
   const pain = i(log.pain, 0)
   const painScore = Math.max(0, 100 - pain * 20)
+  const exercise = restDay ? 100 : Math.min(100, (n(log.exerciseMins) / dailyExerciseTarget) * 100)
 
   const components = [
-    { key: 'sleepHours', label: 'Sleep', value: sleep, weight: 0.28,
+    { key: 'sleepHours', label: 'Sleep', value: sleep, weight: 0.24,
       detail: `${n(log.sleepHours)}h / ${s.sleepTarget}h`,
       advice: 'Add an earlier shutdown cue or protect tomorrow morning from late-night drift.' },
-    { key: 'steps', label: 'Steps', value: steps, weight: 0.18,
+    { key: 'steps', label: 'Steps', value: steps, weight: 0.15,
       detail: `${i(log.steps).toLocaleString()} / ${s.stepTarget.toLocaleString()}`,
       advice: 'Add a 10-minute walk to a transition you already have.' },
-    { key: 'water', label: 'Water', value: water, weight: 0.14,
+    { key: 'water', label: 'Water', value: water, weight: 0.11,
       detail: `${n(log.water).toFixed(1)}L / ${s.waterTarget}L`,
       advice: 'Put water in reach and pair the next glass with food or a work start.' },
-    { key: 'energy', label: 'Energy', value: energy, weight: 0.22,
+    { key: 'energy', label: 'Energy', value: energy, weight: 0.20,
       detail: `${i(log.energy, 3)} / 5`,
       advice: 'Reduce friction: food, daylight, a short walk, or a lower-demand plan.' },
-    { key: 'sleepQuality', label: 'Sleep quality', value: quality, weight: 0.18,
+    { key: 'sleepQuality', label: 'Sleep quality', value: quality, weight: 0.15,
       detail: `${i(log.sleepQuality, 3)} / 5`,
       advice: 'Improve the pre-sleep environment before adding more effort tomorrow.' },
+    { key: 'exercise', label: 'Movement', value: exercise, weight: 0.15,
+      detail: restDay ? 'Rest day (marked in Workouts)' : `${Math.round(n(log.exerciseMins))} / ${Math.round(dailyExerciseTarget)} min`,
+      advice: METRIC_ADVICE.exercise },
     // Label is 'Pain', not 'Low pain' — this is the one driver where the
     // raw metric and the 0-100 "goodness" value move in OPPOSITE
     // directions (high pain -> low value, unlike every other driver where
@@ -76,7 +107,7 @@ export function healthDetails(log, settings) {
   ]
 
   const score = Math.max(0, Math.min(100, Math.round(
-    sleep * 0.28 + steps * 0.18 + water * 0.14 + energy * 0.22 + quality * 0.18 - pain * 7
+    sleep * 0.24 + steps * 0.15 + water * 0.11 + energy * 0.20 + quality * 0.15 + exercise * 0.15 - pain * 7
   )))
 
   return { score, components }
@@ -101,13 +132,26 @@ export function weakestComponent(details) {
   return [...details.components].sort((a, b) => a.value - b.value)[0]
 }
 
-/** Per-driver averages and hit rates across a set of logs (Trends view). */
-export function healthDrivers(logs, settings) {
+/**
+ * Per-driver averages and hit rates across a set of logs (Trends view).
+ * `restDates` — a Set (or array) of "YYYY-MM-DD" strings marked as rest
+ * days in the workout plan — excludes those dates from the Movement
+ * driver's average and hit rate entirely, rather than averaging in a 0.
+ * Averaging a rest day's exerciseMins in with training days would drag
+ * the "average minutes" figure down in a way that misrepresents effort on
+ * the days that were actually meant for training; excluding it keeps the
+ * driver honest about training days specifically, and the `detail` string
+ * says how many rest days were set aside so the number isn't a mystery.
+ */
+export function healthDrivers(logs, settings, restDates) {
+  const restSet = restDates instanceof Set ? restDates : new Set(restDates || [])
   const s = {
     sleepTarget: settings?.sleepTarget ?? 7.5,
     stepTarget: settings?.stepTarget ?? 10000,
     waterTarget: settings?.waterTarget ?? 2,
+    weeklyExerciseTarget: settings?.weeklyExerciseTarget ?? 150,
   }
+  const dailyExerciseTarget = s.weeklyExerciseTarget / 7
   const driver = (label, valueFn, target, hitFn, fmt, maxOverride, lowerIsBetter = false) => {
     const values = logs.map(valueFn).filter((v) => Number.isFinite(v))
     const avg = values.length ? values.reduce((a, b) => a + b, 0) / values.length : null
@@ -124,12 +168,27 @@ export function healthDrivers(logs, settings) {
     }
   }
 
+  const trainingLogs = logs.filter((l) => !restSet.has(l.date))
+  const restCount = logs.length - trainingLogs.length
+  const exVals = trainingLogs.map((l) => n(l.exerciseMins, NaN)).filter((v) => Number.isFinite(v))
+  const exAvg = exVals.length ? exVals.reduce((a, b) => a + b, 0) / exVals.length : null
+  const exHits = exVals.filter((v) => v >= dailyExerciseTarget).length
+  const exerciseDriver = {
+    label: 'Movement',
+    score: exAvg == null ? 0 : Math.min(100, (exAvg / dailyExerciseTarget) * 100),
+    hitRate: exVals.length ? Math.round((exHits / exVals.length) * 100) : 0,
+    detail: exAvg == null
+      ? (restCount ? `No training days logged (${restCount} rest)` : 'No logged values')
+      : `${exAvg.toFixed(0)}min avg on training days${restCount ? ` · ${restCount} rest excluded` : ''}`,
+  }
+
   return [
     driver('Sleep', (l) => n(l.sleepHours, NaN), s.sleepTarget, (v) => v >= s.sleepTarget, (v) => `${v.toFixed(1)}h avg`),
     driver('Steps', (l) => i(l.steps, NaN), s.stepTarget, (v) => v >= s.stepTarget, (v) => `${Math.round(v).toLocaleString()} avg`),
     driver('Water', (l) => n(l.water, NaN), s.waterTarget, (v) => v >= s.waterTarget, (v) => `${v.toFixed(1)}L avg`),
     driver('Energy', (l) => i(l.energy, NaN), 4, (v) => v >= 4, (v) => `${v.toFixed(1)}/5 avg`, 5),
     driver('Sleep quality', (l) => i(l.sleepQuality, NaN), 4, (v) => v >= 4, (v) => `${v.toFixed(1)}/5 avg`, 5),
+    exerciseDriver,
     driver('Pain', (l) => i(l.pain, NaN), 2, (v) => v <= 2, (v) => `${v.toFixed(1)}/5 avg`, 5, true),
   ].sort((a, b) => a.score - b.score)
 }
@@ -139,6 +198,11 @@ export const METRIC_ADVICE = {
   steps: 'Attach walking to something already happening: after food, before work, or between tasks.',
   water: 'Put water in reach and use meals as anchors. Do not rely on remembering later.',
   exercise: 'Use a minimum viable session: 10 minutes still keeps the identity alive.',
+  // 'movement' alias: the healthDrivers() Trends label is 'Movement' (matches
+  // METRICS.exercise.label in design.js), but the lookup in HealthPage's
+  // TrendsView keys off the lower-cased first word of that label — so this
+  // needs to exist under both keys for the coach card to find it.
+  movement: 'Use a minimum viable session: 10 minutes still keeps the identity alive.',
   energy: 'Reduce the plan to the essentials and look for sleep, food, light, or overload as the lever.',
 }
 

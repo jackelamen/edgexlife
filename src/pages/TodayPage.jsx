@@ -12,6 +12,7 @@ import {
   fetchHealthIndex, fetchHealthLogs, fetchHealthSettings, saveHealthLog,
   fetchWellnessIndex, fetchWellnessCheckins, saveCheckin, logHabit, unlogHabit,
   fetchSprints, fetchSprintPhases, fetchSprintTactics, saveSprint,
+  fetchWorkoutPlan, restDatesFromPlan,
 } from '../lib/data'
 import { healthDetails, clarityDetails, healthLabel, weakestComponent } from '../lib/scores'
 import { findPatterns } from '../lib/correlations'
@@ -48,6 +49,8 @@ export default function TodayPage() {
 
   const healthIdx = useAsync((f) => fetchHealthIndex({ force: f }))
   const wellnessIdx = useAsync((f) => fetchWellnessIndex({ force: f }))
+  const workoutPlan = useAsync((f) => fetchWorkoutPlan({ force: f }))
+  const restDates = useMemo(() => restDatesFromPlan(workoutPlan.data), [workoutPlan.data])
   const lastHealthDate = healthIdx.data?.[0] || null
   const lastCheckinDate = wellnessIdx.data?.[0]?.date || null
 
@@ -58,7 +61,7 @@ export default function TodayPage() {
 
   const lastHealth = (health.data || [])[0]
   const lastCheckin = (wellness.data || [])[0]
-  const healthDet = lastHealth ? healthDetails(lastHealth, settings.data) : null
+  const healthDet = lastHealth ? healthDetails(lastHealth, settings.data, restDates.has(lastHealthDate)) : null
   const healthScore = healthDet?.score ?? null
   const clarity = lastCheckin ? clarityDetails(lastCheckin)?.score : null
   const weakest = weakestComponent(healthDet)
@@ -94,8 +97,8 @@ export default function TodayPage() {
     const matched = [...allDates].map((date) => ({
       date, health: healthByDate[date] || null, checkin: checkinByDate[date] || null,
     }))
-    return findPatterns(matched, settings.data)
-  }, [patternHealth.data, patternWellness.data, patternFrom, settings.data])
+    return findPatterns(matched, settings.data, restDates)
+  }, [patternHealth.data, patternWellness.data, patternFrom, settings.data, restDates])
 
   const doneToday = useMemo(() => {
     const s = new Set()

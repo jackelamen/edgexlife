@@ -34,8 +34,13 @@ function bucketAvg(rows, predicate, valueFn) {
  * for that date. Only dates carrying BOTH are useful for a cross-module
  * read; `matchedDays` in the return value is that count, surfaced so the
  * empty/thin-data state can say something honest about why.
+ *
+ * `restDates`: Set of dates marked as rest days in the workout plan (see
+ * lib/data.js `restDatesFromPlan`) — passed straight through to
+ * healthDetails so a rest day doesn't read as a low-movement day and drag
+ * a date out of the "Health Score 70+" bucket it would otherwise be in.
  */
-export function findPatterns(matched, settings) {
+export function findPatterns(matched, settings, restDates) {
   const both = (matched || []).filter((m) => m.health && m.checkin)
   const patterns = []
 
@@ -71,7 +76,7 @@ export function findPatterns(matched, settings) {
   }
 
   const scoreSplit = bucketAvg(both,
-    (m) => (healthDetails(m.health, settings)?.score ?? 0) >= 70,
+    (m) => (healthDetails(m.health, settings, restDates?.has(m.date))?.score ?? 0) >= 70,
     (m) => clarityDetails(m.checkin)?.score)
   if (scoreSplit.yesN >= MIN_DAYS_PER_BUCKET && scoreSplit.noN >= MIN_DAYS_PER_BUCKET) {
     const diff = Math.round(scoreSplit.yesAvg - scoreSplit.noAvg)

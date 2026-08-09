@@ -372,6 +372,12 @@ export async function deleteFastingSession(id) {
 export const fetchWorkoutPlan = (o) => cachedQuery('workout-plan',
   async () => (await rpc('life_get_workout_plan')) || {}, { ttlMs: TTL.health, ...o })
 
+/** Every date explicitly marked `rest: true` in the workout plan, as a
+    Set — the one signal the Health Score uses to tell "intentional rest
+    day" apart from "forgot to log/train" (see lib/scores.js). */
+export const restDatesFromPlan = (plan) =>
+  new Set(Object.entries(plan || {}).filter(([, day]) => day?.rest).map(([date]) => date))
+
 export async function saveWorkoutPlan(plan) {
   await rpc('life_save_workout_plan', { p_plan: plan })
   invalidate('workout-plan')
