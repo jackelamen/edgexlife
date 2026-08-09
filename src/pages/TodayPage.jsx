@@ -1,26 +1,27 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import Icon from '../components/ui/Icon'
 import { View } from '../components/shell/Shell'
 import {
-  Card, CardHead, PageHeader, Ring, Empty, Loading, Badge,
+  Card, CardHead, PageHeader, Ring, Empty, Loading, Badge, Field, RangeScale,
 } from '../components/ui/Kit'
 import { useAsync } from '../hooks/useAsync'
 import {
   fetchGoals, fetchGoalRollup, fetchHabits, fetchHabitLogs,
-  fetchHealthIndex, fetchHealthLogs, fetchHealthSettings,
-  fetchWellnessIndex, fetchWellnessCheckins, logHabit, unlogHabit,
+  fetchHealthIndex, fetchHealthLogs, fetchHealthSettings, saveHealthLog,
+  fetchWellnessIndex, fetchWellnessCheckins, saveCheckin, logHabit, unlogHabit,
   fetchSprints, fetchSprintPhases, fetchSprintTactics, saveSprint,
 } from '../lib/data'
 import { healthDetails, clarityDetails, healthLabel, weakestComponent } from '../lib/scores'
+import { findPatterns } from '../lib/correlations'
 import {
   isSprintActive, sprintCurrentWeek, tacticsForWeek,
   checkKey, tacticKeyId, todayDayIdx, xpwTarget, xpwDoneCount, xpwDidToday,
   effectiveCustomDays, originalDayFor,
 } from '../lib/goals'
 import { MODULES, STATUS, metric } from '../lib/design'
-import { today, daysAgo, pretty } from '../lib/dates'
+import { today, daysAgo, pretty, shiftDate } from '../lib/dates'
 
 /*
   Mission control.
@@ -65,6 +66,36 @@ export default function TodayPage() {
   const daysSince = (d) => (d ? Math.round((new Date(`${t}T12:00`) - new Date(`${d}T12:00`)) / 86400000) : null)
   const healthAge = daysSince(lastHealthDate)
   const checkinAge = daysSince(lastCheckinDate)
+
+  /* ── Cross-module patterns ──────────────────────────────────────
+     "Nothing correlates the three systems, even though the data already
+     lives together" — this is that. Windowed off the more recent of the
+     two most-recent entries, not off `today`: this app's data is
+     stale-by-design (weeks can pass with nothing logged), so a trailing
+     daysAgo(N)-from-today window would often see zero overlapping days. */
+  const patternAnchor = lastHealthDate && lastCheckinDate
+    ? (lastHealthDate > lastCheckinDate ? lastHealthDate : lastCheckinDate)
+    : lastHealthDate || lastCheckinDate
+  const patternFrom = patternAnchor ? shiftDate(patternAnchor, -199) : null
+  const patternHealth = useAsync((f) => fetchHealthLogs(patternFrom, patternAnchor, { force: f }),
+    [patternFrom, patternAnchor], { enabled: Boolean(patternFrom) })
+  const patternWellness = useAsync((f) => fetchWellnessCheckins(patternFrom, patternAnchor, { force: f }),
+    [patternFrom, patternAnchor], { enabled: Boolean(patternFrom) })
+
+  const { patterns, matchedDays } = useMemo(() => {
+    if (!patternFrom) return { patterns: [], matchedDays: 0 }
+    const healthByDate = {}
+    ;(patternHealth.data || []).forEach((h) => { healthByDate[h.date] = h })
+    const checkinByDate = {}
+    // last check-in per date wins where a day has more than one entry —
+    // matches how Wellness's own Trends view collapses multi-entry days.
+    ;(patternWellness.data || []).forEach((c) => { checkinByDate[c.date] = c })
+    const allDates = new Set([...Object.keys(healthByDate), ...Object.keys(checkinByDate)])
+    const matched = [...allDates].map((date) => ({
+      date, health: healthByDate[date] || null, checkin: checkinByDate[date] || null,
+    }))
+    return findPatterns(matched, settings.data)
+  }, [patternHealth.data, patternWellness.data, patternFrom, settings.data])
 
   const doneToday = useMemo(() => {
     const s = new Set()
@@ -172,22 +203,53 @@ export default function TodayPage() {
     } catch (e) { toast.error(e.message) }
   }
 
+  /* ── Quick-capture, right from the attention queue ──────────────────
+     "You still have to navigate there and open the full log editor" — this
+     closes that gap. Deliberately a small subset of each module's full
+     form (the components that move the score most / default sensibly when
+     left blank), not a clone of LogEditor/CheckinView — the point is to
+     cut the distance between noticing and acting, not to replace the full
+     editor. `quickOpen` holds which alert kind ('health' | 'wellness') has
+     its inline form expanded; only one at a time. */
+  const [quickOpen, setQuickOpen] = useState(null)
+  const [quickBusy, setQuickBusy] = useState(false)
+
+  async function quickSaveHealth(vals) {
+    setQuickBusy(true)
+    try {
+      await saveHealthLog(t, vals)
+      toast.success('Health logged')
+      setQuickOpen(null)
+      healthIdx.reload(); health.reload()
+    } catch (e) { toast.error(e.message) } finally { setQuickBusy(false) }
+  }
+
+  async function quickSaveWellness(vals) {
+    setQuickBusy(true)
+    try {
+      await saveCheckin(t, vals)
+      toast.success('Wellness check-in saved')
+      setQuickOpen(null)
+      wellnessIdx.reload(); wellness.reload()
+    } catch (e) { toast.error(e.message) } finally { setQuickBusy(false) }
+  }
+
   /* ── The attention queue: computed, ranked, each with a way to act ──
      This is the part that makes it mission control rather than a dashboard.
      Severity uses the reserved status ramp; nothing here is decorative. */
   const alerts = useMemo(() => {
     const a = []
     if (healthAge == null) {
-      a.push({ sev: 'risk', icon: 'monitor_heart', text: 'No health log yet', to: '/health', cta: 'Log' })
+      a.push({ sev: 'risk', icon: 'monitor_heart', text: 'No health log yet', to: '/health', cta: 'Log', kind: 'health' })
     } else if (healthAge >= 2) {
       a.push({ sev: healthAge >= 5 ? 'risk' : 'short', icon: 'monitor_heart',
-        text: `Health not logged in ${healthAge} days`, to: '/health', cta: 'Log' })
+        text: `Health not logged in ${healthAge} days`, to: '/health', cta: 'Log', kind: 'health' })
     }
     if (checkinAge == null) {
-      a.push({ sev: 'risk', icon: 'self_improvement', text: 'No wellness check-in yet', to: '/wellness', cta: 'Check in' })
+      a.push({ sev: 'risk', icon: 'self_improvement', text: 'No wellness check-in yet', to: '/wellness', cta: 'Check in', kind: 'wellness' })
     } else if (checkinAge >= 2) {
       a.push({ sev: checkinAge >= 5 ? 'risk' : 'short', icon: 'self_improvement',
-        text: `No check-in in ${checkinAge} days`, to: '/wellness', cta: 'Check in' })
+        text: `No check-in in ${checkinAge} days`, to: '/wellness', cta: 'Check in', kind: 'wellness' })
     }
     const openDue = dueActions.length - dueDone
     if (openDue > 0) {
@@ -242,16 +304,32 @@ export default function TodayPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
           {alerts.map((al, i) => {
             const s = STATUS[al.sev]
+            const quickable = al.kind === 'health' || al.kind === 'wellness'
+            const open = quickable && quickOpen === al.kind
             return (
-              <div key={i} className="alert-row">
-                <span className="alert-dot" style={{ background: s.color }} />
-                <div className="alert-ic" style={{ background: s.bg }}>
-                  <Icon name={al.icon} size={17} style={{ color: s.color }} />
+              <div key={i}>
+                <div className="alert-row">
+                  <span className="alert-dot" style={{ background: s.color }} />
+                  <div className="alert-ic" style={{ background: s.bg }}>
+                    <Icon name={al.icon} size={17} style={{ color: s.color }} />
+                  </div>
+                  <span className="alert-text">{al.text}</span>
+                  {quickable && (
+                    <button type="button" className="btn btn-secondary btn-xs"
+                      onClick={() => setQuickOpen(open ? null : al.kind)}>
+                      {open ? 'Cancel' : al.cta} <Icon name={open ? 'close' : 'bolt'} size={14} />
+                    </button>
+                  )}
+                  <Link to={al.to} className="btn btn-ghost btn-xs">
+                    Open <Icon name="arrow_forward" size={14} />
+                  </Link>
                 </div>
-                <span className="alert-text">{al.text}</span>
-                <Link to={al.to} className="btn btn-secondary btn-xs">
-                  {al.cta} <Icon name="arrow_forward" size={14} />
-                </Link>
+                {open && al.kind === 'health' && (
+                  <QuickHealthForm busy={quickBusy} onCancel={() => setQuickOpen(null)} onSave={quickSaveHealth} />
+                )}
+                {open && al.kind === 'wellness' && (
+                  <QuickWellnessForm busy={quickBusy} onCancel={() => setQuickOpen(null)} onSave={quickSaveWellness} />
+                )}
               </div>
             )
           })}
@@ -349,6 +427,30 @@ export default function TodayPage() {
         </Card>
       </div>
 
+      {/* ── What connects: the one thing three separate trackers couldn't
+             show you, because their data never lived in the same place. ── */}
+      <Card style={{ marginTop: 14 }}>
+        <CardHead title="What connects" sub="Plain comparisons across your last 200 days of overlapping health and wellness logs." />
+        {(patternHealth.loading || patternWellness.loading) ? <Loading /> : !patterns.length ? (
+          <Empty icon="hub" title={matchedDays < 3 ? 'Not enough overlapping days yet' : 'No strong pattern yet'}>
+            {matchedDays < 3
+              ? 'Log both Health and Wellness on the same days a few more times and a pattern can surface here.'
+              : `Checked ${matchedDays} days with both a health log and a check-in — nothing crossed the bar to report yet.`}
+          </Empty>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+            {patterns.map((p) => (
+              <div key={p.key} className="alert-row">
+                <div className="alert-ic" style={{ background: p.up ? STATUS.good.bg : STATUS.short.bg }}>
+                  <Icon name={p.icon} size={17} style={{ color: p.up ? STATUS.good.color : STATUS.short.color }} />
+                </div>
+                <span className="alert-text">{p.text}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+
       {/* ── Standing goals state ── */}
       <Card style={{ marginTop: 14 }}>
         <CardHead title="Goals in play" sub="Active goals and what's attached to them."
@@ -399,5 +501,80 @@ function SystemPanel({ module, to, score, lastLabel, age, foot }) {
         <Icon name="arrow_forward" size={15} />
       </div>
     </Link>
+  )
+}
+
+/**
+ * Inline quick-capture for a health log, right under its alert row. Only
+ * the components that move the Health Score most (sleep, steps, water,
+ * energy) — sleep quality and pain default sensibly (3/5, 0/5) when left
+ * blank, so this stays a few taps, not the full LogEditor. Anything
+ * captured here is a normal log row afterward: opening /health later shows
+ * it exactly like one made from the full editor, and re-saving there only
+ * fills in the rest.
+ */
+function QuickHealthForm({ busy, onCancel, onSave }) {
+  const [sleepHours, setSleepHours] = useState('')
+  const [steps, setSteps] = useState('')
+  const [water, setWater] = useState('')
+  const [energy, setEnergy] = useState(3)
+
+  return (
+    <div className="card card-pad" style={{ marginTop: 6, marginLeft: 40 }}>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Sleep (hrs)">
+          <input type="number" min="0" max="16" step="0.5" value={sleepHours}
+            onChange={(e) => setSleepHours(e.target.value)} placeholder="7.5" />
+        </Field>
+        <Field label="Steps">
+          <input type="number" min="0" step="100" value={steps}
+            onChange={(e) => setSteps(e.target.value)} placeholder="8000" />
+        </Field>
+        <Field label="Water (L)">
+          <input type="number" min="0" max="8" step="0.25" value={water}
+            onChange={(e) => setWater(e.target.value)} placeholder="2" />
+        </Field>
+        <RangeScale label="Energy" value={energy} onChange={setEnergy} low="Low" high="High" />
+      </div>
+      <div style={{ display: 'flex', gap: 8, marginTop: 12, justifyContent: 'flex-end' }}>
+        <button type="button" className="btn btn-ghost btn-sm" onClick={onCancel}>Cancel</button>
+        <button type="button" className="btn btn-primary btn-sm" disabled={busy}
+          onClick={() => onSave({ sleepHours, steps, water, energy })}>
+          {busy ? 'Saving…' : 'Save log'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Inline quick-capture for a wellness check-in. Unlike Health, all four
+ * clarity-score components (mood, stress, clarity, grounded) fit in one
+ * screen without trimming anything, so this is the full scoring input —
+ * just without the free-text loop/reframe fields the full CheckinView
+ * offers for a deeper entry.
+ */
+function QuickWellnessForm({ busy, onCancel, onSave }) {
+  const [mood, setMood] = useState(3)
+  const [stress, setStress] = useState(3)
+  const [clarity, setClarity] = useState(3)
+  const [grounded, setGrounded] = useState(3)
+
+  return (
+    <div className="card card-pad" style={{ marginTop: 6, marginLeft: 40 }}>
+      <div className="grid grid-cols-2 gap-3">
+        <RangeScale label="Mood" value={mood} onChange={setMood} low="Heavy" high="Bright" />
+        <RangeScale label="Stress" value={stress} onChange={setStress} low="Easy" high="High" />
+        <RangeScale label="Clarity" value={clarity} onChange={setClarity} low="Foggy" high="Clear" />
+        <RangeScale label="Grounded" value={grounded} onChange={setGrounded} low="Adrift" high="Grounded" />
+      </div>
+      <div style={{ display: 'flex', gap: 8, marginTop: 12, justifyContent: 'flex-end' }}>
+        <button type="button" className="btn btn-ghost btn-sm" onClick={onCancel}>Cancel</button>
+        <button type="button" className="btn btn-primary btn-sm" disabled={busy}
+          onClick={() => onSave({ mood, stress, clarity, grounded })}>
+          {busy ? 'Saving…' : 'Save check-in'}
+        </button>
+      </div>
+    </div>
   )
 }

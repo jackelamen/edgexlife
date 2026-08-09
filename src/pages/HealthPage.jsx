@@ -16,6 +16,7 @@ import {
 import {
   healthDetails, healthLabel, weakestComponent, healthDrivers, METRIC_ADVICE,
 } from '../lib/scores'
+import { currentStreak, longestStreak, milestoneHit } from '../lib/streaks'
 import { today, daysAgo, pretty, prettyShort } from '../lib/dates'
 import WorkoutModule from '../components/health/WorkoutModule'
 import FastingModule, { FastingStatusCard } from '../components/health/FastingModule'
@@ -55,7 +56,7 @@ export default function HealthPage() {
 
       <Tabs value={view} onChange={setView} options={VIEWS} />
 
-      {view === 'today' && <TodayView settings={settings.data} onEdit={setEditDate} onNavFasting={() => setView('fasting')} />}
+      {view === 'today' && <TodayView settings={settings.data} index={index} onEdit={setEditDate} onNavFasting={() => setView('fasting')} />}
       {view === 'log' && <LogView settings={settings.data} index={index} onEdit={setEditDate} />}
       {view === 'workout' && <WorkoutModule />}
       {view === 'fasting' && <FastingModule />}
@@ -75,13 +76,19 @@ export default function HealthPage() {
 
 /* ═══════════════ Today ═══════════════ */
 
-function TodayView({ settings, onEdit, onNavFasting }) {
+function TodayView({ settings, index, onEdit, onNavFasting }) {
   const t = today()
   const logs = useAsync((f) => fetchHealthLogs(t, t, { force: f }), [t])
   const routines = useAsync((f) => fetchRoutines({ force: f }))
   const checks = useAsync((f) => fetchChecks(t, t, { force: f }), [t])
   // 14 days of scores for the status-dot strip.
   const recent = useAsync((f) => fetchHealthLogs(daysAgo(13), t, { force: f }), [t])
+
+  // Health never got the streak/celebration pass Goals shipped 2026-08-08 —
+  // same "consecutive days logged" idea, computed off the same date index
+  // LogView/TrendsView already fetch, no new reads.
+  const streak = useMemo(() => currentStreak(index.data || []), [index.data])
+  const longest = useMemo(() => longestStreak(index.data || []), [index.data])
 
   const log = (logs.data || [])[0] || null
   const details = log ? healthDetails(log, settings) : null
@@ -112,6 +119,11 @@ function TodayView({ settings, onEdit, onNavFasting }) {
             <div className="hero-eyebrow">Health score</div>
             <div className="hero-h">{title}</div>
             <p className="hero-copy">{copy}</p>
+            {streak > 1 && (
+              <span className="badge badge-orange" style={{ marginTop: 10, width: 'fit-content' }}>
+                🔥 {streak} day logging streak
+              </span>
+            )}
             {!log && (
               <button className="btn btn-secondary" style={{ marginTop: 16 }} onClick={() => onEdit(t)}>
                 <Icon name="edit_note" size={17} /> Log today
@@ -167,7 +179,10 @@ function TodayView({ settings, onEdit, onNavFasting }) {
                 Colour here is status, not metric
               </div>
             </div>
-            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-2)' }}>{onTrack} on track</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-2)', textAlign: 'right' }}>
+              {onTrack} on track
+              {longest > 1 && <><br /><span style={{ color: 'var(--text-3)', fontWeight: 600 }}>{longest}-day best streak</span></>}
+            </span>
           </div>
           <StatusDots values={dots} />
         </Card>
@@ -355,7 +370,13 @@ function LogEditor({ date, settings, onClose, onSaved }) {
         exerciseMins: f.exerciseMins, exerciseTypes: f.exerciseTypes || [],
         notes: f.notes || '',
       })
-      toast.success('Log saved')
+      // Milestone check happens right here, once, off a freshly-forced index
+      // read — not in a render effect, which would refire every time the
+      // page opens on a streak that happens to equal a milestone.
+      const dates = await fetchHealthIndex({ force: true })
+      const hit = milestoneHit(currentStreak(dates))
+      if (hit) toast.success(`🔥 ${hit}-day logging streak!`, { duration: 4500 })
+      else toast.success('Log saved')
       onSaved?.(); onClose()
     } catch (e) { toast.error(e.message) } finally { setSaving(false) }
   }

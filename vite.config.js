@@ -10,6 +10,18 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['icons/*.png', '*.svg'],
+      // Switched from the default generateSW strategy to injectManifest so
+      // the service worker can handle real `push` events (the daily "log
+      // your day" / "check in" reminder) — generateSW only ever produces a
+      // Workbox precache worker with no room for custom event listeners.
+      // src/sw.js is the source; the build injects the precache manifest
+      // into self.__WB_MANIFEST there.
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.js',
+      injectManifest: {
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+      },
       manifest: {
         id: '/?app=edgex-life',
         name: 'EdgeX Life — Goals, Health, Wellness',
@@ -25,17 +37,6 @@ export default defineConfig({
           { src: 'icons/icon-192-maskable.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' },
           { src: 'icons/icon-512-maskable.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
-      },
-      workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
-        cleanupOutdatedCaches: true,
-        skipWaiting: true,
-        clientsClaim: true,
-        navigateFallback: '/index.html',
-        // Vision-board images are fetched one-by-one through an RPC and then
-        // cached by the app itself (see src/lib/imageCache.js). Nothing from
-        // supabase.co is ever cached by Workbox.
-        navigateFallbackDenylist: [/^\/api/],
       },
     }),
   ],

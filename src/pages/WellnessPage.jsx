@@ -15,6 +15,7 @@ import {
 import {
   clarityDetails, clarityLabel, MOOD_LABELS, STATES, SLEEP_IMPACTS, THOUGHT_TYPES,
 } from '../lib/scores'
+import { currentStreak, longestStreak, milestoneHit } from '../lib/streaks'
 import { RESET_TOOLS, suggestedReset, PRACTICE_TYPES, AFTER_STATES } from '../lib/practices'
 import { today, daysAgo, shiftDate, pretty } from '../lib/dates'
 import { STATUS } from '../lib/design'
@@ -78,7 +79,7 @@ export default function WellnessPage() {
       <Tabs value={view} onChange={setView} options={VIEWS} />
 
       {view === 'today' && (
-        <Dashboard latest={latest} notes={notes} todayCheckins={todayCheckins}
+        <Dashboard latest={latest} notes={notes} todayCheckins={todayCheckins} index={index}
           onCheckIn={() => openCheckin(t, latest?.id)} onNav={setView} onOpenCheckin={openCheckin} />
       )}
       {view === 'checkin' && (
@@ -120,7 +121,7 @@ const CLARITY_PLACEHOLDERS = [
   { key: 'grounded', label: 'Groundedness' },
 ]
 
-function Dashboard({ latest, notes, todayCheckins, onCheckIn, onNav, onOpenCheckin }) {
+function Dashboard({ latest, notes, todayCheckins, index, onCheckIn, onNav, onOpenCheckin }) {
   const details = latest ? clarityDetails(latest) : null
   const score = details?.score ?? null
   const [title, copy] = clarityLabel(score)
@@ -128,6 +129,13 @@ function Dashboard({ latest, notes, todayCheckins, onCheckIn, onNav, onOpenCheck
   const tool = suggestedReset(latest?.state, score)
   const practiceMins = (notes.data?.practices || [])
     .filter((p) => p.date === today()).reduce((s, p) => s + (p.minutes || 0), 0)
+
+  // Wellness never got the streak/celebration pass Goals shipped
+  // 2026-08-08 — same idea as Health's: consecutive days with a check-in,
+  // off the date index already fetched at the page level.
+  const checkinDates = useMemo(() => (index.data || []).map((r) => r.date), [index.data])
+  const streak = useMemo(() => currentStreak(checkinDates), [checkinDates])
+  const longest = useMemo(() => longestStreak(checkinDates), [checkinDates])
 
   return (
     <>
@@ -137,6 +145,11 @@ function Dashboard({ latest, notes, todayCheckins, onCheckIn, onNav, onOpenCheck
             <Badge tone="purple"><Icon name="spa" size={14} /> Clarity</Badge>
             <h2 style={{ fontSize: 26, lineHeight: 1.15, letterSpacing: '-.03em', margin: '8px 0' }}>{title}</h2>
             <p style={{ color: 'rgba(255,255,255,.68)', maxWidth: 560 }}>{copy}</p>
+            {streak > 1 && (
+              <span className="badge badge-orange" style={{ marginTop: 4, width: 'fit-content' }}>
+                🔥 {streak} day check-in streak{longest > streak ? ` · ${longest}-day best` : ''}
+              </span>
+            )}
           </div>
           <Ring score={score} sub="signal" />
           {/* Spans the full hero width (see .hero-actions) so that on a
@@ -380,9 +393,20 @@ function CheckinView({ date, entryId, onSaved, onDeleted, onNav }) {
   async function save() {
     setSaving(true)
     try {
+      const isNew = !form.id
       const id = form.id || newId('c')
       await saveCheckin(d, { ...form, id })
-      toast.success(form.id ? 'Wellness check-in updated' : 'Wellness check-in saved')
+      // Only a genuinely new day's first check-in should be able to move
+      // the streak — editing an existing entry (isNew === false) can't, so
+      // it never checks or refires a milestone.
+      if (isNew) {
+        const rows = await fetchWellnessIndex({ force: true })
+        const hit = milestoneHit(currentStreak(rows.map((r) => r.date)))
+        if (hit) toast.success(`🔥 ${hit}-day check-in streak!`, { duration: 4500 })
+        else toast.success('Wellness check-in saved')
+      } else {
+        toast.success('Wellness check-in updated')
+      }
       setSelectedId(id)
       entries.reload()
       onSaved(d)

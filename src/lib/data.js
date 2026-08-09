@@ -597,10 +597,62 @@ export async function unlogHabit(habitId, dateISO) {
   invalidate('habit-logs')
 }
 
+/* ═══════════════════════ REMINDERS ═══════════════════════
+   life_reminder_prefs is a real per-user table (like goals/sprints), read
+   and written directly under RLS rather than through a life_* RPC — RPCs
+   in this file exist specifically to slice/merge the traction_data JSONB
+   blobs, which this table isn't. The life-send-reminders edge function
+   reads this same table with the service role (bypassing RLS) on a
+   pg_cron schedule; see supabase/functions/life-send-reminders. */
+
+const REMINDER_DEFAULTS = {
+  timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Los_Angeles',
+  health_enabled: true, health_time: '20:00',
+  wellness_enabled: true, wellness_time: '20:00',
+}
+
+export const fetchReminderPrefs = (o) => cachedQuery('reminder-prefs', async () => {
+  const row = unwrap(await supabase.from('life_reminder_prefs')
+    .select('timezone,health_enabled,health_time,wellness_enabled,wellness_time')
+    .maybeSingle())
+  return row ? { ...REMINDER_DEFAULTS, ...row, health_time: row.health_time?.slice(0, 5),
+    wellness_time: row.wellness_time?.slice(0, 5) } : REMINDER_DEFAULTS
+}, { ttlMs: HOUR, ...o })
+
+export async function saveReminderPrefs(prefs) {
+  const id = await uid()
+  const { error } = await supabase.from('life_reminder_prefs')
+    .upsert({
+      user_id: id,
+      timezone: prefs.timezone || REMINDER_DEFAULTS.timezone,
+      health_enabled: Boolean(prefs.health_enabled),
+      health_time: prefs.health_time || '20:00',
+      wellness_enabled: Boolean(prefs.wellness_enabled),
+      wellness_time: prefs.wellness_time || '20:00',
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'user_id' })
+  if (error) throw error
+  invalidate('reminder-prefs')
+}
+
+/** Registers this browser's push subscription so life-send-reminders can
+    reach it. Upsert-by-endpoint: re-subscribing (e.g. after clearing site
+    data) just refreshes the row rather than creating a duplicate. */
+export async function savePushSubscription(row) {
+  const { error } = await supabase.from('push_subscriptions')
+    .upsert({ user_id: await uid(), ...row }, { onConflict: 'endpoint' })
+  if (error) throw error
+}
+
+export async function removePushSubscription(endpoint) {
+  const { error } = await supabase.from('push_subscriptions').delete().eq('endpoint', endpoint)
+  if (error) throw error
+}
+
 export function refreshAll() {
   ;['goals', 'visions', 'goal-metrics', 'metric-logs', 'sprints', 'sprint-phases',
     'sprint-tactics', 'goal-rollup', 'vision-board', 'vision-items', 'health-logs',
     'health-index', 'health-settings', 'routines', 'checks', 'workout-plan',
     'workout-sessions', 'wellness-index', 'wellness-checkins', 'wellness-notes',
-    'habits', 'habit-logs', 'goal-tasks', 'unlinked-tasks'].forEach(invalidate)
+    'habits', 'habit-logs', 'goal-tasks', 'unlinked-tasks', 'reminder-prefs'].forEach(invalidate)
 }
