@@ -288,7 +288,15 @@ function normalizeHealthLog(date, p) {
     steps: num(p.steps), weight: num(p.weight), water: num(p.water),
     energy: num(p.energy), pain: num(p.pain), exerciseMins: num(p.exerciseMins),
     exerciseTypes: Array.isArray(types) ? types : [types].filter(Boolean),
-    nutrition: p.nutrition ?? null, notes: p.notes || '', savedAt: p.savedAt || null,
+    // `nutrition` (legacy, freeform) is unrelated to the two below — it was
+    // never surfaced in this app's UI, kept only so old imported data isn't
+    // silently dropped. `nutritionScore`/`nutritionNotes`/`isFastingDay`
+    // are the new, actually-edited fields (see LogEditor in HealthPage.jsx
+    // and the score formula in lib/scores.js).
+    nutrition: p.nutrition ?? null,
+    nutritionScore: num(p.nutritionScore), nutritionNotes: p.nutritionNotes || '',
+    isFastingDay: Boolean(p.isFastingDay),
+    notes: p.notes || '', savedAt: p.savedAt || null,
   }
 }
 
@@ -371,12 +379,6 @@ export async function deleteFastingSession(id) {
 
 export const fetchWorkoutPlan = (o) => cachedQuery('workout-plan',
   async () => (await rpc('life_get_workout_plan')) || {}, { ttlMs: TTL.health, ...o })
-
-/** Every date explicitly marked `rest: true` in the workout plan, as a
-    Set — the one signal the Health Score uses to tell "intentional rest
-    day" apart from "forgot to log/train" (see lib/scores.js). */
-export const restDatesFromPlan = (plan) =>
-  new Set(Object.entries(plan || {}).filter(([, day]) => day?.rest).map(([date]) => date))
 
 export async function saveWorkoutPlan(plan) {
   await rpc('life_save_workout_plan', { p_plan: plan })

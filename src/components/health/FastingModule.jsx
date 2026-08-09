@@ -25,7 +25,21 @@ export default function FastingModule() {
   const confirm = useConfirm()
   const list = sessions.data || []
   const activeSession = list.find(isActive) || null
+  // `editing` holds whichever session is open in the modal — a completed
+  // session (from history), the live session (to fix a start time you
+  // forgot to set), or a blank draft (to log a fast retroactively). Which
+  // case it is doesn't change how it's saved (saveFastingSession upserts by
+  // id either way) — only `editRequireEnd` changes, since a still-running
+  // fast is allowed to leave its end blank while every other case isn't.
   const [editing, setEditing] = useState(null)
+  const [editRequireEnd, setEditRequireEnd] = useState(true)
+
+  function openEdit(session) { setEditing(session); setEditRequireEnd(true) }
+  function openEditActiveStart() { setEditing(activeSession); setEditRequireEnd(false) }
+  function openLogPastFast() {
+    setEditing({ id: newId('fast'), startedAt: null, endedAt: null, method: '16:8', notes: '' })
+    setEditRequireEnd(true)
+  }
 
   async function startFast(methodId) {
     const method = FAST_METHODS.find((m) => m.id === methodId)
@@ -59,11 +73,12 @@ export default function FastingModule() {
   }
 
   async function updateSession(patch) {
+    const wasNew = !list.some((s) => s.id === editing.id)
     try {
       await saveFastingSession({ ...editing, ...patch })
       sessions.reload()
       setEditing(null)
-      toast.success('Fast updated')
+      toast.success(wasNew ? 'Past fast logged' : 'Fast updated')
     } catch (err) { toast.error(err.message || 'Could not save') }
   }
 
@@ -72,39 +87,49 @@ export default function FastingModule() {
   return (
     <>
       {activeSession
-        ? <ActiveFastCard session={activeSession} onEnd={endFast} />
+        ? <ActiveFastCard session={activeSession} onEnd={endFast} onEditStart={openEditActiveStart} />
         : <StartFastCard onStart={startFast} />}
 
       <WeeklyStats sessions={list} />
 
       <Card>
-        <CardHead title="Fasting history" sub="Completed fasts, most recent first. Tap to edit start, end, method or notes." />
+        <CardHead title="Fasting history" sub="Completed fasts, most recent first. Tap to edit start, end, method or notes."
+          right={<button className="btn btn-secondary btn-sm" onClick={openLogPastFast}>
+            <Icon name="add" size={15} /> Log a past fast
+          </button>} />
         {!list.filter((s) => s.endedAt).length ? (
           <Empty icon="schedule" title="No completed fasts yet">
-            Start one above — even a 16:8 counts toward the week.
+            Start one above, or log a past one if you forgot to start the timer.
           </Empty>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {list.filter((s) => s.endedAt).map((s) => (
               <FastRow key={s.id} session={s} confirm={confirm}
-                onEdit={() => setEditing(s)} onDelete={() => removeSession(s.id)} />
+                onEdit={() => openEdit(s)} onDelete={() => removeSession(s.id)} />
             ))}
           </div>
         )}
       </Card>
 
-      <EditFastModal session={editing} onClose={() => setEditing(null)} onSave={updateSession} />
+      <EditFastModal session={editing} requireEnd={editRequireEnd} onClose={() => setEditing(null)} onSave={updateSession} />
     </>
   )
 }
 
-/* ── Edit a completed session ────────────────────────────────
-   Fasts are logged live, but Jack starts/ends them a few minutes late or
-   early often enough that the recorded duration can be meaningfully off —
-   this lets a past session's start/end/method/notes be corrected after
-   the fact without deleting and re-creating it (which would lose its id
-   and week-streak placement). */
-function EditFastModal({ session, onClose, onSave }) {
+/* ── Edit / create a session ────────────────────────────────
+   One modal, three jobs, because they're all the same edit under the
+   hood (saveFastingSession upserts by id regardless):
+     1. Correct a completed session's start/end/method/notes.
+     2. Correct the RUNNING session's start time — the actual "forgot to
+        start the timer" fix. `requireEnd=false` here, so leaving the end
+        field blank keeps the fast live instead of forcing you to end it
+        just to fix when it began. Filling in an end anyway ends it early,
+        which is a reasonable thing to want in the same motion.
+     3. Log a fast retroactively — `session` comes in as a blank draft
+        with a fresh id and no dates, `requireEnd=true` since a
+        retroactive entry is definitionally already over.
+*/
+function EditFastModal({ session, requireEnd = true, onClose, onSave }) {
   const [start, setStart] = useState('')
   const [end, setEnd] = useState('')
   const [method, setMethod] = useState('16:8')
@@ -122,14 +147,19 @@ function EditFastModal({ session, onClose, onSave }) {
 
   const startedAt = fromLocalInputValue(start)
   const endedAt = fromLocalInputValue(end)
-  const invalid = !startedAt || !endedAt || new Date(endedAt) <= new Date(startedAt)
+  const invalid = !startedAt || (requireEnd && !endedAt) || (endedAt && new Date(endedAt) <= new Date(startedAt))
+  const isNew = !session.startedAt
 
   return (
-    <Modal open={!!session} onClose={onClose} title="Edit fast" sub="Correct the start, end, method or notes for this session."
+    <Modal open={!!session} onClose={onClose}
+      title={isNew ? 'Log a past fast' : requireEnd ? 'Edit fast' : 'Fix start time'}
+      sub={isNew ? 'Both start and end, since this one already happened.'
+        : requireEnd ? 'Correct the start, end, method or notes for this session.'
+          : "Leave Ended blank to keep the fast running — this only corrects when it began."}
       footer={<>
         <button className="btn btn-secondary" onClick={onClose}>Cancel</button>
         <button className="btn btn-primary" disabled={invalid}
-          onClick={() => onSave({ startedAt, endedAt, method, notes })}>
+          onClick={() => onSave({ startedAt, endedAt: endedAt || null, method, notes })}>
           <Icon name="check" size={16} /> Save
         </button>
       </>}>
@@ -137,7 +167,7 @@ function EditFastModal({ session, onClose, onSave }) {
         <Field label="Started">
           <input type="datetime-local" value={start} onChange={(e) => setStart(e.target.value)} />
         </Field>
-        <Field label="Ended">
+        <Field label="Ended" hint={requireEnd ? undefined : 'Optional — blank keeps it running'}>
           <input type="datetime-local" value={end} onChange={(e) => setEnd(e.target.value)} />
         </Field>
       </div>
@@ -216,7 +246,7 @@ export function FastingStatusCard({ onNav }) {
 
 /* ── Active timer ─────────────────────────────────────────── */
 
-function ActiveFastCard({ session, onEnd }) {
+function ActiveFastCard({ session, onEnd, onEditStart }) {
   // Re-render once a minute so the elapsed time actually counts up without
   // a full reload — a fast is measured in hours, a second-tick would just
   // burn cycles for no visible benefit.
@@ -245,6 +275,9 @@ function ActiveFastCard({ session, onEnd }) {
           <div className="hero-actions">
             <button className="btn btn-primary" onClick={onEnd}>
               <Icon name="stop_circle" size={17} /> End Fast
+            </button>
+            <button className="btn btn-secondary" onClick={onEditStart} title="Forgot to start the timer on time?">
+              <Icon name="edit" size={17} /> Fix start time
             </button>
           </div>
         </div>

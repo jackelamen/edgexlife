@@ -71,6 +71,7 @@ export const METRICS = {
   exercise: { label: 'Movement', icon: 'exercise', color: '#6b3fa0', tint: '#eae1f5' },
   water: { label: 'Water', icon: 'water_drop', color: '#2b83c9', tint: '#dcebf8' },
   energy: { label: 'Energy', icon: 'bolt', color: '#c2477e', tint: '#fbe1ed' },
+  nutrition: { label: 'Nutrition', icon: 'restaurant', color: '#a0522d', tint: '#f2e2d5' },
   pain: { label: 'Low pain', icon: 'healing', color: '#8a5a4a', tint: '#f0e5e1' },
 
   fasting: { label: 'Fasting', icon: 'schedule', color: '#445b73', tint: '#dfe5ec' },
