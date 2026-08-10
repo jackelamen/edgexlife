@@ -30,6 +30,35 @@ export function suggestedReset(state, score) {
   return RESET_TOOLS[0]
 }
 
+/* Wim Hof Breathing is structurally different from every other preset
+   here: those are all a single short cycle (in/hold/out/rest) that LOOPS
+   for the whole session via phaseAt's modulo. Wim Hof is a fixed,
+   non-repeating sequence — 30 fast breaths, then a breath-hold retention,
+   then a recovery hold, three times with a longer retention each round
+   (60s / 90s / 120s, per Jack's spec) — so instead it's authored as one
+   flat list of phases whose total already equals the full 10-minute
+   session. As long as total == minutes*60, elapsed never wraps back to
+   the start (phaseAt's modulo only matters if a session outlasts one
+   full cycle), so it plays through once and simply holds on the last
+   phase for any final second of rounding. */
+function wimHofRound(holdSeconds, isLast) {
+  const phases = []
+  for (let i = 0; i < 30; i++) {
+    phases.push({ key: 'in', label: 'Breathe In', seconds: 1.5, from: 0.12, to: 1.14 })
+    phases.push({ key: 'out', label: 'Let Go', seconds: 1.5, from: 1.14, to: 0.3 })
+  }
+  phases.push({ key: 'hold', label: 'Hold — Lungs Empty', seconds: holdSeconds, from: 0.12, to: 0.12 })
+  phases.push({ key: 'in', label: 'Recovery Breath', seconds: 2, from: 0.12, to: 1.3 })
+  phases.push({ key: 'hold', label: 'Hold — Lungs Full', seconds: 15, from: 1.3, to: 1.3 })
+  phases.push({ key: 'out', label: isLast ? 'Session Complete' : 'Release', seconds: isLast ? 5 : 2, from: 1.3, to: 0.12 })
+  return phases
+}
+const WIM_HOF_PHASES = [
+  ...wimHofRound(60, false),
+  ...wimHofRound(90, false),
+  ...wimHofRound(120, true),
+]
+
 export const BREATH_PRESETS = [
   { id: 'two-minute', label: '2-Minute Breathing', pattern: '4-2-6-2', minutes: 2,
     practiceType: '2-Minute Breathing',
@@ -68,11 +97,14 @@ export const BREATH_PRESETS = [
       { key: 'out', label: 'Exhale', seconds: 8, from: 1.14, to: 0.12 },
       { key: 'rest', label: 'Hold', seconds: 2, from: 0.12, to: 0.12 },
     ] },
+  { id: 'wim-hof', label: 'Wim Hof Breathing', pattern: '30 breaths + hold', minutes: 10,
+    practiceType: 'Wim Hof Breathing',
+    phases: WIM_HOF_PHASES },
 ]
 
 export const PRACTICE_TYPES = [
   'Meditation', '2-Minute Breathing', 'Box Breathing 4-4-4-4', '4-7-8 Breathing',
-  'Equal Breathing (Sama Vritti)', '5-5-8-2 Breathing', 'Body Scan', 'Prayer',
+  'Equal Breathing (Sama Vritti)', '5-5-8-2 Breathing', 'Wim Hof Breathing', 'Body Scan', 'Prayer',
   'Quiet Sitting', 'Other',
 ]
 export const AFTER_STATES = ['Clearer', 'Calmer', 'Still Restless', 'Sleepy', 'Emotional', 'Grounded']
