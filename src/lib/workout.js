@@ -84,13 +84,26 @@ export function weekDates(weeks = 0) {
   })
 }
 
-/** Total volume (reps × weight) for a session — drives the heatmap shading. */
-export function sessionVolume(session) {
+/** The actual load moved on one set. For bodyweight exercises (Push-Up,
+    Pull-Up, Dips, etc. — see BODYWEIGHT_EXERCISES) any weight entered is
+    ADDED weight on top of bodyweight, e.g. a weighted dip with "20" logged
+    is bodyweightKg + 20, not just 20 — leaving it as just 20 undercounts
+    every unweighted rep of a hard bodyweight move. Everything else is
+    unaffected: the entered weight is the load, same as always. */
+export function setLoadKg(exerciseName, weightInput, bodyweightKg = 70) {
+  const w = parseFloat(weightInput) || 0
+  return BODYWEIGHT_EXERCISES.has(exerciseName) ? bodyweightKg + w : w
+}
+
+/** Total volume (reps × load) for a session — drives the heatmap shading.
+    bodyweightKg defaults to 70 so old call sites that haven't been updated
+    with a real settings value still return a sane number rather than NaN. */
+export function sessionVolume(session, bodyweightKg = 70) {
   return (session.exercises || []).reduce((total, ex) =>
     total + (ex.sets || []).reduce((s, set) => {
       const reps = parseFloat(set.reps) || 0
-      const weight = parseFloat(set.weight) || 0
-      return s + reps * weight
+      const load = setLoadKg(ex.name, set.weight, bodyweightKg)
+      return s + reps * load
     }, 0), 0)
 }
 

@@ -334,6 +334,7 @@ export const fetchHealthSettings = (o) => cachedQuery('health-settings', async (
     sleepTarget: s.sleepTarget ?? 7.5,
     waterTarget: s.waterTarget ?? 2,
     weeklyExerciseTarget: s.weeklyExerciseTarget ?? 150,
+    bodyweightKg: s.bodyweightKg ?? 70,
   }
 }, { ttlMs: HOUR, ...o })
 

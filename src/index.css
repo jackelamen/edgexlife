@@ -486,6 +486,7 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
 .db-exercise-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); }
 
 .session-header { background: var(--sidebar-bg); border-top: 3px solid var(--accent); border-radius: var(--radius-lg); padding: 20px; color: var(--white); margin-bottom: 18px; }
+.session-type-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
 .ex-card { background: var(--white); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; box-shadow: var(--shadow-sm); }
 .ex-card-hdr { display: flex; align-items: center; gap: 10px; padding: 13px 14px; cursor: pointer; user-select: none; }
 .ex-card-hdr .ex-name { font-size: 14px; font-weight: 800; flex: 1; }
@@ -712,6 +713,55 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
     min-height: 0; flex-direction: row; align-items: center;
     justify-content: space-between; padding: 12px 14px;
   }
+
+  /* Workout: the segmented tabs used flex:1 with no shrink limit, so
+     "Session Log" pushed the row wider than the screen and the last tab
+     ran off the edge — same overflow problem the page-level .tabs had,
+     same fix, a wrapping grid instead of a rigid row. */
+  .wk-tabs {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+    gap: 3px; padding: 3px;
+  }
+  .wk-tab {
+    padding: 7px 3px; font-size: 10.5px; gap: 3px; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+
+  .plan-week { gap: 4px; }
+  .plan-slot { min-height: 54px; padding: 6px 4px; }
+  .plan-slot .wt-name { font-size: 10px; }
+  .plan-slot .wt-meta { font-size: 9px; }
+
+  .wt-type-grid { gap: 6px; }
+  .wt-type-btn { padding: 9px 4px; font-size: 10px; }
+  .wt-type-btn .em { font-size: 18px; }
+
+  /* Session header + type/date row: two selects side by side don't fit
+     next to their labels at this width, so stack them. */
+  .session-header { padding: 14px; }
+  .session-type-row { grid-template-columns: 1fr; }
+  .session-timer { padding: 11px; gap: 8px; flex-wrap: wrap; }
+  .timer-display { font-size: 22px; }
+  .timer-btn { padding: 7px 10px; font-size: 11px; }
+
+  /* Exercise cards + set grid: drop the summary text (redundant with the
+     open card below it) and tighten the five-column set row so REPS /
+     WEIGHT / VOL keep their own space instead of collapsing into dashes. */
+  .ex-card-hdr { padding: 11px 12px; gap: 8px; }
+  .ex-card-hdr .ex-name { font-size: 13px; }
+  .ex-card-hdr .ex-summary { display: none; }
+  .sets-grid, .set-row { grid-template-columns: 18px 1fr 1fr 1fr 30px; gap: 4px; }
+  .sets-grid .set-label { font-size: 9px; }
+  .set-input { font-size: 12.5px; padding: 7px 2px; }
+  .set-done-btn { width: 28px; height: 28px; }
+
+  .db-editor-grid { grid-template-columns: 1fr; }
+  .wk-heatmap { grid-template-columns: repeat(10, 1fr); gap: 3px; }
+  .session-log-row { grid-template-columns: 1fr; padding: 11px 12px; gap: 8px; }
+
+  /* Keep the FAB clear of the bottom nav and off to the side, so it stops
+     sitting on top of the last set row's inputs on a tall session card. */
+  .mob-fab { width: 50px; height: 50px; right: 14px; }
 }
 
 /* ── Today / mission control ───────────────────────────────── */

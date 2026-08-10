@@ -69,6 +69,7 @@ export default function HealthPage() {
         settings={settings.data}
         onClose={() => setEditDate(null)}
         onSaved={() => index.reload()}
+        onBodyweightSynced={() => settings.reload()}
       />
     </View>
   )
@@ -375,7 +376,7 @@ function RangeField({ label, value, onChange, low, high, min = 1, max = 5 }) {
   )
 }
 
-function LogEditor({ date, settings, onClose, onSaved }) {
+function LogEditor({ date, settings, onClose, onSaved, onBodyweightSynced }) {
   const open = Boolean(date)
   const existing = useAsync((f) => fetchHealthLogs(date, date, { force: f }), [date], { enabled: open })
   const [form, setForm] = useState(null)
@@ -384,13 +385,17 @@ function LogEditor({ date, settings, onClose, onSaved }) {
   useEffect(() => {
     if (!open) { setForm(null); return }
     const l = (existing.data || [])[0]
+    // A day with no weight logged yet defaults to the current bodyweight
+    // setting rather than blank — that setting IS "the most recent weight
+    // logged" once nothing here overrides it, so this keeps the field
+    // truthful instead of showing an empty box next to a real number.
     setForm(l ? { ...l } : {
       date, sleepHours: null, sleepQuality: null, steps: null, water: null,
-      weight: null, energy: null, pain: null, exerciseMins: null,
+      weight: settings?.bodyweightKg ?? null, energy: null, pain: null, exerciseMins: null,
       exerciseTypes: [], exercisedToday: false, nutritionScore: null,
       nutritionNotes: '', isFastingDay: false, notes: '',
     })
-  }, [open, existing.data, date])
+  }, [open, existing.data, date]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const f = form
   const set = (k, v) => setForm({ ...f, [k]: v })
@@ -408,6 +413,14 @@ function LogEditor({ date, settings, onClose, onSaved }) {
         isFastingDay: Boolean(f.isFastingDay),
         notes: f.notes || '',
       })
+      // Bodyweight logged here IS the bodyweight setting — keep them as one
+      // number instead of two that can quietly drift apart. Only writes
+      // through when a real value was entered and it actually changed, so
+      // opening/closing the editor without touching the field is a no-op.
+      if (f.weight != null && f.weight !== settings?.bodyweightKg) {
+        await saveHealthSettings({ ...settings, bodyweightKg: f.weight })
+        onBodyweightSynced?.()
+      }
       // Milestone check happens right here, once, off a freshly-forced index
       // read — not in a render effect, which would refire every time the
       // page opens on a streak that happens to equal a milestone.
@@ -437,7 +450,7 @@ function LogEditor({ date, settings, onClose, onSaved }) {
               <input type="number" step="0.1" value={f.water ?? ''}
                 onChange={(e) => set('water', e.target.value === '' ? null : Number(e.target.value))} />
             </Field>
-            <Field label="Weight (kg)">
+            <Field label="Bodyweight (kg)">
               <input type="number" step="0.1" value={f.weight ?? ''}
                 onChange={(e) => set('weight', e.target.value === '' ? null : Number(e.target.value))} />
             </Field>
@@ -725,10 +738,16 @@ function SettingsView({ settings }) {
           <input type="number" step="10" value={s.weeklyExerciseTarget}
             onChange={(e) => setForm({ ...s, weeklyExerciseTarget: Number(e.target.value) })} />
         </Field>
+        <Field label="Bodyweight (kg)">
+          <input type="number" step="0.5" value={s.bodyweightKg}
+            onChange={(e) => setForm({ ...s, bodyweightKg: Number(e.target.value) })} />
+        </Field>
       </div>
       <p style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 12 }}>
         Changing a target re-reads every past score, since the score is always computed
-        against your current targets.
+        against your current targets. Bodyweight doesn't feed the score — it's used by
+        Workout to count added weight on bodyweight moves (pull-ups, dips, push-ups) as
+        bodyweight plus what you entered, not just what you entered.
       </p>
       <button className="btn btn-primary" style={{ marginTop: 16 }} disabled={!form || saving}
         onClick={async () => {

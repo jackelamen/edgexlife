@@ -9,12 +9,12 @@ import {
   fetchWorkoutPlan, savePlanDay, clearPlanDay, fetchExerciseDB, saveExerciseDB,
   fetchWorkoutSessions, saveWorkoutSession, deleteWorkoutSession,
   addExerciseMinutes, fetchGoals, newId,
-  fetchExerciseGoals, saveExerciseGoal, deleteExerciseGoal,
+  fetchExerciseGoals, saveExerciseGoal, deleteExerciseGoal, fetchHealthSettings,
 } from '../../lib/data'
 import {
   WK_TYPES, DEFAULT_EXERCISE_DB, WK_TEMPLATES, bodypartLabel,
   DAY_SHORT, DAY_FULL, weekDates, sessionVolume, sessionSetCount, fmtDuration,
-  parseWorkoutCSV, WORKOUT_CSV_TEMPLATE, isBodyweightExercise,
+  parseWorkoutCSV, WORKOUT_CSV_TEMPLATE, isBodyweightExercise, setLoadKg,
 } from '../../lib/workout'
 import { today, pretty, prettyShort } from '../../lib/dates'
 import TrendChart from './TrendChart'
@@ -44,9 +44,11 @@ export default function WorkoutModule() {
   const dbRaw = useAsync((f) => fetchExerciseDB({ force: f }))
   const goals = useAsync((f) => fetchGoals({ force: f }))
   const exGoals = useAsync((f) => fetchExerciseGoals({ force: f }))
+  const healthSettings = useAsync((f) => fetchHealthSettings({ force: f }))
 
   const db = dbRaw.data || DEFAULT_EXERCISE_DB
   const healthGoals = (goals.data || []).filter((g) => g.area === 'health' && g.status === 'active')
+  const bodyweightKg = healthSettings.data?.bodyweightKg ?? 70
 
   function startSession(dateStr, blank = false) {
     const date = dateStr || today()
@@ -69,6 +71,16 @@ export default function WorkoutModule() {
     setTab('log')
   }
 
+  // Both the header "Log Session" button and the mobile FAB used to call
+  // startSession() unconditionally — if a session was already in progress
+  // (timer running, sets logged), that silently wiped it and forced a full
+  // re-entry, with the elapsed time gone for good. Now they just take you
+  // back to the session that's already open instead of starting a new one.
+  function goToSessionOrStart(dateStr, blank = false) {
+    if (session) { setTab('log'); return }
+    startSession(dateStr, blank)
+  }
+
   return (
     <>
       <div className="flex items-start justify-between gap-4 flex-wrap" style={{ marginBottom: 24 }}>
@@ -88,8 +100,8 @@ export default function WorkoutModule() {
           <button className="btn btn-secondary btn-sm" onClick={() => setWeekOffset((w) => w + 1)}>
             <Icon name="chevron_right" size={16} />
           </button>
-          <button className="btn btn-primary btn-sm" onClick={() => startSession(null, true)}>
-            <Icon name="play_arrow" size={16} /> Log Session
+          <button className="btn btn-primary btn-sm" onClick={() => goToSessionOrStart(null, true)}>
+            <Icon name="play_arrow" size={16} /> {session ? 'Resume Session' : 'Log Session'}
           </button>
         </div>
       </div>
@@ -99,24 +111,31 @@ export default function WorkoutModule() {
       {tab === 'plan' && (
         <PlanTab
           plan={plan} weekOffset={weekOffset} db={db} goals={healthGoals}
-          sessions={sessions.data || []} onStart={startSession}
+          sessions={sessions.data || []} onStart={goToSessionOrStart} bodyweightKg={bodyweightKg}
         />
       )}
       {tab === 'log' && (
         <SessionTab
           session={session} setSession={setSession} db={db} goals={healthGoals} plan={plan}
           pastSessions={sessions.data || []} exerciseGoals={exGoals.data || []}
-          onStart={startSession}
+          onStart={goToSessionOrStart} bodyweightKg={bodyweightKg}
           onFinished={() => { sessions.reload(); setSession(null); setTab('history') }}
         />
       )}
       {tab === 'db' && <DatabaseTab db={db} onSaved={() => dbRaw.reload()} />}
-      {tab === 'history' && <HistoryTab sessions={sessions} onEdit={setSession} onTab={setTab} />}
-      {tab === 'progress' && <ProgressTab sessions={sessions.data || []} exGoals={exGoals} db={db} />}
+      {tab === 'history' && <HistoryTab sessions={sessions} onEdit={setSession} onTab={setTab} bodyweightKg={bodyweightKg} />}
+      {tab === 'progress' && <ProgressTab sessions={sessions.data || []} exGoals={exGoals} db={db} bodyweightKg={bodyweightKg} />}
 
-      <button className="mob-fab" onClick={() => startSession(null, true)} aria-label="Log session">
+      {/* Hidden while a session is open — its whole job is "jump into Log
+          Session", which is meaningless once you're already there, and a
+          fixed-position button was sitting on top of the sets grid's own
+          inputs on tall session cards. */}
+      {tab !== 'log' && (
+      <button className="mob-fab" onClick={() => goToSessionOrStart(null, true)}
+        aria-label={session ? 'Resume session' : 'Log session'}>
         <Icon name="play_arrow" size={26} fill />
       </button>
+      )}
     </>
   )
 }
@@ -145,7 +164,7 @@ function sessionToPlanDay(session, existing) {
 
 /* ═══════════════ Plan ═══════════════ */
 
-function PlanTab({ plan, weekOffset, db, goals, sessions, onStart }) {
+function PlanTab({ plan, weekOffset, db, goals, sessions, onStart, bodyweightKg = 70 }) {
   const [editDate, setEditDate] = useState(null)
   const [importPreview, setImportPreview] = useState(null) // { days, errors } | null
   const [importing, setImporting] = useState(false)
@@ -155,7 +174,7 @@ function PlanTab({ plan, weekOffset, db, goals, sessions, onStart }) {
 
   const weekSessions = sessions.filter((s) => dates.includes(s.date))
   const totalMins = weekSessions.reduce((n, s) => n + Math.round((s.durationSec || 0) / 60), 0)
-  const totalVol = weekSessions.reduce((n, s) => n + sessionVolume(s), 0)
+  const totalVol = weekSessions.reduce((n, s) => n + sessionVolume(s, bodyweightKg), 0)
   const planned = dates.filter((d) => plan.data?.[d] && !plan.data[d].rest).length
 
   // A day with a REAL saved plan uses it as-is. A day with no plan but at
@@ -538,7 +557,7 @@ async function syncPlanFromSession(session, plan) {
 
 /* ═══════════════ Live session ═══════════════ */
 
-function SessionTab({ session, setSession, db, goals, plan, pastSessions, exerciseGoals, onStart, onFinished }) {
+function SessionTab({ session, setSession, db, goals, plan, pastSessions, exerciseGoals, onStart, onFinished, bodyweightKg = 70 }) {
   const [secs, setSecs] = useState(0)
   const [running, setRunning] = useState(false)
   const [openEx, setOpenEx] = useState(0)
@@ -635,7 +654,7 @@ function SessionTab({ session, setSession, db, goals, plan, pastSessions, exerci
         </div>
       </div>
 
-      <div className="session-type-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
+      <div className="session-type-row">
         <select value={session.type} onChange={(e) => set({ type: e.target.value })} style={{ fontSize: 13, padding: '8px 10px' }}>
           {WK_TYPES.map((t) => <option key={t.id} value={t.id}>{t.em} {t.label}</option>)}
         </select>
@@ -705,7 +724,7 @@ function SessionTab({ session, setSession, db, goals, plan, pastSessions, exerci
                           sets: ex.sets.map((x, j) => j === si ? { ...x, weight: e.target.value } : x),
                         })} />
                       <span className="tnum" style={{ fontSize: 12, fontWeight: 800, color: 'var(--text-3)', textAlign: 'center' }}>
-                        {((parseFloat(s.reps) || 0) * (parseFloat(s.weight) || 0)) || '—'}
+                        {((parseFloat(s.reps) || 0) * setLoadKg(ex.name, s.weight, bodyweightKg)) || '—'}
                       </span>
                       <button className={`set-done-btn${s.done ? ' done' : ''}`}
                         onClick={() => updateEx(i, {
@@ -868,7 +887,7 @@ function DatabaseTab({ db, onSaved }) {
 
 /* ═══════════════ History ═══════════════ */
 
-function HistoryTab({ sessions, onEdit, onTab }) {
+function HistoryTab({ sessions, onEdit, onTab, bodyweightKg = 70 }) {
   const [filter, setFilter] = useState('all')
   const confirm = useConfirm()
   const all = sessions.data || []
@@ -886,16 +905,16 @@ function HistoryTab({ sessions, onEdit, onTab }) {
       d.setDate(start.getDate() + i)
       const iso = d.toISOString().slice(0, 10)
       const day = all.filter((s) => s.date === iso)
-      const vol = day.reduce((n, s) => n + sessionVolume(s), 0)
+      const vol = day.reduce((n, s) => n + sessionVolume(s, bodyweightKg), 0)
       const mins = day.reduce((n, s) => n + Math.round((s.durationSec || 0) / 60), 0)
       const level = !day.length ? 0 : vol > 8000 ? 5 : vol > 4000 ? 4 : vol > 1500 ? 3 : vol > 0 ? 2 : 1
       out.push({ iso, level, mins, count: day.length })
     }
     return out
-  }, [all])
+  }, [all, bodyweightKg])
 
   const totalMins = all.reduce((n, s) => n + Math.round((s.durationSec || 0) / 60), 0)
-  const totalVol = all.reduce((n, s) => n + sessionVolume(s), 0)
+  const totalVol = all.reduce((n, s) => n + sessionVolume(s, bodyweightKg), 0)
   const streak = useMemo(() => {
     let n = 0
     const dates = new Set(all.map((s) => s.date))
@@ -959,7 +978,7 @@ function HistoryTab({ sessions, onEdit, onTab }) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {list.map((s) => {
               const type = WK_TYPES.find((t) => t.id === s.type)
-              const vol = sessionVolume(s)
+              const vol = sessionVolume(s, bodyweightKg)
               return (
                 <div key={s.id} className="session-log-row">
                   <div>
@@ -1025,7 +1044,7 @@ function HistoryTab({ sessions, onEdit, onTab }) {
      the lever for a push-up or pull-up, reps are. topReps is the best
      single set that session (the direct analog of top-set weight),
      totalReps is every rep across all sets (the analog of volume). */
-function exerciseHistory(sessions, name) {
+function exerciseHistory(sessions, name, bodyweightKg = 70) {
   return sessions
     .filter((s) => (s.exercises || []).some((e) => e.name === name))
     .slice()
@@ -1048,7 +1067,11 @@ function exerciseHistory(sessions, name) {
       let topReps = 0
       let totalReps = 0
       for (const set of sets) {
-        volume += set.weight * set.reps
+        // topWeight/est1RM stay on raw weight — added-weight-only strength
+        // progression, deliberately separate from "how much did I move".
+        // Volume alone gets the bodyweight treatment: an unweighted set
+        // on a bodyweight move is still real load moved.
+        volume += setLoadKg(name, set.weight, bodyweightKg) * set.reps
         totalReps += set.reps
         if (set.reps > topReps) topReps = set.reps
         if (set.weight > topWeight) { topWeight = set.weight; topSet = set }
@@ -1177,7 +1200,7 @@ function goalMeta({ goal, lastImprovedDate }) {
   return { daysIn, daysSincePR }
 }
 
-function ProgressTab({ sessions, exGoals, db }) {
+function ProgressTab({ sessions, exGoals, db, bodyweightKg = 70 }) {
   const [newGoalOpen, setNewGoalOpen] = useState(false)
   const [prefill, setPrefill] = useState(null)
   const confirm = useConfirm()
@@ -1431,7 +1454,7 @@ function ProgressTab({ sessions, exGoals, db }) {
         <p style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 14 }}>
           A secondary view — every exercise you've logged, with a chart, whether or not it has a goal.
         </p>
-        <ExerciseExplorer sessions={sessions} />
+        <ExerciseExplorer sessions={sessions} bodyweightKg={bodyweightKg} />
       </div>
 
       <NewGoalModal open={newGoalOpen} prefill={prefill} sessions={sessions} db={db}
@@ -1581,7 +1604,7 @@ function NewGoalModal({ open, prefill, sessions, db, onClose, onSaved }) {
 /* ── Explorer (secondary) ────────────────────────────────────
    The original single-exercise chart, kept as-is but demoted below Goals
    — a browse tool for anything logged, goal or no goal. */
-function ExerciseExplorer({ sessions }) {
+function ExerciseExplorer({ sessions, bodyweightKg = 70 }) {
   const exerciseNames = useMemo(() => {
     const counts = new Map()
     sessions.forEach((s) => (s.exercises || []).forEach((e) => {
@@ -1615,7 +1638,7 @@ function ExerciseExplorer({ sessions }) {
     )
   }
 
-  const rows = exerciseHistory(sessions, selected)
+  const rows = exerciseHistory(sessions, selected, bodyweightKg)
   const byWeight = mode === 'weight'
   const unit = byWeight ? ' kg' : ' reps'
   // Reps mode tracks TOTAL reps that session (every rep across every set),
