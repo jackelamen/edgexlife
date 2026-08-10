@@ -488,7 +488,7 @@ function LogEditor({ date, settings, onClose, onSaved, onBodyweightSynced }) {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
               <RangeField label="Energy" value={f.energy} onChange={(v) => set('energy', v)} low="Depleted" high="Charged" />
               <RangeField label="Sleep quality" value={f.sleepQuality} onChange={(v) => set('sleepQuality', v)} low="Broken" high="Deep" />
-              <RangeField label="Pain / strain" value={f.pain} onChange={(v) => set('pain', v)} low="None" high="Severe" />
+              <RangeField label="Pain / strain" value={f.pain} onChange={(v) => set('pain', v)} low="None" high="Severe" min={0} />
             </div>
           </div>
 
