@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import Icon from '../ui/Icon'
-import { BREATH_PRESETS, cycleSeconds, phaseAt, MEDITATION_FADE_SECONDS, MEDITATION_AUDIO_SRC } from '../../lib/practices'
+import { BREATH_PRESETS, cycleSeconds, phaseAt, MEDITATION_FADE_SECONDS, MEDITATION_TRACKS } from '../../lib/practices'
 import { metricColor } from '../../lib/design'
 
 // Breath phase colour = identity, not decoration (lib/design.js rule 1):
@@ -33,6 +33,8 @@ export default function BreathTimer({ onComplete }) {
   const [phaseView, setPhaseView] = useState({ scale: 0.12, color: BREATH_IN.hex, text: 'Ready', sub: 'ready' })
   const [fullscreen, setFullscreen] = useState(false)
   const [audioSync, setAudioSync] = useState(true)
+  const [trackId, setTrackId] = useState(MEDITATION_TRACKS[0].id)
+  const track = MEDITATION_TRACKS.find((t) => t.id === trackId) || MEDITATION_TRACKS[0]
 
   const timerRef = useRef(null)
   const breathRef = useRef(null)
@@ -313,14 +315,26 @@ export default function BreathTimer({ onComplete }) {
       <div className="audio-panel">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
           <div>
-            <h2 style={{ fontSize: 13, fontWeight: 800 }}>Meditation Music</h2>
-            <p style={{ fontSize: 12, color: 'var(--text-2)' }}>20 minute deep meditation track.</p>
+            <h2 style={{ fontSize: 13, fontWeight: 800 }}>{track.label} Music</h2>
+            <p style={{ fontSize: 12, color: 'var(--text-2)' }}>{track.sub}</p>
           </div>
           <Icon name="music_note" size={18} style={{ color: 'var(--accent)' }} />
         </div>
-        <audio ref={audioRef} controls loop preload="metadata">
-          <source src={MEDITATION_AUDIO_SRC} type="audio/mpeg" />
-        </audio>
+        {MEDITATION_TRACKS.length > 1 && (
+          <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+            {MEDITATION_TRACKS.map((t) => (
+              <button key={t.id} type="button"
+                className={`btn btn-sm ${t.id === trackId ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => setTrackId(t.id)}>
+                {t.label}
+              </button>
+            ))}
+          </div>
+        )}
+        {/* key={track.id} forces a fresh <audio> element on switch instead of
+            fiddling with .load() — a track change mid-session is rare enough
+            that a clean reset (paused, from the top) is the right behavior. */}
+        <audio ref={audioRef} key={track.id} controls loop preload="metadata" src={track.src} />
         <label className="audio-toggle">
           <input type="checkbox" checked={audioSync} onChange={(e) => setAudioSync(e.target.checked)} />
           Start and pause with timer

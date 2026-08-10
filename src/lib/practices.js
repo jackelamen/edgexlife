@@ -77,7 +77,14 @@ export const PRACTICE_TYPES = [
 ]
 export const AFTER_STATES = ['Clearer', 'Calmer', 'Still Restless', 'Sleepy', 'Emotional', 'Grounded']
 export const MEDITATION_FADE_SECONDS = 10
-export const MEDITATION_AUDIO_SRC = '/audio/meditation-20min.mp3'
+
+/* Selectable practice tracks for the meditation/breathing audio panel.
+   First entry is the default. Add another track by dropping the file in
+   public/audio and adding an entry here — nothing else needs to change. */
+export const MEDITATION_TRACKS = [
+  { id: 'meditation', label: 'Meditation', sub: '20 minute deep meditation track.', src: '/audio/meditation-20min.mp3' },
+  { id: 'visualization', label: 'Visualization', sub: 'Guided visualization / breathing track.', src: '/audio/visualization.mp3' },
+]
 
 export const cycleSeconds = (preset) => preset.phases.reduce((s, p) => s + p.seconds, 0)
 
