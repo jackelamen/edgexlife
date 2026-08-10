@@ -385,13 +385,16 @@ function LogEditor({ date, settings, onClose, onSaved, onBodyweightSynced }) {
   useEffect(() => {
     if (!open) { setForm(null); return }
     const l = (existing.data || [])[0]
-    // A day with no weight logged yet defaults to the current bodyweight
-    // setting rather than blank — that setting IS "the most recent weight
-    // logged" once nothing here overrides it, so this keeps the field
-    // truthful instead of showing an empty box next to a real number.
+    // Stays blank, not pre-filled — an earlier version defaulted this to
+    // the bodyweight setting, which meant every saved day (even ones you
+    // never touched the field on) got stamped with that same number,
+    // flattening the actual weight trend. The setting shows as a
+    // placeholder hint instead (see the input below); it only becomes a
+    // real logged value, and only then syncs back to the setting, if you
+    // actually type something.
     setForm(l ? { ...l } : {
       date, sleepHours: null, sleepQuality: null, steps: null, water: null,
-      weight: settings?.bodyweightKg ?? null, energy: null, pain: null, exerciseMins: null,
+      weight: null, energy: null, pain: null, exerciseMins: null,
       exerciseTypes: [], exercisedToday: false, nutritionScore: null,
       nutritionNotes: '', isFastingDay: false, notes: '',
     })
@@ -452,6 +455,7 @@ function LogEditor({ date, settings, onClose, onSaved, onBodyweightSynced }) {
             </Field>
             <Field label="Bodyweight (kg)">
               <input type="number" step="0.1" value={f.weight ?? ''}
+                placeholder={settings?.bodyweightKg != null ? String(settings.bodyweightKg) : ''}
                 onChange={(e) => set('weight', e.target.value === '' ? null : Number(e.target.value))} />
             </Field>
           </div>
@@ -717,6 +721,12 @@ function SettingsView({ settings }) {
   const [saving, setSaving] = useState(false)
   if (!s) return <Loading />
 
+  async function saveSettings(label) {
+    setSaving(true)
+    try { await saveHealthSettings(s); toast.success(label); settings.reload(); setForm(null) }
+    catch (e) { toast.error(e.message) } finally { setSaving(false) }
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 560 }}>
     <Card>
@@ -738,24 +748,39 @@ function SettingsView({ settings }) {
           <input type="number" step="10" value={s.weeklyExerciseTarget}
             onChange={(e) => setForm({ ...s, weeklyExerciseTarget: Number(e.target.value) })} />
         </Field>
-        <Field label="Bodyweight (kg)">
-          <input type="number" step="0.5" value={s.bodyweightKg}
-            onChange={(e) => setForm({ ...s, bodyweightKg: Number(e.target.value) })} />
-        </Field>
       </div>
       <p style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 12 }}>
         Changing a target re-reads every past score, since the score is always computed
-        against your current targets. Bodyweight doesn't feed the score — it's used by
-        Workout to count added weight on bodyweight moves (pull-ups, dips, push-ups) as
-        bodyweight plus what you entered, not just what you entered.
+        against your current targets.
       </p>
       <button className="btn btn-primary" style={{ marginTop: 16 }} disabled={!form || saving}
-        onClick={async () => {
-          setSaving(true)
-          try { await saveHealthSettings(s); toast.success('Targets saved'); settings.reload(); setForm(null) }
-          catch (e) { toast.error(e.message) } finally { setSaving(false) }
-        }}>
+        onClick={() => saveSettings('Targets saved')}>
         <Icon name="save" size={17} /> {saving ? 'Saving…' : 'Save targets'}
+      </button>
+    </Card>
+
+    <Card>
+      <CardHead title="Bodyweight" sub="Doesn't feed the Health Score — used by Workout and, optionally, a weight goal." />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14 }}>
+        <Field label="Current bodyweight (kg)">
+          <input type="number" step="0.5" value={s.bodyweightKg}
+            onChange={(e) => setForm({ ...s, bodyweightKg: Number(e.target.value) })} />
+        </Field>
+        <Field label="Target weight (kg)">
+          <input type="number" step="0.5" value={s.targetWeightKg ?? ''} placeholder="No target set"
+            onChange={(e) => setForm({ ...s, targetWeightKg: e.target.value === '' ? null : Number(e.target.value) })} />
+        </Field>
+      </div>
+      <p style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 12 }}>
+        Current bodyweight is what Workout uses to count added weight on bodyweight moves
+        (pull-ups, dips, push-ups) as bodyweight plus what you entered, not just what you
+        entered — it's kept in sync with whatever you log on the Bodyweight field in Daily
+        Log, so the two never drift apart. Target weight is just a goal you're tracking
+        toward; nothing else reads it yet.
+      </p>
+      <button className="btn btn-primary" style={{ marginTop: 16 }} disabled={!form || saving}
+        onClick={() => saveSettings('Bodyweight saved')}>
+        <Icon name="save" size={17} /> {saving ? 'Saving…' : 'Save bodyweight'}
       </button>
     </Card>
 
