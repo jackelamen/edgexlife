@@ -384,8 +384,21 @@ function CheckinView({ date, entryId, onSaved, onDeleted, onNav }) {
   const [moveDate, setMoveDate] = useState(shiftDate(date, -1))
   const [saving, setSaving] = useState(false)
 
-  // Re-seed the form when a different date/entry is selected.
-  useMemo(() => { setForm(current ? { ...current } : blank()) }, [d, selectedId]) // eslint-disable-line
+  // Re-seed the form when a different date/entry is selected — a real
+  // effect, not useMemo (useMemo is a caching hint React can discard any
+  // time, not a place to put a setState side effect). Depending on
+  // entries.data too, not just [d, selectedId], is the actual fix: the
+  // checkins fetch is always still loading on first render, so `list` is
+  // empty and `current` is undefined the first time this runs no matter
+  // what selectedId already is. Without entries.data in the deps, the
+  // form got permanently seeded from that empty-list pass and never
+  // re-seeded once the real data arrived — which is exactly why opening
+  // an existing check-in showed blank defaults instead of its saved
+  // values, indistinguishable from starting a new one.
+  useEffect(() => {
+    setForm(current ? { ...current } : blank())
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [d, selectedId, entries.data])
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
   const preview = clarityDetails(form)?.score
