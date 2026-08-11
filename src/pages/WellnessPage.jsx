@@ -491,7 +491,7 @@ function CheckinView({ date, entryId, onSaved, onDeleted, onNav }) {
             {[['stress', 'Stress'], ['clarity', 'Clarity'], ['grounded', 'Groundedness']].map(([k, label]) => (
               <Field key={k} label={label}>
                 <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                  <input type="range" min={1} max={5} value={form[k] ?? 3} onChange={(e) => set(k, Number(e.target.value))} />
+                  <input type="range" min={0} max={5} value={form[k] ?? 3} onChange={(e) => set(k, Number(e.target.value))} />
                   <div className="score-pill">{form[k] ?? 3}</div>
                 </div>
               </Field>

@@ -199,7 +199,11 @@ export function clarityDetails(c) {
   const clarity = i(c.clarity, 3)
   const grounded = i(c.grounded, 3)
   const stress = i(c.stress, 3)
-  const stressEase = 6 - stress
+  // 5 - stress, not 6 - stress: stress is now rated 0-5 (0 = none, matching
+  // Pain's own 0-5 fix — no stress is a real, common state, not a floor of
+  // "at least a little"), so the inversion needs a matching 0-5 span to
+  // land exactly on 0-100 at both ends instead of topping out past 100.
+  const stressEase = 5 - stress
 
   const moodScore = (mood / 5) * 100
   const stressScore = (stressEase / 5) * 100
