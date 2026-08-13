@@ -7,6 +7,7 @@ import { fetchFastingSessions, saveFastingSession, deleteFastingSession, newId }
 import {
   FAST_METHODS, methodLabel, isActive, elapsedMs, progressPct, formatDuration,
   weekStreak, thisWeekCount, longestFast, toLocalInputValue, fromLocalInputValue,
+  targetHoursFor,
 } from '../../lib/fasting'
 import { pretty } from '../../lib/dates'
 import { metric } from '../../lib/design'
@@ -74,8 +75,15 @@ export default function FastingModule() {
 
   async function updateSession(patch) {
     const wasNew = !list.some((s) => s.id === editing.id)
+    // Recompute targetHours from whatever method ends up selected, rather
+    // than trusting a carried-over value — a blank "log a past fast" draft
+    // never had one at all, and editing an existing fast's method should
+    // move its target with it instead of judging the new method against
+    // the old one's target.
+    const merged = { ...editing, ...patch }
+    merged.targetHours = FAST_METHODS.find((m) => m.id === merged.method)?.hours ?? null
     try {
-      await saveFastingSession({ ...editing, ...patch })
+      await saveFastingSession(merged)
       sessions.reload()
       setEditing(null)
       toast.success(wasNew ? 'Past fast logged' : 'Fast updated')
@@ -103,7 +111,9 @@ export default function FastingModule() {
           </Empty>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {list.filter((s) => s.endedAt).map((s) => (
+            {list.filter((s) => s.endedAt)
+              .sort((a, b) => new Date(b.startedAt) - new Date(a.startedAt))
+              .map((s) => (
               <FastRow key={s.id} session={s} confirm={confirm}
                 onEdit={() => openEdit(s)} onDelete={() => removeSession(s.id)} />
             ))}
@@ -259,7 +269,8 @@ function ActiveFastCard({ session, onEnd, onEditStart }) {
   const ms = elapsedMs(session)
   const pct = progressPct(session)
   const m = metric('fasting')
-  const overTarget = session.targetHours && ms / 3600000 >= session.targetHours
+  const target = targetHoursFor(session)
+  const overTarget = target && ms / 3600000 >= target
 
   return (
     <div className="hero-card" style={{ marginBottom: 14, background: m.color }}>
@@ -269,8 +280,10 @@ function ActiveFastCard({ session, onEnd, onEditStart }) {
           <div className="hero-h">{formatDuration(ms)}</div>
           <p className="hero-copy">
             {overTarget
-              ? `Past your ${session.targetHours}h target — end whenever feels right.`
-              : `Started ${new Date(session.startedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}. Aiming for ${session.targetHours}h.`}
+              ? `Past your ${target}h target — end whenever feels right.`
+              : target
+                ? `Started ${new Date(session.startedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}. Aiming for ${target}h.`
+                : `Started ${new Date(session.startedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}.`}
           </p>
           <div className="hero-actions">
             <button className="btn btn-primary" onClick={onEnd}>
@@ -362,7 +375,8 @@ const subStyle = { fontSize: 11.5, color: 'var(--text-3)', fontWeight: 600 }
 function FastRow({ session, confirm, onEdit, onDelete }) {
   const ms = elapsedMs(session)
   const hours = ms / 3600000
-  const hit = session.targetHours && hours >= session.targetHours
+  const target = targetHoursFor(session)
+  const hit = target && hours >= target
   const armed = confirm.isArmed(session.id)
 
   return (

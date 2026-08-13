@@ -21,6 +21,18 @@ export const FAST_METHODS = [
 
 export const methodLabel = (id) => FAST_METHODS.find((m) => m.id === id)?.label || id
 
+/** The hours a session should be judged against. Prefers the session's own
+    stored targetHours, but falls back to the method's default — sessions
+    saved through the "log a past fast" / edit flow before this fix never
+    had targetHours written at all, which silently made every one of them
+    read as "under target" no matter how long the fast actually ran. This
+    fallback makes those older records correct again without needing to
+    re-edit each one by hand. */
+export function targetHoursFor(session) {
+  if (session?.targetHours != null) return session.targetHours
+  return FAST_METHODS.find((m) => m.id === session?.method)?.hours ?? null
+}
+
 export const isActive = (s) => !!s && s.endedAt == null
 
 /** Elapsed time in ms — from start to now if running, start to end if not. */
@@ -36,8 +48,9 @@ export const elapsedHours = (session, now) => elapsedMs(session, now) / 3600000
 /** Progress against the session's own target — caps at 100 so a fast run
     long doesn't blow out a tile's fill past what "full" means. */
 export function progressPct(session, now) {
-  if (!session?.targetHours) return null
-  return Math.max(0, Math.min(100, (elapsedHours(session, now) / session.targetHours) * 100))
+  const target = targetHoursFor(session)
+  if (!target) return null
+  return Math.max(0, Math.min(100, (elapsedHours(session, now) / target) * 100))
 }
 
 export function formatDuration(ms) {
