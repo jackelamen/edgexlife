@@ -407,7 +407,8 @@ function LogEditor({ date, settings, onClose, onSaved, onBodyweightSynced }) {
   async function save() {
     setSaving(true)
     try {
-      await saveHealthLog(date, {
+      const targetDate = f.date || date
+      await saveHealthLog(targetDate, {
         sleepHours: f.sleepHours, sleepQuality: f.sleepQuality, steps: f.steps,
         water: f.water, weight: f.weight, energy: f.energy, pain: f.pain,
         exerciseMins: f.exerciseMins, exerciseTypes: f.exerciseTypes || [],
@@ -416,6 +417,13 @@ function LogEditor({ date, settings, onClose, onSaved, onBodyweightSynced }) {
         isFastingDay: Boolean(f.isFastingDay),
         notes: f.notes || '',
       })
+      // Reassigning the date on an EXISTING log (opened via the pencil on a
+      // real row) moves it rather than duplicating it — the just-saved copy
+      // lives under targetDate now, so the old date's row would otherwise
+      // stick around as an orphan with the same content.
+      if (targetDate !== date && (existing.data || []).length) {
+        await deleteHealthLog(date)
+      }
       // Bodyweight logged here IS the bodyweight setting — keep them as one
       // number instead of two that can quietly drift apart. Only writes
       // through when a real value was entered and it actually changed, so
@@ -436,10 +444,16 @@ function LogEditor({ date, settings, onClose, onSaved, onBodyweightSynced }) {
   }
 
   return (
-    <Modal open={open} onClose={onClose} title={date ? pretty(date) : ''} sub="Log your day" maxWidth={620}>
+    <Modal open={open} onClose={onClose} title={f?.date ? pretty(f.date) : (date ? pretty(date) : '')} sub="Log your day" maxWidth={620}>
       {!f ? <Loading /> : (
         <>
           <SectionLabel>The basics</SectionLabel>
+          <div style={{ marginBottom: 14 }}>
+            <Field label="Logging for" hint="Past midnight? Point this at yesterday instead of today.">
+              <input type="date" value={f.date || ''} max={today()}
+                onChange={(e) => e.target.value && set('date', e.target.value)} />
+            </Field>
+          </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14 }}>
             <Field label="Sleep (hours)">
               <input type="number" step="0.25" max="24" value={f.sleepHours ?? ''}
