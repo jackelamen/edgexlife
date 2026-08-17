@@ -17,7 +17,7 @@ import {
   healthDetails, healthLabel, weakestComponent, healthDrivers, METRIC_ADVICE, MOVEMENT_BONUS_POINTS,
 } from '../lib/scores'
 import { currentStreak, longestStreak, milestoneHit } from '../lib/streaks'
-import { today, daysAgo, pretty, prettyShort } from '../lib/dates'
+import { today, daysAgo, pretty, prettyShort, hmLabel } from '../lib/dates'
 import WorkoutModule from '../components/health/WorkoutModule'
 import FastingModule, { FastingStatusCard } from '../components/health/FastingModule'
 import TrendChart from '../components/health/TrendChart'
@@ -152,7 +152,7 @@ function TodayView({ settings, index, onEdit, onNavFasting }) {
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3" style={{ marginBottom: 14 }}>
         <StatCard metricKey="sleepHours" label="Sleep" pct={sleepPct}
-          value={log?.sleepHours != null ? `${log.sleepHours}h` : '--'}
+          value={log?.sleepHours != null ? hmLabel(log.sleepHours) : '--'}
           sub={settings ? `of ${settings.sleepTarget}h target` : ''} />
         <StatCard metricKey="steps" label="Steps" pct={stepsPct}
           value={log?.steps != null ? log.steps.toLocaleString() : '--'}
@@ -316,7 +316,7 @@ function LogView({ settings, index, onEdit }) {
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                     {l.isFastingDay && <Badge tone="blue">Fasting day</Badge>}
                     {l.exercisedToday && <Badge tone="green">+{MOVEMENT_BONUS_POINTS} exercised</Badge>}
-                    {l.sleepHours != null && <span className="log-chip"><Icon name="bedtime" size={13} />{l.sleepHours}h</span>}
+                    {l.sleepHours != null && <span className="log-chip"><Icon name="bedtime" size={13} />{hmLabel(l.sleepHours)}</span>}
                     {l.steps != null && <span className="log-chip"><Icon name="steps" size={13} />{l.steps.toLocaleString()}</span>}
                     {l.water != null && <span className="log-chip"><Icon name="water_drop" size={13} />{l.water}L</span>}
                     {l.exerciseMins ? <span className="log-chip"><Icon name="fitness_center" size={13} />{l.exerciseMins}m</span> : null}
@@ -358,6 +358,41 @@ function LogView({ settings, index, onEdit }) {
 }
 
 /* ═══════════════ Log editor ═══════════════ */
+
+/** Sleep is stored as decimal hours (unchanged — scoring/history all read
+    log.sleepHours as a number), but a bare decimal input meant Jack could
+    only log in quarter-hour increments and had to do the minutes math
+    himself. Hours/minutes are DERIVED from the decimal each render rather
+    than held as separate local state, so this stays a plain controlled
+    field with no risk of drifting out of sync with `value` — 2-decimal
+    precision on the stored hours is enough to round-trip any minute value
+    exactly (worst-case rounding error is ~0.3min, well under the 0.5min
+    threshold Math.round needs to recover the original minute). */
+function SleepHoursField({ value, onChange }) {
+  const totalMin = value != null ? Math.round(Number(value) * 60) : null
+  const h = totalMin != null ? Math.floor(totalMin / 60) : ''
+  const m = totalMin != null ? totalMin % 60 : ''
+
+  function commit(nh, nm) {
+    if (nh === '' && nm === '') { onChange(null); return }
+    const hh = nh === '' ? 0 : Math.max(0, Number(nh))
+    const mm = nm === '' ? 0 : Math.max(0, Math.min(59, Number(nm)))
+    onChange(Math.round((hh + mm / 60) * 100) / 100)
+  }
+
+  return (
+    <Field label="Sleep">
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+        <input type="number" min="0" max="23" placeholder="7" style={{ width: 64 }}
+          value={h} onChange={(e) => commit(e.target.value, m)} />
+        <span style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 700 }}>h</span>
+        <input type="number" min="0" max="59" step="5" placeholder="30" style={{ width: 64 }}
+          value={m} onChange={(e) => commit(h, e.target.value)} />
+        <span style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 700 }}>m</span>
+      </div>
+    </Field>
+  )
+}
 
 function RangeField({ label, value, onChange, low, high, min = 1, max = 5 }) {
   const mid = Math.round((min + max) / 2)
@@ -455,10 +490,7 @@ function LogEditor({ date, settings, onClose, onSaved, onBodyweightSynced }) {
             </Field>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14 }}>
-            <Field label="Sleep (hours)">
-              <input type="number" step="0.25" max="24" value={f.sleepHours ?? ''}
-                onChange={(e) => set('sleepHours', e.target.value === '' ? null : Number(e.target.value))} />
-            </Field>
+            <SleepHoursField value={f.sleepHours} onChange={(v) => set('sleepHours', v)} />
             <Field label="Steps">
               <input type="number" step="100" value={f.steps ?? ''}
                 onChange={(e) => set('steps', e.target.value === '' ? null : Number(e.target.value))} />

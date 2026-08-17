@@ -32,3 +32,15 @@ export const prettyShort = (dateStr) => {
     return dateStr
   }
 }
+
+/** Decimal hours (7.5) -> "7h 30m" for display. Rounds to the nearest
+    minute rather than showing raw decimal noise (7.4166666...h). */
+export function hmLabel(hours) {
+  if (hours == null || Number.isNaN(Number(hours))) return null
+  const totalMin = Math.round(Number(hours) * 60)
+  const h = Math.floor(totalMin / 60)
+  const m = totalMin % 60
+  if (h && m) return `${h}h ${m}m`
+  if (h) return `${h}h`
+  return `${m}m`
+}

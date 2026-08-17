@@ -35,6 +35,8 @@
     Never subtracted when unchecked — see the header note above for why. */
 export const MOVEMENT_BONUS_POINTS = 5
 
+import { hmLabel } from './dates'
+
 const n = (v, fallback = 0) => {
   const x = parseFloat(v)
   return Number.isFinite(x) ? x : fallback
@@ -74,7 +76,7 @@ export function healthDetails(log, settings) {
 
   const components = [
     { key: 'sleepHours', label: 'Sleep', value: sleep, weight: 0.24,
-      detail: `${n(log.sleepHours)}h / ${s.sleepTarget}h`,
+      detail: `${hmLabel(n(log.sleepHours)) || '0h'} / ${hmLabel(s.sleepTarget)}`,
       advice: 'Add an earlier shutdown cue or protect tomorrow morning from late-night drift.' },
     { key: 'steps', label: 'Steps', value: steps, weight: 0.15,
       detail: `${i(log.steps).toLocaleString()} / ${s.stepTarget.toLocaleString()}`,
