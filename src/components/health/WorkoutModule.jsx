@@ -563,6 +563,14 @@ function SessionTab({ session, setSession, db, goals, plan, pastSessions, exerci
   const [openEx, setOpenEx] = useState(0)
   const startedAt = useRef(0)
   const base = useRef(0)
+  // The duration this session ALREADY carried when it was loaded into the
+  // editor — 0 for a brand-new session, but a real value when re-opening a
+  // finished one from History to fix a forgotten timer. `finish()` diffs
+  // against this rather than syncing the full `secs` value every time, so
+  // editing an already-logged session's duration adjusts that day's
+  // exerciseMins by the CHANGE, instead of adding the whole duration again
+  // on top of what a previous finish already synced.
+  const originalDurationSec = useRef(0)
 
   // Active goals grouped by exercise name — surfaced right on the exercise
   // card during logging, not just on a separate Progress tab you have to
@@ -584,7 +592,15 @@ function SessionTab({ session, setSession, db, goals, plan, pastSessions, exerci
     return () => clearInterval(id)
   }, [running])
 
-  useEffect(() => { setSecs(0); base.current = 0; setRunning(false); setOpenEx(0) }, [session?.id])
+  useEffect(() => {
+    // Seed from the session's own durationSec rather than always 0 — a
+    // finished workout re-opened from History (say, to add the duration
+    // you forgot to time) used to show "00:00" no matter how much was
+    // actually logged, which read as the session having lost its time.
+    const d = session?.durationSec || 0
+    setSecs(d); base.current = d; setRunning(false); setOpenEx(0)
+    originalDurationSec.current = d
+  }, [session?.id])
 
   if (!session) {
     return (
@@ -614,7 +630,11 @@ function SessionTab({ session, setSession, db, goals, plan, pastSessions, exerci
     }
     try {
       await saveWorkoutSession(cleaned)
-      await addExerciseMinutes(cleaned.date, Math.round(secs / 60), cleaned.type)
+      // Sync the CHANGE in duration, not the whole thing — see
+      // originalDurationSec above. A brand-new session has originalDurationSec
+      // 0, so this is identical to syncing the full duration like before.
+      const deltaMin = Math.round((secs - originalDurationSec.current) / 60)
+      if (deltaMin) await addExerciseMinutes(cleaned.date, deltaMin, cleaned.type)
       await syncPlanFromSession(cleaned, plan)
       toast.success('Session saved')
       onFinished()
@@ -651,6 +671,23 @@ function SessionTab({ session, setSession, db, goals, plan, pastSessions, exerci
           <button className="timer-btn reset" onClick={() => { base.current = 0; setSecs(0); setRunning(false) }}>
             Reset
           </button>
+        </div>
+        {/* Forgot to hit Start? Type the real length in directly — works on
+            a session mid-log or one pulled back in from History after being
+            finished. Disabled while the clock is running so the two inputs
+            can't fight over the same number. */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, paddingTop: 10, borderTop: '1px solid rgba(255,255,255,.12)' }}>
+          <label style={{ fontSize: 12, color: 'rgba(255,255,255,.6)', fontWeight: 700 }}>
+            Forgot to time it? Set minutes directly
+          </label>
+          <input type="number" min="0" step="5" disabled={running}
+            style={{ width: 72, fontSize: 13, padding: '5px 8px' }}
+            value={running ? '' : Math.round(secs / 60)}
+            placeholder={running ? '…' : '0'}
+            onChange={(e) => {
+              const mins = e.target.value === '' ? 0 : Math.max(0, Number(e.target.value))
+              base.current = mins * 60; setSecs(mins * 60)
+            }} />
         </div>
       </div>
 
