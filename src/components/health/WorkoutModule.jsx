@@ -676,8 +676,8 @@ function SessionTab({ session, setSession, db, goals, plan, pastSessions, exerci
             a session mid-log or one pulled back in from History after being
             finished. Disabled while the clock is running so the two inputs
             can't fight over the same number. */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, paddingTop: 10, borderTop: '1px solid rgba(255,255,255,.12)' }}>
-          <label style={{ fontSize: 12, color: 'rgba(255,255,255,.6)', fontWeight: 700 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
+          <label style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 700 }}>
             Forgot to time it? Set minutes directly
           </label>
           <input type="number" min="0" step="5" disabled={running}
