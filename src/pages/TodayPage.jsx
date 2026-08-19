@@ -282,33 +282,77 @@ export default function TodayPage() {
      points against an empty set, which reads as a dramatic collapse that
      never happened. Comparing your last N logs to the N before them
      always compares like with like, whatever the gaps. */
-  const trend = useMemo(() => {
-    const pts = (patternHealth.data || [])
-      .filter((h) => h?.date)
+  /* Reusable "last N logs vs the N before" comparator. Measured in LOGGED
+     ENTRIES, not calendar days — this app's data is stale-by-design (weeks
+     can pass with nothing logged), so a calendar window frequently compares
+     a handful of points against an empty set, reading as a collapse that
+     never happened. Comparing your last N logs to the N before them always
+     compares like with like, whatever the gaps. */
+  function trendOf(rows, scoreFn) {
+    const pts = (rows || [])
+      .filter((r) => r?.date)
       .slice()
       .sort((a, b) => (a.date < b.date ? -1 : 1))
-      .map((h) => ({ date: h.date, score: healthDetails(h, settings.data)?.score }))
+      .map((r) => ({ date: r.date, score: scoreFn(r) }))
       .filter((p) => p.score != null)
-    if (pts.length < 6) return { pts, delta: null, n: pts.length }
+    if (pts.length < 6) return { delta: null, n: pts.length }
     const half = Math.min(15, Math.floor(pts.length / 2))
     const recent = pts.slice(-half)
     const prior = pts.slice(-half * 2, -half)
     const avg = (xs) => xs.reduce((s, x) => s + x.score, 0) / xs.length
-    return { pts, delta: Math.round(avg(recent) - avg(prior)), n: half }
-  }, [patternHealth.data, settings.data])
+    return { delta: Math.round(avg(recent) - avg(prior)), n: half }
+  }
 
-  const spark = trend.pts.slice(-60)
+  /* One trend per system — this is the fix for the hero reading as a
+     Health widget with two footnotes. Goals has no natural day-over-day
+     score to trend (a cycle-action completion rate resets every week by
+     design), so it's represented by today's completion instead of a
+     delta; Health and Wellness both get a real trend from data already
+     loaded for "What connects", at no extra query cost. */
+  const healthTrend = useMemo(
+    () => trendOf(patternHealth.data, (h) => healthDetails(h, settings.data)?.score),
+    [patternHealth.data, settings.data])
+  const wellnessTrend = useMemo(
+    () => trendOf(patternWellness.data, (c) => clarityDetails(c)?.score),
+    [patternWellness.data])
+  const goalsPct = dueActions.length ? Math.round((dueDone / dueActions.length) * 100) : null
 
-  /* Direction wording. The 3-point dead band is deliberate: day-to-day
-     health scores wobble by a couple of points on nothing at all, and a
-     hero that flips between "climbing" and "slipping" on that noise
-     teaches you to stop reading it. */
-  const traj = (() => {
-    if (trend.delta == null) return { word: 'Building the picture', em: 'not enough history yet', tone: 'flat' }
-    if (trend.delta >= 3) return { word: 'Health is climbing', em: `+${trend.delta} over your last ${trend.n} logs`, tone: 'up' }
-    if (trend.delta <= -3) return { word: 'Health is slipping', em: `${trend.delta} over your last ${trend.n} logs`, tone: 'down' }
-    return { word: 'Holding steady', em: `within ${Math.abs(trend.delta) || 1} point of your last ${trend.n} logs`, tone: 'flat' }
+  /* Direction wording, shared by both trended systems. The 3-point dead
+     band is deliberate: day-to-day scores wobble by a couple of points on
+     nothing at all, and copy that flips between "climbing" and "slipping"
+     on that noise teaches you to stop reading it. */
+  function directionOf(trend) {
+    if (trend.delta == null) return { tone: 'flat', verb: 'still gathering data' }
+    if (trend.delta >= 3) return { tone: 'up', verb: 'climbing' }
+    if (trend.delta <= -3) return { tone: 'down', verb: 'slipping' }
+    return { tone: 'flat', verb: 'holding steady' }
+  }
+  const healthDir = directionOf(healthTrend)
+  const wellnessDir = directionOf(wellnessTrend)
+
+  /* The headline leads with whichever TRENDED system moved the most —
+     Health and Wellness compete for it on |delta|; Goals doesn't have a
+     comparable delta so it never leads, but it always gets its own ring
+     below. Ties and no-data both fall back to Health so the headline
+     never reads as arbitrary. */
+  const lead = (() => {
+    const hMag = Math.abs(healthTrend.delta ?? -1)
+    const wMag = Math.abs(wellnessTrend.delta ?? -1)
+    if (healthTrend.delta == null && wellnessTrend.delta == null) return null
+    return wMag > hMag ? 'wellness' : 'health'
   })()
+  const leadLabel = lead === 'wellness' ? 'Clarity' : 'Health'
+  const leadTrend = lead === 'wellness' ? wellnessTrend : healthTrend
+  const leadDir = lead === 'wellness' ? wellnessDir : healthDir
+  const traj = lead == null
+    ? { word: 'Building the picture', em: 'not enough history yet', tone: 'flat' }
+    : {
+      word: `${leadLabel} is ${leadDir.verb}`,
+      em: leadDir.tone === 'flat'
+        ? `within ${Math.abs(leadTrend.delta) || 1} point of your last ${leadTrend.n} logs`
+        : `${leadTrend.delta > 0 ? '+' : ''}${leadTrend.delta} over your last ${leadTrend.n} logs`,
+      tone: leadDir.tone,
+    }
 
   /* One line of substance under the headline, in priority order: a real
      cross-module pattern if one exists, otherwise the component actually
@@ -351,15 +395,15 @@ export default function TodayPage() {
             <p className="hero-copy">{insight}</p>
           </div>
 
-          <div className="hero-mc-trend">
-            <Ring score={healthScore} sub="health" size={132} />
-            {trend.delta != null && (
-              <span className={`hero-delta is-${traj.tone}`}>
-                <Icon name={traj.tone === 'up' ? 'trending_up' : traj.tone === 'down' ? 'trending_down' : 'trending_flat'} size={15} />
-                {trend.delta > 0 ? `+${trend.delta}` : trend.delta} pts
-              </span>
-            )}
-            {spark.length >= 4 && <HeroSpark points={spark} />}
+          {/* Three rings, one per system — not one big Health ring with an
+              orphaned sparkline hanging off it. The headline above still
+              calls out whichever system actually moved; these three give
+              equal billing to all of them regardless of which one led. */}
+          <div className="hero-mc-rings">
+            <HeroRing label="Health" score={healthScore} trend={healthTrend} dir={healthDir} />
+            <HeroRing label="Clarity" score={clarity} trend={wellnessTrend} dir={wellnessDir} />
+            <HeroRing label="Goals" score={goalsPct}
+              caption={dueActions.length ? `${dueDone}/${dueActions.length} today` : `${activeGoals.length} active`} />
           </div>
 
           <div className="hero-mc-strip">
@@ -653,32 +697,26 @@ function QuickWellnessForm({ busy, onCancel, onSave }) {
 }
 
 /*
-  Hero sparkline. Deliberately NOT components/health/Sparkline — that one
-  is built for a light card (--ever stroke, --ochre marker, axis labels)
-  and is illegible on the saturated hero. This is the same idea stripped
-  to a shape: white line, soft fill beneath, one dot on the latest point,
-  no axes at all. It's there to give the headline a silhouette, not to be
-  read value-by-value — the Health page charts exist for that.
+  One system's ring inside the hero. A trend (Health, Clarity) gets a small
+  delta pill under the ring reusing the same tone/verb logic as the
+  headline; a non-trended system (Goals) gets a plain caption instead of a
+  pill it can't honestly earn. Deliberately three of these side by side
+  rather than one big ring — the whole point of this revision is that the
+  hero stopped being a Health widget with footnotes.
 */
-function HeroSpark({ points }) {
-  const W = 190, H = 42, PAD = 3
-  const vals = points.map((p) => p.score)
-  let min = Math.min(...vals), max = Math.max(...vals)
-  if (min === max) { min -= 1; max += 1 }
-  const n = points.length - 1 || 1
-  const x = (i) => PAD + (i / n) * (W - PAD * 2)
-  const y = (v) => H - PAD - ((v - min) / (max - min)) * (H - PAD * 2)
-  const line = points.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(p.score).toFixed(1)}`).join(' ')
-  const area = `${line} L${x(n).toFixed(1)},${H} L${x(0).toFixed(1)},${H} Z`
-
+function HeroRing({ label, score, trend, dir, caption }) {
   return (
-    <svg className="hero-spark" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img"
-      aria-label={`Health score across your last ${points.length} logs`}>
-      <path d={area} fill="rgba(255,255,255,.16)" />
-      <path d={line} fill="none" stroke="rgba(255,255,255,.85)" strokeWidth="2"
-        strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
-      <circle cx={x(n)} cy={y(points[n].score)} r="2.6" fill="#fff" />
-    </svg>
+    <div className="hero-ring">
+      <Ring score={score} sub={label.toLowerCase()} size={92} stroke={9} />
+      {trend ? (
+        trend.delta != null ? (
+          <span className={`hero-delta is-${dir.tone}`}>
+            <Icon name={dir.tone === 'up' ? 'trending_up' : dir.tone === 'down' ? 'trending_down' : 'trending_flat'} size={13} />
+            {trend.delta > 0 ? `+${trend.delta}` : trend.delta}
+          </span>
+        ) : <span className="hero-ring-caption">building history</span>
+      ) : caption ? <span className="hero-ring-caption">{caption}</span> : null}
+    </div>
   )
 }
 

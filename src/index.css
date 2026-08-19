@@ -250,27 +250,36 @@ h1, h2, h3, h4, .page-title {
 /* ── Mission control hero (Today) ────────────────────────────────────
    Scoped to .hero-mc rather than reusing .hero-content, because Health
    and Wellness both render their own heroes through .hero-card /
-   .hero-content and must not inherit this three-pane layout. */
+   .hero-content and must not inherit this layout.
+
+   Revised 2026-08-19: the first pass gave Health one big ring plus a
+   sparkline that had nowhere honest to sit, which read as "a Health
+   widget with two footnotes" rather than a hero for all three systems.
+   This version gives Health, Wellness (Clarity) and Goals one equally
+   sized ring each — the headline still calls out whichever trended
+   system actually moved, but nothing here implies Health outranks the
+   others. */
 .hero-mc {
   position: relative; z-index: 1; padding: 26px 30px;
-  display: grid; grid-template-columns: 1.3fr .7fr; gap: 18px 28px; align-items: center;
+  display: grid; grid-template-columns: 1.25fr auto; gap: 18px 32px; align-items: center;
 }
 .hero-mc-main { min-width: 0; }
-.hero-mc-trend { display: flex; flex-direction: column; align-items: center; gap: 10px; }
-/* Ring sets marginLeft:auto inline for the old right-aligned layout; this
-   column centres it instead. */
-.hero-mc-trend .score-ring { margin-left: 0 !important; }
+.hero-mc-rings { display: flex; gap: 22px; }
+.hero-ring { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+/* Ring sets marginLeft:auto inline for its default right-aligned layout;
+   this column centres it instead. */
+.hero-ring .score-ring { margin-left: 0 !important; }
 .hero-delta {
-  display: inline-flex; align-items: center; gap: 5px; padding: 4px 11px; border-radius: 999px;
-  background: rgba(255,255,255,.16); font-size: 12px; font-weight: 800; letter-spacing: .02em;
+  display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 999px;
+  background: rgba(255,255,255,.16); font-size: 11.5px; font-weight: 800; letter-spacing: .02em;
   font-variant-numeric: tabular-nums; white-space: nowrap;
 }
 .hero-delta.is-up { background: rgba(255,255,255,.22); }
 .hero-delta.is-down { background: rgba(0,0,0,.20); }
-.hero-spark { width: 190px; height: 42px; display: block; opacity: .92; }
+.hero-ring-caption { font-size: 10.5px; font-weight: 700; letter-spacing: .04em; opacity: .62; white-space: nowrap; }
 
 /* Streak strip. Spans both columns so it reads as a footer to the whole
-   banner rather than a fourth thing competing with the ring. */
+   banner rather than a fourth thing competing with the rings. */
 .hero-mc-strip {
   grid-column: 1 / -1; display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px;
   padding-top: 16px; margin-top: 2px; border-top: 1px solid rgba(255,255,255,.18);
@@ -618,6 +627,7 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
   .view { padding: 22px 18px 90px; }
   .hero-content { grid-template-columns: 1fr; }
   .hero-mc { grid-template-columns: 1fr auto; }
+  .hero-mc-rings { gap: 14px; }
   .hero-mc-strip { grid-template-columns: repeat(2, 1fr); }
   .db-editor-grid, .exercise-picker { grid-template-columns: 1fr; }
   .plan-week { gap: 5px; }
@@ -698,11 +708,13 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
   .hero-eyebrow { font-size: 9.5px; margin-bottom: 4px; }
   .hero-h { font-size: 22px; margin-bottom: 9px; }
   .hero-copy { font-size: 12.5px; }
-  /* Phones: the sparkline is the first thing to go — at this width it's a
-     smudge, and the delta pill already carries the direction. */
-  .hero-mc { padding: 16px; gap: 12px 14px; grid-template-columns: 1fr auto; }
-  .hero-mc-trend { gap: 7px; }
-  .hero-spark { display: none; }
+  /* Phones: three rings side by side still fit at a smaller size — this
+     is the layout's whole point, so it doesn't get to drop a system just
+     because the screen is narrow. */
+  .hero-mc { padding: 16px; gap: 12px 10px; grid-template-columns: 1fr auto; }
+  .hero-mc-rings { gap: 8px; }
+  .hero-mc-rings .score-ring { width: 62px !important; height: 62px !important; }
+  .hero-ring-caption, .hero-delta { font-size: 9.5px; }
   .hero-mc-strip { grid-template-columns: repeat(2, 1fr); gap: 10px; padding-top: 12px; }
   .hero-stat-v { font-size: 19px; }
   .hero-stat-l { font-size: 9.5px; }
