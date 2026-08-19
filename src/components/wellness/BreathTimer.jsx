@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import Icon from '../ui/Icon'
-import { BREATH_PRESETS, cycleSeconds, phaseAt, MEDITATION_FADE_SECONDS, MEDITATION_TRACKS } from '../../lib/practices'
+import { BREATH_PRESETS, cycleSeconds, phaseAt, cueAhead, LONG_PHASE_SECONDS, MEDITATION_FADE_SECONDS, MEDITATION_TRACKS } from '../../lib/practices'
 import { metricColor } from '../../lib/design'
 
 // Breath phase colour = identity, not decoration (lib/design.js rule 1):
@@ -30,7 +30,7 @@ export default function BreathTimer({ onComplete }) {
   const [remaining, setRemaining] = useState(preset.minutes * 60)
   const [running, setRunning] = useState(false)
   const [phaseLabel, setPhaseLabel] = useState('Ready')
-  const [phaseView, setPhaseView] = useState({ scale: 0.12, color: BREATH_IN.hex, text: 'Ready', sub: 'ready', progress: 0, key: 'idle' })
+  const [phaseView, setPhaseView] = useState({ scale: 0.12, color: BREATH_IN.hex, text: 'Ready', sub: 'ready', progress: 0, key: 'idle', hold: null, cue: null })
   const [fullscreen, setFullscreen] = useState(false)
   const fsRef = useRef(null)
   const [audioSync, setAudioSync] = useState(true)
@@ -93,25 +93,35 @@ export default function BreathTimer({ onComplete }) {
   // an actual inhale/exhale does. Holds have from === to so easing is a no-op.
   const ease = (t) => t * t * (3 - 2 * t)
 
-  function applyBreathVisual(phase, progress) {
+  /*
+    `sub` is the small line under the phase word. It prefers the most specific
+    thing it can say: which breath of 30 you're on (Wim Hof only), otherwise
+    the preset's pattern. `hold` is a live seconds-remaining readout, shown
+    only for phases long enough that a static "Hold" tells you nothing —
+    the 60/90/120s retentions especially.
+  */
+  function applyBreathVisual(phase, progress, remaining, cue) {
     const scale = phase.from + (phase.to - phase.from) * ease(progress)
     setPhaseView({
       scale, color: phase.key === 'out' ? BREATH_OUT.hex : BREATH_IN.hex,
-      text: phase.label, sub: presetRef.current.pattern,
+      text: phase.label,
+      sub: phase.rep ? `Breath ${phase.rep} / ${phase.reps}${phase.round ? ` · Round ${phase.round}` : ''}` : presetRef.current.pattern,
       progress, key: phase.key,
+      hold: phase.seconds >= LONG_PHASE_SECONDS && remaining != null ? Math.ceil(remaining) : null,
+      cue: cue || null,
     })
     setPhaseLabel(phase.label)
   }
 
   function applyIntroVisual(text, sub) {
-    setPhaseView({ scale: 0.12, color: BREATH_IN.hex, text, sub, progress: 0, key: 'idle' })
+    setPhaseView({ scale: 0.12, color: BREATH_IN.hex, text, sub, progress: 0, key: 'idle', hold: null, cue: null })
   }
 
   function updateBreathGuide() {
     if (!startedAtRef.current) { applyBreathVisual(presetRef.current.phases[0], 0); return }
     const elapsed = (Date.now() - startedAtRef.current) / 1000
-    const { phase, progress } = phaseAt(presetRef.current, elapsed)
-    applyBreathVisual(phase, progress)
+    const { phase, progress, remaining } = phaseAt(presetRef.current, elapsed)
+    applyBreathVisual(phase, progress, remaining, cueAhead(presetRef.current, elapsed))
   }
 
   function secondsUntilExhaleComplete() {
@@ -329,8 +339,23 @@ export default function BreathTimer({ onComplete }) {
           boxShadow: `0 0 ${(24 + openness * 40).toFixed(0)}px rgba(${glowRGB},${(0.12 + openness * 0.16).toFixed(3)}), inset 0 0 28px rgba(255,255,255,.10)`,
         }} />
         <div className="breath-count">
-          <strong>{phaseView.text}</strong>
-          <span>{phaseView.sub}</span>
+          {/* The cue takes over the centre entirely for its last few seconds.
+              Replacing the phase word rather than sitting beside it is the
+              point: eyes-closed-ish peeking at a screen, one word has to win. */}
+          {phaseView.cue ? (
+            <>
+              <strong className="breath-cue-num" key={Math.ceil(phaseView.cue.seconds)}>
+                {Math.max(1, Math.ceil(phaseView.cue.seconds))}
+              </strong>
+              <span className="breath-cue-label">{phaseView.cue.cue} in</span>
+            </>
+          ) : (
+            <>
+              <strong>{phaseView.text}</strong>
+              {phaseView.hold != null && <em className="breath-hold-count">{phaseView.hold}s</em>}
+              <span>{phaseView.sub}</span>
+            </>
+          )}
         </div>
       </div>
       <div className="timer-time">{m}:{s}</div>

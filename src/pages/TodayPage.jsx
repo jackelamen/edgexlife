@@ -14,6 +14,7 @@ import {
   fetchSprints, fetchSprintPhases, fetchSprintTactics, saveSprint,
 } from '../lib/data'
 import { healthDetails, clarityDetails, healthLabel, weakestComponent } from '../lib/scores'
+import { currentStreak, longestStreak } from '../lib/streaks'
 import { findPatterns } from '../lib/correlations'
 import {
   isSprintActive, sprintCurrentWeek, tacticsForWeek,
@@ -266,6 +267,60 @@ export default function TodayPage() {
     return a.sort((x, y) => (x.sev === 'risk' ? -1 : 1) - (y.sev === 'risk' ? -1 : 1))
   }, [healthAge, checkinAge, dueActions.length, dueDone, weakest, liveCycles.length, activeGoals.length])
 
+  /* ── Trajectory ────────────────────────────────────────────────────
+     The hero used to restate the alert count that is listed immediately
+     below it and repeat the health score already shown in the Health
+     system panel. Direction is the one question nothing else on this page
+     answers: am I actually getting better?
+
+     Free, egress-wise — this reuses the 200-day health pull "What
+     connects" already makes, and issues no query of its own.
+
+     Halves are measured in LOGGED ENTRIES, not calendar days. This app's
+     data is stale-by-design (weeks can pass with nothing logged), so
+     "last 30 days vs the 30 before" is frequently comparing a handful of
+     points against an empty set, which reads as a dramatic collapse that
+     never happened. Comparing your last N logs to the N before them
+     always compares like with like, whatever the gaps. */
+  const trend = useMemo(() => {
+    const pts = (patternHealth.data || [])
+      .filter((h) => h?.date)
+      .slice()
+      .sort((a, b) => (a.date < b.date ? -1 : 1))
+      .map((h) => ({ date: h.date, score: healthDetails(h, settings.data)?.score }))
+      .filter((p) => p.score != null)
+    if (pts.length < 6) return { pts, delta: null, n: pts.length }
+    const half = Math.min(15, Math.floor(pts.length / 2))
+    const recent = pts.slice(-half)
+    const prior = pts.slice(-half * 2, -half)
+    const avg = (xs) => xs.reduce((s, x) => s + x.score, 0) / xs.length
+    return { pts, delta: Math.round(avg(recent) - avg(prior)), n: half }
+  }, [patternHealth.data, settings.data])
+
+  const spark = trend.pts.slice(-60)
+
+  /* Direction wording. The 3-point dead band is deliberate: day-to-day
+     health scores wobble by a couple of points on nothing at all, and a
+     hero that flips between "climbing" and "slipping" on that noise
+     teaches you to stop reading it. */
+  const traj = (() => {
+    if (trend.delta == null) return { word: 'Building the picture', em: 'not enough history yet', tone: 'flat' }
+    if (trend.delta >= 3) return { word: 'Health is climbing', em: `+${trend.delta} over your last ${trend.n} logs`, tone: 'up' }
+    if (trend.delta <= -3) return { word: 'Health is slipping', em: `${trend.delta} over your last ${trend.n} logs`, tone: 'down' }
+    return { word: 'Holding steady', em: `within ${Math.abs(trend.delta) || 1} point of your last ${trend.n} logs`, tone: 'flat' }
+  })()
+
+  /* One line of substance under the headline, in priority order: a real
+     cross-module pattern if one exists, otherwise the component actually
+     dragging the score, otherwise an honest "nothing to say yet". */
+  const insight = patterns[0]?.text
+    || (weakest ? `${weakest.label} is the piece holding your score back — ${weakest.detail}.` : null)
+    || 'Log Health and Wellness on the same days and cross-system patterns start surfacing here.'
+
+  const healthStreak = currentStreak(healthIdx.data || [])
+  const checkinStreak = currentStreak((wellnessIdx.data || []).map((x) => x.date))
+  const bestStreak = longestStreak(healthIdx.data || [])
+
   const hour = new Date().getHours()
   const greeting = hour < 5 ? 'Still up' : hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
   const allClear = !alerts.length
@@ -279,23 +334,41 @@ export default function TodayPage() {
         sub="Everything that wants you today, and the state of all three systems."
       />
 
-      {/* Command banner — one verdict, and the number that matters */}
+      {/* ── Command banner ──────────────────────────────────────────────
+             Rebuilt 2026-08-19. Three panes instead of copy-plus-ring:
+             direction (left), the score in context of its own trend
+             (right), and the streaks that were previously computed
+             nowhere on this page (strip). The open-item and alert counts
+             are gone on purpose — both were restating the list rendered
+             directly beneath this card. */}
       <div className="hero-card" style={{ marginBottom: 14 }}>
-        <div className="hero-content">
-          <div>
+        <div className="hero-mc">
+          <div className="hero-mc-main">
             <div className="hero-eyebrow">{greeting}, Jack</div>
             <div className="hero-h">
-              {allClear && totalOpen === 0 ? 'All clear.'
-                : totalOpen === 0 ? <>Nothing due.<br /><em>But something needs a look.</em></>
-                : <>{totalOpen} thing{totalOpen === 1 ? '' : 's'} open<br /><em>across your systems.</em></>}
+              {traj.word}.<br /><em>{traj.em}.</em>
             </div>
-            <p className="hero-copy">
-              {allClear
-                ? 'Every system is current and nothing is overdue. Log as the day goes.'
-                : `${alerts.length} item${alerts.length === 1 ? '' : 's'} want attention. They're listed below, each with somewhere to go.`}
-            </p>
+            <p className="hero-copy">{insight}</p>
           </div>
-          <Ring score={healthScore} sub="health" />
+
+          <div className="hero-mc-trend">
+            <Ring score={healthScore} sub="health" size={132} />
+            {trend.delta != null && (
+              <span className={`hero-delta is-${traj.tone}`}>
+                <Icon name={traj.tone === 'up' ? 'trending_up' : traj.tone === 'down' ? 'trending_down' : 'trending_flat'} size={15} />
+                {trend.delta > 0 ? `+${trend.delta}` : trend.delta} pts
+              </span>
+            )}
+            {spark.length >= 4 && <HeroSpark points={spark} />}
+          </div>
+
+          <div className="hero-mc-strip">
+            <HeroStat value={healthStreak} unit={healthStreak === 1 ? 'day' : 'days'} label="Health streak" />
+            <HeroStat value={checkinStreak} unit={checkinStreak === 1 ? 'day' : 'days'} label="Check-in streak" />
+            <HeroStat value={bestStreak} unit={bestStreak === 1 ? 'day' : 'days'} label="Best run" />
+            <HeroStat value={totalOpen} unit={totalOpen === 1 ? 'item' : 'items'}
+              label={allClear ? 'Open · all systems current' : 'Open today'} />
+          </div>
         </div>
       </div>
 
@@ -575,6 +648,47 @@ function QuickWellnessForm({ busy, onCancel, onSave }) {
           {busy ? 'Saving…' : 'Save check-in'}
         </button>
       </div>
+    </div>
+  )
+}
+
+/*
+  Hero sparkline. Deliberately NOT components/health/Sparkline — that one
+  is built for a light card (--ever stroke, --ochre marker, axis labels)
+  and is illegible on the saturated hero. This is the same idea stripped
+  to a shape: white line, soft fill beneath, one dot on the latest point,
+  no axes at all. It's there to give the headline a silhouette, not to be
+  read value-by-value — the Health page charts exist for that.
+*/
+function HeroSpark({ points }) {
+  const W = 190, H = 42, PAD = 3
+  const vals = points.map((p) => p.score)
+  let min = Math.min(...vals), max = Math.max(...vals)
+  if (min === max) { min -= 1; max += 1 }
+  const n = points.length - 1 || 1
+  const x = (i) => PAD + (i / n) * (W - PAD * 2)
+  const y = (v) => H - PAD - ((v - min) / (max - min)) * (H - PAD * 2)
+  const line = points.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(p.score).toFixed(1)}`).join(' ')
+  const area = `${line} L${x(n).toFixed(1)},${H} L${x(0).toFixed(1)},${H} Z`
+
+  return (
+    <svg className="hero-spark" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img"
+      aria-label={`Health score across your last ${points.length} logs`}>
+      <path d={area} fill="rgba(255,255,255,.16)" />
+      <path d={line} fill="none" stroke="rgba(255,255,255,.85)" strokeWidth="2"
+        strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+      <circle cx={x(n)} cy={y(points[n].score)} r="2.6" fill="#fff" />
+    </svg>
+  )
+}
+
+function HeroStat({ value, unit, label }) {
+  return (
+    <div className="hero-stat">
+      <div className="hero-stat-v">
+        <span className="tnum">{value}</span> <small>{unit}</small>
+      </div>
+      <div className="hero-stat-l">{label}</div>
     </div>
   )
 }

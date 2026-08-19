@@ -41,22 +41,33 @@ export function suggestedReset(state, score) {
    the start (phaseAt's modulo only matters if a session outlasts one
    full cycle), so it plays through once and simply holds on the last
    phase for any final second of rounding. */
-function wimHofRound(holdSeconds, isLast) {
+/*
+  Two annotations exist purely so the UI can warn you about what's coming,
+  which matters far more here than in the looping presets: in Box or 4-7-8
+  you learn the shape after one cycle, but Wim Hof drops a 60-120 second
+  breath hold at the end of 30 fast breaths and there is otherwise no signal
+  it's about to arrive.
+
+    rep / reps  — breath N of 30, so the round has a visible position.
+    cue         — the phase announces itself in advance; BreathTimer counts
+                  the final CUE_LEAD_SECONDS down to it ("HOLD IN 3").
+*/
+function wimHofRound(round, holdSeconds, isLast) {
   const phases = []
   for (let i = 0; i < 30; i++) {
-    phases.push({ key: 'in', label: 'Breathe In', seconds: 1.5, from: 0.12, to: 1.14 })
-    phases.push({ key: 'out', label: 'Let Go', seconds: 1.5, from: 1.14, to: 0.3 })
+    phases.push({ key: 'in', label: 'Breathe In', seconds: 1.5, from: 0.12, to: 1.14, rep: i + 1, reps: 30, round })
+    phases.push({ key: 'out', label: 'Let Go', seconds: 1.5, from: 1.14, to: 0.3, rep: i + 1, reps: 30, round })
   }
-  phases.push({ key: 'hold', label: 'Hold — Lungs Empty', seconds: holdSeconds, from: 0.12, to: 0.12 })
-  phases.push({ key: 'in', label: 'Recovery Breath', seconds: 2, from: 0.12, to: 1.3 })
-  phases.push({ key: 'hold', label: 'Hold — Lungs Full', seconds: 15, from: 1.3, to: 1.3 })
-  phases.push({ key: 'out', label: isLast ? 'Session Complete' : 'Release', seconds: isLast ? 5 : 2, from: 1.3, to: 0.12 })
+  phases.push({ key: 'hold', label: 'Hold — Lungs Empty', seconds: holdSeconds, from: 0.12, to: 0.12, cue: 'Hold', round })
+  phases.push({ key: 'in', label: 'Recovery Breath', seconds: 2, from: 0.12, to: 1.3, cue: 'Breathe In', round })
+  phases.push({ key: 'hold', label: 'Hold — Lungs Full', seconds: 15, from: 1.3, to: 1.3, round })
+  phases.push({ key: 'out', label: isLast ? 'Session Complete' : 'Release', seconds: isLast ? 5 : 2, from: 1.3, to: 0.12, round })
   return phases
 }
 const WIM_HOF_PHASES = [
-  ...wimHofRound(60, false),
-  ...wimHofRound(90, false),
-  ...wimHofRound(120, true),
+  ...wimHofRound(1, 60, false),
+  ...wimHofRound(2, 90, false),
+  ...wimHofRound(3, 120, true),
 ]
 
 export const BREATH_PRESETS = [
@@ -120,14 +131,43 @@ export const MEDITATION_TRACKS = [
 
 export const cycleSeconds = (preset) => preset.phases.reduce((s, p) => s + p.seconds, 0)
 
+/** How many seconds of lead-in warning a cued phase gets. */
+export const CUE_LEAD_SECONDS = 5
+
+/** Any phase at least this long gets a live remaining-seconds readout. */
+export const LONG_PHASE_SECONDS = 12
+
 /** Which phase are we in at `elapsed` seconds, and how far through it. */
 export function phaseAt(preset, elapsed) {
   const total = cycleSeconds(preset)
   let t = elapsed % total
-  for (const p of preset.phases) {
-    if (t < p.seconds) return { phase: p, progress: t / p.seconds }
+  for (let i = 0; i < preset.phases.length; i++) {
+    const p = preset.phases[i]
+    if (t < p.seconds) return { phase: p, progress: t / p.seconds, index: i, remaining: p.seconds - t }
     t -= p.seconds
   }
-  const last = preset.phases[preset.phases.length - 1]
-  return { phase: last, progress: 1 }
+  const i = preset.phases.length - 1
+  return { phase: preset.phases[i], progress: 1, index: i, remaining: 0 }
+}
+
+/*
+  Look ahead for a phase carrying a `cue` and report how far off it is, but
+  only once it's inside the lead window — the caller renders nothing until
+  this returns non-null, so no preset without cues pays any attention cost.
+
+  The scan walks at most one full cycle forward and wraps with modulo, which
+  is correct for both preset shapes: the looping presets genuinely continue
+  past the end, and Wim Hof's flat sequence is authored to be exactly one
+  session long, so the wrap is unreachable there in practice.
+*/
+export function cueAhead(preset, elapsed, lead = CUE_LEAD_SECONDS) {
+  const { index, remaining } = phaseAt(preset, elapsed)
+  let seconds = remaining
+  for (let step = 1; step <= preset.phases.length; step++) {
+    const p = preset.phases[(index + step) % preset.phases.length]
+    if (p.cue) return seconds <= lead ? { cue: p.cue, seconds } : null
+    seconds += p.seconds
+    if (seconds > lead) return null
+  }
+  return null
 }
