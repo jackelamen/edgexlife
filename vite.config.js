@@ -24,8 +24,8 @@ export default defineConfig({
       },
       manifest: {
         id: '/?app=edgex-life',
-        name: 'EdgeX Life — Goals, Health, Wellness',
-        short_name: 'EdgeX Life',
+        name: 'xLife — Goals, Health, Wellness',
+        short_name: 'xLife',
         description: 'Vision, goals, health and wellness for The EDGEx',
         theme_color: '#f6f4ef',
         background_color: '#f6f4ef',

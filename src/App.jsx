@@ -16,7 +16,7 @@ export default function App() {
   if (!ready) {
     return (
       <div style={{ height: '100%', display: 'grid', placeItems: 'center', color: 'var(--text-3)', fontWeight: 700 }}>
-        EDGEx Life
+        xLife
       </div>
     )
   }

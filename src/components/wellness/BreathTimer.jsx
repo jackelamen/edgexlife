@@ -30,8 +30,9 @@ export default function BreathTimer({ onComplete }) {
   const [remaining, setRemaining] = useState(preset.minutes * 60)
   const [running, setRunning] = useState(false)
   const [phaseLabel, setPhaseLabel] = useState('Ready')
-  const [phaseView, setPhaseView] = useState({ scale: 0.12, color: BREATH_IN.hex, text: 'Ready', sub: 'ready' })
+  const [phaseView, setPhaseView] = useState({ scale: 0.12, color: BREATH_IN.hex, text: 'Ready', sub: 'ready', progress: 0, key: 'idle' })
   const [fullscreen, setFullscreen] = useState(false)
+  const fsRef = useRef(null)
   const [audioSync, setAudioSync] = useState(true)
   const [trackId, setTrackId] = useState(MEDITATION_TRACKS[0].id)
   const track = MEDITATION_TRACKS.find((t) => t.id === trackId) || MEDITATION_TRACKS[0]
@@ -53,9 +54,30 @@ export default function BreathTimer({ onComplete }) {
 
   useEffect(() => () => clearAll(), [])
 
+  /*
+    The overlay alone still leaves the browser's own chrome (tab strip, URL
+    bar, OS menu bar) on screen, which is exactly what you don't want to look
+    at mid-session. So entering full screen ALSO asks for real document full
+    screen; if the browser refuses (iOS Safari has no Fullscreen API on
+    non-video elements) the overlay still covers the viewport and everything
+    works, just with chrome visible. Esc / the OS gesture leaving native full
+    screen closes the overlay too, so the two can't drift out of sync.
+  */
+  useEffect(() => {
+    if (!fullscreen) return
+    const el = fsRef.current
+    el?.requestFullscreen?.().catch(() => {})
+    const onChange = () => { if (!document.fullscreenElement) setFullscreen(false) }
+    document.addEventListener('fullscreenchange', onChange)
+    return () => {
+      document.removeEventListener('fullscreenchange', onChange)
+      if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {})
+    }
+  }, [fullscreen])
+
   function clearAll() {
     clearInterval(timerRef.current); timerRef.current = null
-    clearInterval(breathRef.current); breathRef.current = null
+    stopBreathGuide()
     clearInterval(introRef.current); introRef.current = null
     clearFade(true)
   }
@@ -66,17 +88,23 @@ export default function BreathTimer({ onComplete }) {
     if (restoreVolume && audioRef.current) audioRef.current.volume = 1
   }
 
+  // Linear progress feels mechanical to breathe along with; smoothstep gives
+  // the orb a soft start and settle at each end of the phase, which is what
+  // an actual inhale/exhale does. Holds have from === to so easing is a no-op.
+  const ease = (t) => t * t * (3 - 2 * t)
+
   function applyBreathVisual(phase, progress) {
-    const scale = phase.from + (phase.to - phase.from) * progress
+    const scale = phase.from + (phase.to - phase.from) * ease(progress)
     setPhaseView({
       scale, color: phase.key === 'out' ? BREATH_OUT.hex : BREATH_IN.hex,
       text: phase.label, sub: presetRef.current.pattern,
+      progress, key: phase.key,
     })
     setPhaseLabel(phase.label)
   }
 
   function applyIntroVisual(text, sub) {
-    setPhaseView({ scale: 0.12, color: BREATH_IN.hex, text, sub })
+    setPhaseView({ scale: 0.12, color: BREATH_IN.hex, text, sub, progress: 0, key: 'idle' })
   }
 
   function updateBreathGuide() {
@@ -108,11 +136,22 @@ export default function BreathTimer({ onComplete }) {
     return 0
   }
 
+  // Driven by requestAnimationFrame rather than a 200ms interval: the orb and
+  // the halo rings are now continuous motion the user is meant to breathe
+  // along with, and 5fps steps read as stuttering however long the CSS
+  // transition is. Wall-clock math inside updateBreathGuide is unchanged, so a
+  // backgrounded tab (where rAF pauses) still resyncs on the next frame.
   function startBreathGuide() {
     startedAtRef.current = Date.now()
     updateBreathGuide()
-    clearInterval(breathRef.current)
-    breathRef.current = setInterval(updateBreathGuide, 200)
+    stopBreathGuide()
+    const loop = () => { updateBreathGuide(); breathRef.current = requestAnimationFrame(loop) }
+    breathRef.current = requestAnimationFrame(loop)
+  }
+
+  function stopBreathGuide() {
+    if (breathRef.current) cancelAnimationFrame(breathRef.current)
+    breathRef.current = null
   }
 
   function shouldSyncAudio() { return audioSync }
@@ -151,7 +190,7 @@ export default function BreathTimer({ onComplete }) {
 
   function completeSession() {
     clearInterval(timerRef.current); timerRef.current = null
-    clearInterval(breathRef.current); breathRef.current = null
+    stopBreathGuide()
     completingRef.current = false
     fadeAudioOver(1.6)
     setRunning(false)
@@ -194,7 +233,7 @@ export default function BreathTimer({ onComplete }) {
     if (timerRef.current || introRef.current) {
       clearInterval(timerRef.current); timerRef.current = null
       clearInterval(introRef.current); introRef.current = null
-      clearInterval(breathRef.current); breathRef.current = null
+      stopBreathGuide()
       startedAtRef.current = 0
       pauseAudio()
       setRunning(false)
@@ -243,6 +282,14 @@ export default function BreathTimer({ onComplete }) {
   const m = String(Math.floor(remaining / 60)).padStart(2, '0')
   const s = String(remaining % 60).padStart(2, '0')
 
+  const glowRGB = phaseView.color === BREATH_OUT.hex ? BREATH_OUT.glow : BREATH_IN.glow
+  // 0 at fully-collapsed, ~1 at fully-expanded — one normalized value that
+  // every ambient layer (aura brightness, halo spread, ring opacity) reads
+  // from, so the whole scene breathes as a single organism instead of a
+  // handful of independently-timed animations.
+  const openness = Math.max(0, Math.min(1, (phaseView.scale - 0.12) / 1.02))
+  const RING = 2 * Math.PI * 68
+
   const face = (isFs) => (
     <div className="timer-face">
       {!isFs && (
@@ -251,17 +298,35 @@ export default function BreathTimer({ onComplete }) {
         </button>
       )}
       <div className="breath-visual">
+        {/* Halo rings: three copies of the orb's outline trailing it outward at
+            increasing scale and decreasing opacity. Reads as an expanding wave
+            on the inhale and a collapsing one on the exhale — the "something
+            to look at" that is still literally the breath, not decoration
+            running on its own clock. */}
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="breath-halo" style={{
+            transform: `scale(${(phaseView.scale * (1 + (i + 1) * 0.16)).toFixed(3)})`,
+            borderColor: `rgba(${glowRGB},${(0.30 - i * 0.08) * (0.35 + openness * 0.65)})`,
+            opacity: 0.35 + openness * 0.65,
+          }} />
+        ))}
         <svg viewBox="0 0 156 156">
           <circle cx="78" cy="78" r="68" fill="none" stroke="rgba(255,255,255,.12)" strokeWidth="7" />
+          {/* Now a real progress arc for the current phase rather than a static
+              full ring — it sweeps once per inhale/hold/exhale/rest, giving a
+              second, slower read on where you are in the pattern. */}
           <circle className="breath-ring" cx="78" cy="78" r="68" fill="none" strokeWidth="7"
-            strokeLinecap="round" style={{ stroke: phaseView.color }} />
+            strokeLinecap="round"
+            style={{
+              stroke: phaseView.color,
+              strokeDasharray: RING,
+              strokeDashoffset: running ? RING * (1 - phaseView.progress) : 0,
+            }} />
         </svg>
         <div className="breath-orb" style={{
           transform: `scale(${phaseView.scale.toFixed(3)})`,
-          background: phaseView.color === BREATH_OUT.hex ? `rgba(${BREATH_OUT.glow},.20)` : `rgba(${BREATH_IN.glow},.24)`,
-          boxShadow: phaseView.color === BREATH_OUT.hex
-            ? `0 0 28px rgba(${BREATH_OUT.glow},.16), inset 0 0 28px rgba(255,255,255,.08)`
-            : `0 0 30px rgba(${BREATH_IN.glow},.18), inset 0 0 28px rgba(255,255,255,.10)`,
+          background: `rgba(${glowRGB},${(0.16 + openness * 0.12).toFixed(3)})`,
+          boxShadow: `0 0 ${(24 + openness * 40).toFixed(0)}px rgba(${glowRGB},${(0.12 + openness * 0.16).toFixed(3)}), inset 0 0 28px rgba(255,255,255,.10)`,
         }} />
         <div className="breath-count">
           <strong>{phaseView.text}</strong>
@@ -342,7 +407,10 @@ export default function BreathTimer({ onComplete }) {
       </div>
 
       {fullscreen && (
-        <div className="meditation-fullscreen">
+        <div className="meditation-fullscreen" ref={fsRef} style={{ '--breath-glow': glowRGB, '--breath-open': openness.toFixed(3) }}>
+          {/* Slow-drifting blurred blobs, brightness tied to --breath-open so
+              the whole room lightens as you inhale and dims as you exhale. */}
+          <div className="fs-aura" aria-hidden="true"><i /><i /><i /></div>
           <button className="fs-exit" title="Exit full screen" onClick={() => setFullscreen(false)}>
             <Icon name="fullscreen_exit" size={24} />
           </button>

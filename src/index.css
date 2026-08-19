@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /*
-  EdgeX Life — design system v3
+  xLife — design system v3
   ================================================================
   The colour meanings live in src/lib/design.js, which is the source of
   truth; this file is its CSS surface. Read that file first — it explains
@@ -849,8 +849,10 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
 .med-full-btn:hover { background: rgba(255,255,255,.22); transform: translateY(-1px); }
 .breath-visual { width: 190px; height: 190px; position: relative; display: flex; align-items: center; justify-content: center; margin-bottom: 2px; }
 .breath-visual svg { position: absolute; inset: 0; transform: rotate(-90deg); }
-.breath-ring { stroke-dasharray: 427; stroke-dashoffset: 0; opacity: .28; transition: stroke .6s ease, opacity .6s ease; }
-.breath-orb { width: 146px; height: 146px; border-radius: 50%; background: rgba(123,92,214,.24); box-shadow: 0 0 30px rgba(123,92,214,.18), inset 0 0 28px rgba(255,255,255,.10); transition: transform .8s ease, background .8s ease, box-shadow .8s ease; }
+.breath-ring { opacity: .42; transition: stroke .6s ease, opacity .6s ease; }
+.breath-orb { width: 146px; height: 146px; border-radius: 50%; background: rgba(123,92,214,.24); box-shadow: 0 0 30px rgba(123,92,214,.18), inset 0 0 28px rgba(255,255,255,.10); will-change: transform; }
+/* Halo rings trail the orb outward; sized to the orb so scale() matches it. */
+.breath-halo { position: absolute; inset: 12%; border-radius: 50%; border: 1.5px solid rgba(123,92,214,.28); pointer-events: none; will-change: transform; }
 .breath-count { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; pointer-events: none; }
 .breath-count strong { font-size: 20px; line-height: 1; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; text-shadow: 0 0 24px rgba(255,255,255,.20); }
 .breath-count span { font-size: 10px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: rgba(255,255,255,.48); margin-top: 8px; }
@@ -860,13 +862,45 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
 .breath-preset.active { border-color: rgba(var(--accent-rgb), .55); background: var(--accent-light); box-shadow: 0 0 0 3px var(--accent-dim); }
 .breath-preset strong { display: block; font-size: 13px; font-weight: 800; color: var(--text); }
 .breath-preset span { display: block; font-size: 11px; font-weight: 800; color: var(--text-3); margin-top: 3px; }
-.meditation-fullscreen { position: fixed; inset: 0; z-index: 220; display: flex; align-items: center; justify-content: center; background: radial-gradient(circle at 50% 28%, rgba(var(--accent-rgb),.32), transparent 34%), linear-gradient(135deg, #0d0710, var(--accent-dark) 58%, #1b0d1f); color: var(--white); }
-.meditation-fullscreen .fs-inner { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; width: min(92vw,720px); min-height: 80vh; text-align: center; }
-.meditation-fullscreen .breath-visual { width: 380px; height: 380px; }
-.meditation-fullscreen .breath-orb { width: 290px; height: 290px; }
-.meditation-fullscreen .breath-count strong { font-size: 42px; }
-.meditation-fullscreen .timer-time { font-size: 74px; margin-top: 0; }
-.fs-exit { position: absolute; top: 24px; right: 24px; width: 44px; height: 44px; border: none; border-radius: 14px; background: rgba(255,255,255,.10); color: var(--white); display: flex; align-items: center; justify-content: center; cursor: pointer; }
+/* Full-screen meditation view.
+   The inner timer keeps its .timer-face class for layout, but every trace of
+   the CARD it is on the dashboard (gradient fill, rounded corners, fixed
+   300px box) is stripped here — previously those survived into full screen
+   and the session rendered as a small floating card on a dark page instead
+   of filling the display. Sizing is viewport-relative (vmin/vh) so the orb
+   is as large as the screen allows on a phone, a laptop, and an external
+   monitor alike. */
+.meditation-fullscreen { position: fixed; inset: 0; z-index: 220; display: flex; align-items: center; justify-content: center; overflow: hidden; background: radial-gradient(circle at 50% 30%, rgba(var(--accent-rgb),.30), transparent 46%), linear-gradient(135deg, #0d0710, var(--accent-dark) 58%, #1b0d1f); color: var(--white); }
+.meditation-fullscreen .fs-inner { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: clamp(10px, 2.4vh, 26px); width: 100%; height: 100%; min-height: 100dvh; padding: max(20px, env(safe-area-inset-top)) 20px max(20px, env(safe-area-inset-bottom)); text-align: center; }
+.meditation-fullscreen .timer-face { background: none; border-radius: 0; min-height: 0; width: 100%; flex: 0 1 auto; overflow: visible; gap: clamp(8px, 2vh, 22px); }
+.meditation-fullscreen .timer-face::after { display: none; }
+.meditation-fullscreen .med-full-btn { display: none; }
+.meditation-fullscreen .breath-visual { width: min(56vh, 78vw, 460px); height: min(56vh, 78vw, 460px); margin-bottom: 0; }
+.meditation-fullscreen .breath-orb { width: 76%; height: 76%; }
+.meditation-fullscreen .breath-count strong { font-size: clamp(26px, 5vh, 46px); }
+.meditation-fullscreen .breath-count span { font-size: clamp(10px, 1.5vh, 14px); }
+.meditation-fullscreen .timer-time { font-size: clamp(40px, 9vh, 84px); margin-top: 0; line-height: 1; }
+
+/* Ambient aura: three big blurred blobs on slow, mutually-offset drifts.
+   Their own motion is deliberately much slower than the breath so it never
+   competes with it; breath brightness comes from --breath-open, set per
+   frame on the overlay by BreathTimer. */
+.fs-aura { position: absolute; inset: -25%; z-index: 0; pointer-events: none; filter: blur(70px); opacity: calc(.30 + var(--breath-open, 0) * .55); transition: opacity .25s linear; }
+.fs-aura i { position: absolute; display: block; border-radius: 50%; background: radial-gradient(circle, rgba(var(--breath-glow, 123,92,214), .55), transparent 70%); }
+.fs-aura i:nth-child(1) { width: 46vmax; height: 46vmax; top: 4%; left: 6%; animation: auraDrift 46s ease-in-out infinite; }
+.fs-aura i:nth-child(2) { width: 38vmax; height: 38vmax; bottom: 2%; right: 4%; animation: auraDrift 62s ease-in-out infinite reverse; }
+.fs-aura i:nth-child(3) { width: 30vmax; height: 30vmax; top: 42%; left: 46%; animation: auraDrift 54s ease-in-out infinite -18s; }
+@keyframes auraDrift {
+  0%   { transform: translate3d(0,0,0) scale(1); }
+  33%  { transform: translate3d(6vmax,-5vmax,0) scale(1.14); }
+  66%  { transform: translate3d(-5vmax,4vmax,0) scale(.92); }
+  100% { transform: translate3d(0,0,0) scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fs-aura i { animation: none; }
+  .breath-halo { display: none; }
+}
+.fs-exit { position: absolute; z-index: 3; top: max(24px, env(safe-area-inset-top)); right: 24px; width: 44px; height: 44px; border: none; border-radius: 14px; background: rgba(255,255,255,.10); color: var(--white); display: flex; align-items: center; justify-content: center; cursor: pointer; }
 .fs-exit:hover { background: rgba(255,255,255,.22); }
 .fs-controls { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
 .audio-panel { margin-top: 14px; padding: 12px; border: 1px solid var(--border); border-radius: 14px; background: var(--white-soft); }

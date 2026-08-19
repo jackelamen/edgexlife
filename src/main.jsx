@@ -12,7 +12,7 @@ if (!supabaseConfigured) {
   // The classic Vercel white-screen: env vars never got set on the host.
   root.render(
     <div style={{ padding: 40, fontFamily: 'system-ui', maxWidth: 560, margin: '0 auto' }}>
-      <h1 style={{ fontSize: 20 }}>EdgeX Life is not configured</h1>
+      <h1 style={{ fontSize: 20 }}>xLife is not configured</h1>
       <p style={{ color: '#47574f', lineHeight: 1.6 }}>
         <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_ANON_KEY</code> are missing.
         Set them in <code>.env.local</code> locally, or in the Vercel project

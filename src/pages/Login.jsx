@@ -31,7 +31,7 @@ export default function Login() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 26 }}>
           <BrandMark size={40} />
           <div>
-            <h1 className="page-title" style={{ fontSize: 20 }}>EdgeX Life</h1>
+            <h1 className="page-title" style={{ fontSize: 20 }}>xLife</h1>
             <p style={{ fontSize: 13, color: 'var(--text-3)', fontWeight: 600 }}>
               Sign in with your Pulse account
             </p>

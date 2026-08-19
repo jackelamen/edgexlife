@@ -33,7 +33,7 @@ self.addEventListener('push', (event) => {
   let data = {}
   try { data = event.data ? event.data.json() : {} } catch { /* non-JSON payload, use defaults */ }
 
-  const title = data.title || 'EdgeX Life'
+  const title = data.title || 'xLife'
   const options = {
     body: data.body || '',
     icon: '/icons/icon-192.png',
