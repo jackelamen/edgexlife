@@ -385,7 +385,8 @@ export default function TodayPage() {
              nowhere on this page (strip). The open-item and alert counts
              are gone on purpose — both were restating the list rendered
              directly beneath this card. */}
-      <div className="hero-card" style={{ marginBottom: 14 }}>
+      <div className="hero-card hero-mc-card" style={{ marginBottom: 14 }}>
+        <HeroEdge />
         <div className="hero-mc">
           <div className="hero-mc-main">
             <div className="hero-eyebrow">{greeting}, Jack</div>
@@ -400,17 +401,17 @@ export default function TodayPage() {
               calls out whichever system actually moved; these three give
               equal billing to all of them regardless of which one led. */}
           <div className="hero-mc-rings">
-            <HeroRing label="Health" score={healthScore} trend={healthTrend} dir={healthDir} />
-            <HeroRing label="Clarity" score={clarity} trend={wellnessTrend} dir={wellnessDir} />
-            <HeroRing label="Goals" score={goalsPct}
+            <HeroRing mod="health" label="Health" score={healthScore} trend={healthTrend} dir={healthDir} />
+            <HeroRing mod="wellness" label="Clarity" score={clarity} trend={wellnessTrend} dir={wellnessDir} />
+            <HeroRing mod="goals" label="Goals" score={goalsPct}
               caption={dueActions.length ? `${dueDone}/${dueActions.length} today` : `${activeGoals.length} active`} />
           </div>
 
           <div className="hero-mc-strip">
-            <HeroStat value={healthStreak} unit={healthStreak === 1 ? 'day' : 'days'} label="Health streak" />
-            <HeroStat value={checkinStreak} unit={checkinStreak === 1 ? 'day' : 'days'} label="Check-in streak" />
+            <HeroStat mod="health" value={healthStreak} unit={healthStreak === 1 ? 'day' : 'days'} label="Health streak" />
+            <HeroStat mod="wellness" value={checkinStreak} unit={checkinStreak === 1 ? 'day' : 'days'} label="Check-in streak" />
             <HeroStat value={bestStreak} unit={bestStreak === 1 ? 'day' : 'days'} label="Best run" />
-            <HeroStat value={totalOpen} unit={totalOpen === 1 ? 'item' : 'items'}
+            <HeroStat mod="goals" value={totalOpen} unit={totalOpen === 1 ? 'item' : 'items'}
               label={allClear ? 'Open · all systems current' : 'Open today'} />
           </div>
         </div>
@@ -704,9 +705,9 @@ function QuickWellnessForm({ busy, onCancel, onSave }) {
   rather than one big ring — the whole point of this revision is that the
   hero stopped being a Health widget with footnotes.
 */
-function HeroRing({ label, score, trend, dir, caption }) {
+function HeroRing({ mod, label, score, trend, dir, caption }) {
   return (
-    <div className="hero-ring">
+    <div className="hero-ring" data-mod={mod}>
       <Ring score={score} sub={label.toLowerCase()} size={92} stroke={9} />
       {trend ? (
         trend.delta != null ? (
@@ -720,13 +721,35 @@ function HeroRing({ label, score, trend, dir, caption }) {
   )
 }
 
-function HeroStat({ value, unit, label }) {
+function HeroStat({ mod, value, unit, label }) {
   return (
-    <div className="hero-stat">
+    <div className="hero-stat" data-mod={mod}>
       <div className="hero-stat-v">
         <span className="tnum">{value}</span> <small>{unit}</small>
       </div>
       <div className="hero-stat-l">{label}</div>
     </div>
+  )
+}
+
+/*
+  The brand mark's three bars — one per life-system — scaled up and bled
+  off the card's right edge as texture. Geometry is copied verbatim from
+  components/shell/BrandMark.jsx (and therefore from
+  public/icons/favicon.svg); if that mark is ever redrawn, redraw this
+  from the same source.
+
+  Using the logo as the hero's ornament rather than a generic blob is what
+  gives Mission control an identity of its own: every other hero in the
+  app is a flat module colour, and this one wears the mark that means
+  "all three systems at once".
+*/
+function HeroEdge() {
+  return (
+    <svg className="hero-edge" viewBox="0 0 48 48" aria-hidden="true" focusable="false">
+      <polygon points="9.89,11.70 28.44,11.70 25.21,17.75 9.89,17.75" fill="#d76d24" />
+      <polygon points="9.89,20.98 33.27,20.98 30.05,27.02 9.89,27.02" fill="#11ae95" />
+      <polygon points="9.89,30.25 38.11,30.25 34.89,36.30 9.89,36.30" fill="#953ca4" />
+    </svg>
   )
 }

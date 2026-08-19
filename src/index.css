@@ -65,6 +65,22 @@
   --accent-grad-2: #14806e;
 }
 
+/* Today owns the graphite already declared as MODULES.today in
+   lib/design.js — this block simply didn't exist, so `data-module="today"`
+   (which Shell HAS been setting all along) fell through to :root, whose
+   --accent is Health's green. That single omission is why Mission control
+   read as "the Health page with different words": it was literally
+   wearing Health's accent. Deliberately a neutral deep slate, not a
+   fourth hue — Today isn't a fourth system competing with the three, it's
+   the surface above them. */
+html[data-module="today"] {
+  --accent: #2f3a44;
+  --accent-dark: #1b2129;
+  --accent-dim: rgba(47, 58, 68, 0.10);
+  --accent-light: #e8eaec;
+  --accent-rgb: 47, 58, 68;
+  --accent-grad-2: #44525f;
+}
 html[data-module="goals"] {
   --accent: #8a4b1f;
   --accent-dark: #613416;
@@ -259,34 +275,102 @@ h1, h2, h3, h4, .page-title {
    sized ring each — the headline still calls out whichever trended
    system actually moved, but nothing here implies Health outranks the
    others. */
+/* ── The card itself ──────────────────────────────────────────────
+   Mission control is the only surface that is ABOUT all three systems at
+   once, so it's the only one that gets to wear all three hues. The base
+   is the sidebar's own ink rather than any module accent — that's the
+   whole identity move: dark chrome says "command surface", a saturated
+   module colour says "you are inside that module". Three soft glows
+   (Goals ochre, Health teal, Wellness violet) bleed in from the edges so
+   the colour present is *the systems themselves*, not a decorative wash.
+
+   Hues here are the BRIGHTENED module values (#d76d24 / #11ae95 /
+   #953ca4), matching BrandMark rather than the deep band in
+   lib/design.js — the deep values go muddy on ink, which is the same
+   documented exception BrandMark already takes. */
+.hero-mc-card {
+  background:
+    radial-gradient(760px 340px at 88% -25%, rgba(17,174,149,.26), transparent 60%),
+    radial-gradient(620px 340px at 104% 118%, rgba(149,60,164,.26), transparent 58%),
+    radial-gradient(560px 300px at 34% 150%, rgba(215,109,36,.16), transparent 62%),
+    linear-gradient(145deg, #14140f 0%, #1b2129 48%, #2f3a44 100%);
+}
+/* The stock hero's big white blob fights the glows above — Today draws
+   its own edge mark instead. */
+.hero-mc-card::before { display: none; }
+
+/* The brand mark's three bars, blown up and bled off the right edge as
+   texture. Reusing the logo geometry rather than inventing an ornament is
+   what makes this card feel like *this app's* command surface. */
+.hero-edge {
+  position: absolute; right: -7%; top: 64%; transform: translateY(-50%);
+  height: 148%; width: auto; opacity: .10; pointer-events: none; z-index: 0;
+  /* Feathered, or the bars' straight cut edges read as rectangular
+     banding artifacts rather than a mark. The fade also keeps the
+     headline column clean without needing a second overlay. */
+  -webkit-mask-image: radial-gradient(closest-side at 64% 50%, #000 32%, transparent 100%);
+  mask-image: radial-gradient(closest-side at 64% 50%, #000 32%, transparent 100%);
+}
+
 .hero-mc {
   position: relative; z-index: 1; padding: 26px 30px;
   display: grid; grid-template-columns: 1.25fr auto; gap: 18px 32px; align-items: center;
 }
 .hero-mc-main { min-width: 0; }
-.hero-mc-rings { display: flex; gap: 22px; }
+.hero-mc-rings { display: flex; gap: 20px; }
+/* Sharing the row with a ~350px ring column, the stock 38px display size
+   wraps to three ragged lines once the content area drops near 790px (a
+   1100px window with the sidebar out). Fluid down to 26px holds it to two
+   lines across every desktop width; the stacked layouts below get the
+   full width back and keep the full size. */
+@media (min-width: 1024px) { .hero-mc .hero-h { font-size: clamp(26px, 2.5vw, 38px); } }
 .hero-ring { display: flex; flex-direction: column; align-items: center; gap: 8px; }
 /* Ring sets marginLeft:auto inline for its default right-aligned layout;
    this column centres it instead. */
 .hero-ring .score-ring { margin-left: 0 !important; }
+
+/* Per-system colour, applied ONLY to the ring's empty track and its
+   label — never to the filled arc. Design rule 3 reserves green/amber/red
+   for performance, and a score ring is named there explicitly; colouring
+   the FILL by module would put a teal-green Health arc next to an ochre
+   Goals arc, which reads exactly like "good" next to "warning". Identity
+   therefore lives on the label and the track, quantity stays white. */
+.hero-ring[data-mod="health"] .score-ring circle:first-of-type { stroke: rgba(17,174,149,.42); }
+.hero-ring[data-mod="wellness"] .score-ring circle:first-of-type { stroke: rgba(149,60,164,.46); }
+.hero-ring[data-mod="goals"] .score-ring circle:first-of-type { stroke: rgba(215,109,36,.42); }
+/* Ring sets opacity inline on its sub-label, so full-strength hue needs
+   the override. */
+.hero-ring .score-ring-sub { opacity: 1 !important; }
+.hero-ring[data-mod="health"] .score-ring-sub { color: #11ae95; }
+.hero-ring[data-mod="wellness"] .score-ring-sub { color: #953ca4; }
+.hero-ring[data-mod="goals"] .score-ring-sub { color: #d76d24; }
+
 .hero-delta {
   display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 999px;
-  background: rgba(255,255,255,.16); font-size: 11.5px; font-weight: 800; letter-spacing: .02em;
+  background: rgba(255,255,255,.14); font-size: 11.5px; font-weight: 800; letter-spacing: .02em;
   font-variant-numeric: tabular-nums; white-space: nowrap;
 }
 .hero-delta.is-up { background: rgba(255,255,255,.22); }
-.hero-delta.is-down { background: rgba(0,0,0,.20); }
-.hero-ring-caption { font-size: 10.5px; font-weight: 700; letter-spacing: .04em; opacity: .62; white-space: nowrap; }
+.hero-delta.is-down { background: rgba(0,0,0,.22); }
+/* Padded to the delta pill's own height so a captioned ring (Goals) and a
+   pilled ring (Health, Clarity) sit on the same baseline. */
+.hero-ring-caption { font-size: 10.5px; font-weight: 700; letter-spacing: .04em; opacity: .55; white-space: nowrap; padding: 3px 0; }
 
 /* Streak strip. Spans both columns so it reads as a footer to the whole
    banner rather than a fourth thing competing with the rings. */
 .hero-mc-strip {
   grid-column: 1 / -1; display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px;
-  padding-top: 16px; margin-top: 2px; border-top: 1px solid rgba(255,255,255,.18);
+  padding-top: 16px; margin-top: 2px; border-top: 1px solid rgba(255,255,255,.14);
 }
+/* Each stat carries the hue of the system it came from — a 2px rule
+   rather than a dot, so the four read as one instrument panel. */
+.hero-stat { padding-left: 11px; border-left: 2px solid rgba(255,255,255,.16); }
+.hero-stat[data-mod="health"] { border-left-color: #11ae95; }
+.hero-stat[data-mod="wellness"] { border-left-color: #953ca4; }
+.hero-stat[data-mod="goals"] { border-left-color: #d76d24; }
 .hero-stat-v { font-size: 24px; font-weight: 800; letter-spacing: -.02em; line-height: 1.05; }
 .hero-stat-v small { font-size: 12px; font-weight: 700; opacity: .68; letter-spacing: 0; }
-.hero-stat-l { font-size: 10.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; opacity: .68; margin-top: 4px; }
+.hero-stat-l { font-size: 10.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; opacity: .62; margin-top: 4px; }
 
 /* Practice row — deliberately not a metric tile. Meditation minutes are an
    activity with no target, so there's nothing honest to fill; giving it a
@@ -626,9 +710,19 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
 @media (max-width: 1023px) {
   .view { padding: 22px 18px 90px; }
   .hero-content { grid-template-columns: 1fr; }
-  .hero-mc { grid-template-columns: 1fr auto; }
-  .hero-mc-rings { gap: 14px; }
-  .hero-mc-strip { grid-template-columns: repeat(2, 1fr); }
+  /* Below desktop the rings move BELOW the headline and span the full
+     width. Kept in the side column, they stole ~350px and forced the
+     headline to wrap to three ragged lines around 900px. */
+  .hero-mc { grid-template-columns: 1fr; gap: 16px; }
+  /* Capped and centred: left to fill an 800px tablet the three rings
+     drift to opposite corners and stop reading as one instrument. */
+  .hero-mc-rings {
+    grid-column: 1 / -1; justify-content: space-around; gap: 10px;
+    width: 100%; max-width: 460px; margin: 0 auto;
+    padding-top: 16px; border-top: 1px solid rgba(255,255,255,.14);
+  }
+  .hero-mc-strip { grid-template-columns: repeat(4, 1fr); }
+  .hero-edge { opacity: .08; height: 150%; }
   .db-editor-grid, .exercise-picker { grid-template-columns: 1fr; }
   .plan-week { gap: 5px; }
   .plan-slot { min-height: 60px; padding: 7px 5px; }
@@ -708,16 +802,20 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
   .hero-eyebrow { font-size: 9.5px; margin-bottom: 4px; }
   .hero-h { font-size: 22px; margin-bottom: 9px; }
   .hero-copy { font-size: 12.5px; }
-  /* Phones: three rings side by side still fit at a smaller size — this
-     is the layout's whole point, so it doesn't get to drop a system just
-     because the screen is narrow. */
-  .hero-mc { padding: 16px; gap: 12px 10px; grid-template-columns: 1fr auto; }
-  .hero-mc-rings { gap: 8px; }
-  .hero-mc-rings .score-ring { width: 62px !important; height: 62px !important; }
+  /* Phones inherit the stacked layout from the tablet block above and
+     just tighten it. Three 76px rings fit comfortably across 360px — no
+     system gets dropped for width, since showing all three at once is the
+     entire point of this hero. */
+  .hero-mc { padding: 16px; gap: 14px; }
+  .hero-mc-rings { gap: 6px; padding-top: 14px; }
+  .hero-mc-rings .score-ring { width: 76px !important; height: 76px !important; }
   .hero-ring-caption, .hero-delta { font-size: 9.5px; }
-  .hero-mc-strip { grid-template-columns: repeat(2, 1fr); gap: 10px; padding-top: 12px; }
+  .hero-mc-strip { grid-template-columns: repeat(2, 1fr); gap: 10px 12px; padding-top: 14px; }
+  .hero-stat { padding-left: 9px; }
   .hero-stat-v { font-size: 19px; }
   .hero-stat-l { font-size: 9.5px; }
+  /* Edge mark reads as noise behind dense phone content. */
+  .hero-edge { display: none; }
   .hero-card::before { width: 230px; height: 230px; top: -110px; right: -70px; }
 
   /* Ring scales via viewBox (see Ring in Kit.jsx); !important because the
