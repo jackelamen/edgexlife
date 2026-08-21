@@ -8,9 +8,10 @@
     .15  nutrition .15, minus (pain * 7) — then Movement, BELOW, adds up to
     MOVEMENT_BONUS_POINTS on top. Clamped 0–100 only at the very end.
 
-  Fixed 2026-08-21 (xLife review — "Instrument critiques"), two things,
-  neither of which touches the formula above (continuity preserved,
-  every score reads exactly as it did before):
+  Fixed 2026-08-21 (xLife review — "Instrument critiques"), three things,
+  none of which touch the formula above (continuity preserved, every
+  score reads exactly as it did before) — the third is a comment-only
+  correction, see below:
 
   1. Pain's declared `weight: 0.14` never matched what the formula
      actually does. The six components above are blended as
@@ -35,20 +36,37 @@
      "you did none of this," which was never true, just unmeasured. A
      day where you explicitly logged 0 (0 steps, 0 water) is unaffected:
      that's a real number, not a missing one, and still scores as 0.
+  3. The Movement paragraph below used to read as if Steps punishing a
+     rest day contradicted Movement being a no-penalty bonus. Confirmed
+     with Jack: not a contradiction, they were never describing the same
+     thing — see the paragraph itself for the corrected version.
 
   Movement is intentionally NOT one of the six weighted components above —
   it's a flat bonus, added after the weighted base is computed, worth
   MOVEMENT_BONUS_POINTS if `log.exercisedToday` is checked and worth
   exactly 0 (never negative) if it isn't. This was a deliberate ask: a
   weighted "% of exerciseMins target" component was tried twice before
-  (2026-08-09) and reverted both times, partly because Steps already
-  covers movement, and partly because ANY weighted component necessarily
-  penalizes an unlogged/rest day — which is the wrong shape for something
-  that should only ever help. A pure additive bonus can't do that: leaving
-  the box unchecked is neutral, not a miss, by construction rather than by
-  a rest-day exception that needs its own plumbing (contrast with the
-  rest-day design from the reverted attempt, still described in git
-  history if that approach is ever wanted for a different component).
+  (2026-08-09) and reverted both times, partly because a structured
+  workout already has its own module (see WorkoutModule), and partly
+  because ANY weighted component necessarily penalizes a day with no
+  logged workout — the wrong shape for something that should only ever
+  help. A pure additive bonus can't do that: leaving the box unchecked is
+  neutral, not a miss, by construction.
+
+  Steps and "rest day" are unrelated by design, confirmed 2026-08-21 —
+  this isn't a gap to close, it's how it's supposed to work. A rest day
+  means no structured workout, nothing more; it has no bearing on Steps,
+  which is its own always-on target regardless of whether today is a
+  training day or a rest day. The earlier version of this comment implied
+  Steps punishing a low-activity day was in tension with Movement being a
+  "no-penalty" bonus, as if the two were meant to describe the same thing
+  and one of them was lying. They were never describing the same thing:
+  Movement (the checkbox) answers "did you do a workout," Steps answers
+  "how much did you move today," and a rest day is a real answer to the
+  first question with no implied answer to the second — you can rest from
+  training and still walk, or not, same as any other day. Nothing about
+  the Steps formula changes here; the fix is this comment no longer
+  claiming a contradiction that was never real.
 
   `nutritionScore` (1–10, self-rated) fills the weighted slot exercise used
   to occupy. `isFastingDay` and `nutritionNotes` ride along on the same log
