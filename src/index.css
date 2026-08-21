@@ -652,7 +652,14 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
 .ex-card-hdr { display: flex; align-items: center; gap: 10px; padding: 13px 14px; cursor: pointer; user-select: none; }
 .ex-card-hdr .ex-name { font-size: 14px; font-weight: 800; flex: 1; }
 .ex-card-hdr .ex-summary { font-size: 12px; color: var(--text-2); }
-.ex-card-hdr .icon-chevron { font-size: 18px; color: var(--text-3); transition: transform .15s; }
+/* Remove-exercise sits right next to the expand chevron, and the whole
+   header is one big tap target for "expand" — on a phone, a thumb aimed
+   at expand that lands a little short used to land ON the delete button
+   instead, an instant, unconfirmed, destructive action. A wider gap plus
+   a slightly bigger tap target on the button gives it real separation
+   instead of relying on precision. */
+.ex-card-hdr .btn-icon.btn-sm { width: 36px; height: 36px; margin-right: 4px; }
+.ex-card-hdr .icon-chevron { font-size: 18px; color: var(--text-3); transition: transform .15s; margin-left: 6px; }
 .ex-card.open .icon-chevron { transform: rotate(180deg); }
 .ex-sets { border-top: 1px solid var(--border); padding: 10px 14px 14px; }
 .sets-grid, .set-row { display: grid; grid-template-columns: 28px 1fr 1fr 1fr 36px; gap: 6px; align-items: center; }

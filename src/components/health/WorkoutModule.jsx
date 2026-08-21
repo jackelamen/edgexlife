@@ -600,6 +600,14 @@ function SessionTab({ session, setSession, db, goals, plan, pastSessions, exerci
   // Which exercise's Repeat button is armed for a destructive replace.
   // -1 = none. See repeatLast().
   const [armedRepeat, setArmedRepeat] = useState(-1)
+  // Which exercise's remove (X) button is armed. -1 = none. Same
+  // arm-then-confirm shape as armedRepeat above, not the shared
+  // useConfirm() hook — this button sits inside a row that's ALSO one
+  // big "expand" tap target, so a single unconfirmed tap here used to
+  // mean a thumb aimed at expand and landing short would silently
+  // delete a logged exercise instead. See the .ex-card-hdr comment in
+  // index.css for the matching spacing fix.
+  const [armedRemove, setArmedRemove] = useState(-1)
   const startedAt = useRef(0)
   const base = useRef(0)
   // The duration this session ALREADY carried when it was loaded into the
@@ -800,7 +808,7 @@ function SessionTab({ session, setSession, db, goals, plan, pastSessions, exerci
           const lastSummary = last ? fmtLastSets(last.sets) : null
           return (
             <div key={i} className={`ex-card${open ? ' open' : ''}`}>
-              <div className="ex-card-hdr" onClick={() => { setOpenEx(open ? -1 : i); setArmedRepeat(-1) }}>
+              <div className="ex-card-hdr" onClick={() => { setOpenEx(open ? -1 : i); setArmedRepeat(-1); setArmedRemove(-1) }}>
                 <input
                   className="ex-name"
                   value={ex.name}
@@ -810,11 +818,23 @@ function SessionTab({ session, setSession, db, goals, plan, pastSessions, exerci
                   style={{ border: 'none', background: 'transparent', padding: 0, fontWeight: 800, fontSize: 14 }}
                 />
                 <span className="ex-summary">{done}/{ex.sets?.length || 0}</span>
-                <button className="btn btn-icon btn-sm" onClick={(e) => {
-                  e.stopPropagation()
-                  set({ exercises: session.exercises.filter((_, j) => j !== i) })
-                }} aria-label="Remove exercise">
-                  <Icon name="close" size={15} />
+                {/* Arm-then-confirm, same shape as Repeat's armedRepeat and
+                    History's useConfirm() elsewhere in this file — a tap
+                    here used to delete instantly, and this button sits
+                    right next to the row's own giant "expand" tap target
+                    (see index.css .ex-card-hdr for the matching spacing
+                    fix), so an imprecise tap could silently lose a
+                    logged exercise's sets. */}
+                <button className={`btn btn-icon btn-sm${armedRemove === i ? ' btn-danger' : ''}`}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    if (armedRemove !== i) { setArmedRemove(i); return }
+                    setArmedRemove(-1)
+                    set({ exercises: session.exercises.filter((_, j) => j !== i) })
+                  }}
+                  aria-label={armedRemove === i ? 'Confirm remove exercise' : 'Remove exercise'}
+                  title={armedRemove === i ? 'Tap again to remove' : 'Remove exercise'}>
+                  <Icon name={armedRemove === i ? 'error_outline' : 'close'} size={15} />
                 </button>
                 <Icon name="expand_more" size={18} className="icon-chevron" />
               </div>

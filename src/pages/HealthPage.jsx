@@ -117,6 +117,22 @@ function TodayView({ settings, index, onEdit, onNavFasting }) {
     } catch (e) { toast.error(e.message) }
   }
 
+  // This week's step total — Steps is the one metric here people actually
+  // think about in weekly terms ("did I move enough this week"), where
+  // Sleep/Water read naturally per-day. No new fetch: `recent` already
+  // pulls the last 14 days for the status-dot strip above, so the last 7
+  // of those are already sitting in memory.
+  const weeklySteps = useMemo(() => {
+    const byDateSteps = {}
+    ;(recent.data || []).forEach((l) => { byDateSteps[l.date] = l.steps })
+    let sum = 0, any = false
+    for (let i = 0; i < 7; i++) {
+      const v = byDateSteps[daysAgo(i)]
+      if (v != null) { sum += v; any = true }
+    }
+    return any ? sum : null
+  }, [recent.data, t])
+
   // Map each of the last 14 days to its score (null where unlogged).
   const byDate = {}
   ;(recent.data || []).forEach((l) => { byDate[l.date] = healthDetails(l, settings)?.score ?? null })
@@ -156,7 +172,10 @@ function TodayView({ settings, index, onEdit, onNavFasting }) {
           sub={settings ? `of ${settings.sleepTarget}h target` : ''} />
         <StatCard metricKey="steps" label="Steps" pct={stepsPct}
           value={log?.steps != null ? log.steps.toLocaleString() : '--'}
-          sub={settings ? `of ${settings.stepTarget.toLocaleString()} target` : ''} />
+          sub={[
+            settings ? `of ${settings.stepTarget.toLocaleString()} target` : '',
+            weeklySteps != null ? `${weeklySteps.toLocaleString()} this wk` : '',
+          ].filter(Boolean).join(' · ')} />
         <StatCard metricKey="water" label="Water" pct={waterPct}
           value={log?.water != null ? `${log.water}L` : '--'}
           sub={settings ? `of ${settings.waterTarget}L target` : ''} />
