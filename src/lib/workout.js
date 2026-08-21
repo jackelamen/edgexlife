@@ -1,4 +1,5 @@
 /* Workout constants ported verbatim from health.html. */
+import { dateKey } from './dates'
 
 export const WK_TYPES = [
   { id: 'Strength', label: 'Strength', em: '🏋️' },
@@ -80,7 +81,7 @@ export function weekDates(weeks = 0) {
   return Array.from({ length: 7 }, (_, i) => {
     const d = new Date(mon)
     d.setDate(mon.getDate() + i)
-    return d.toISOString().slice(0, 10)
+    return dateKey(d)
   })
 }
 

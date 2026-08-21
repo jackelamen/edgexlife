@@ -16,7 +16,7 @@ import {
   DAY_SHORT, DAY_FULL, weekDates, sessionVolume, sessionSetCount, fmtDuration,
   parseWorkoutCSV, WORKOUT_CSV_TEMPLATE, isBodyweightExercise, setLoadKg,
 } from '../../lib/workout'
-import { today, pretty, prettyShort } from '../../lib/dates'
+import { today, dateKey, pretty, prettyShort } from '../../lib/dates'
 import TrendChart from './TrendChart'
 
 /* No standalone "Session Log" tab — it used to be a nav destination that,
@@ -34,10 +34,43 @@ const TABS = [
   { value: 'progress', label: 'Progress', icon: 'trending_up' },
 ]
 
+// An in-progress session lived only in React state. Refresh the tab,
+// switch apps, or have the PWA get evicted mid-workout and every set
+// logged so far was gone with no warning. Mirrored to localStorage on
+// every change and restored on mount, same pattern as ReviewPage's draft
+// persistence — it's a convenience cache, not a source of truth, so a
+// write failure (quota, private mode) is swallowed rather than breaking
+// the workout.
+const SESSION_DRAFT_KEY = 'xlife.workout.activeSession'
+function loadSavedSession() {
+  try {
+    const raw = localStorage.getItem(SESSION_DRAFT_KEY)
+    return raw ? JSON.parse(raw) : null
+  } catch { return null }
+}
+
 export default function WorkoutModule() {
   const [tab, setTab] = useState('plan')
   const [weekOffset, setWeekOffset] = useState(0)
-  const [session, setSession] = useState(null)
+  const [session, setSession] = useState(loadSavedSession)
+  const resumedToastShown = useRef(false)
+
+  useEffect(() => {
+    if (session && !resumedToastShown.current) {
+      resumedToastShown.current = true
+      // Only true on the very first render when a saved draft exists —
+      // any session started this visit goes through startSession(),
+      // which fires after this effect already ran once.
+      if (loadSavedSession()?.id === session.id) {
+        toast('Resumed your in-progress session', { icon: '↩️' })
+        setTab('log')
+      }
+    }
+    try {
+      if (session) localStorage.setItem(SESSION_DRAFT_KEY, JSON.stringify(session))
+      else localStorage.removeItem(SESSION_DRAFT_KEY)
+    } catch { /* quota — this is a convenience cache, not worth breaking the app for */ }
+  }, [session])
 
   const plan = useAsync((f) => fetchWorkoutPlan({ force: f }))
   const sessions = useAsync((f) => fetchWorkoutSessions({ force: f }))
@@ -123,7 +156,10 @@ export default function WorkoutModule() {
         />
       )}
       {tab === 'db' && <DatabaseTab db={db} onSaved={() => dbRaw.reload()} />}
-      {tab === 'history' && <HistoryTab sessions={sessions} onEdit={setSession} onTab={setTab} bodyweightKg={bodyweightKg} />}
+      {tab === 'history' && (
+        <HistoryTab sessions={sessions} onEdit={setSession} onTab={setTab} bodyweightKg={bodyweightKg}
+          activeSessionId={session?.id} />
+      )}
       {tab === 'progress' && <ProgressTab sessions={sessions.data || []} exGoals={exGoals} db={db} bodyweightKg={bodyweightKg} />}
 
       {/* Hidden while a session is open — its whole job is "jump into Log
@@ -660,10 +696,23 @@ function SessionTab({ session, setSession, db, goals, plan, pastSessions, exerci
 
   async function finish() {
     if (running) { base.current = secs; setRunning(false) }
+    // A nameless exercise with real set data used to be silently dropped
+    // here — `filter((e) => e.name.trim())` — while the toast still said
+    // "Session saved" with no hint anything was thrown away. Now only a
+    // truly empty card (no name AND no set data) is dropped; a nameless
+    // one with logged sets is kept and auto-labeled so the reps and
+    // weight aren't lost, and the user is told it happened.
+    const hasSetData = (e) => (e.sets || []).some((s) => String(s.reps ?? '').trim() || String(s.weight ?? '').trim())
+    let autoNamed = 0
+    const exercises = session.exercises.filter((e) => {
+      if (e.name.trim()) return true
+      if (hasSetData(e)) { autoNamed++; return true }
+      return false
+    }).map((e) => (e.name.trim() ? e : { ...e, name: 'Unnamed exercise' }))
     const cleaned = {
       ...session,
       durationSec: secs,
-      exercises: session.exercises.filter((e) => e.name.trim()),
+      exercises,
       completedAt: new Date().toISOString(),
     }
     try {
@@ -671,10 +720,15 @@ function SessionTab({ session, setSession, db, goals, plan, pastSessions, exerci
       // Sync the CHANGE in duration, not the whole thing — see
       // originalDurationSec above. A brand-new session has originalDurationSec
       // 0, so this is identical to syncing the full duration like before.
+      // Always called, even when deltaMin is 0 — see addExerciseMinutes'
+      // doc comment: a finished session with no elapsed timer still needs
+      // to mark exercisedToday, or the Health Score never sees it.
       const deltaMin = Math.round((secs - originalDurationSec.current) / 60)
-      if (deltaMin) await addExerciseMinutes(cleaned.date, deltaMin, cleaned.type)
+      await addExerciseMinutes(cleaned.date, deltaMin, cleaned.type)
       await syncPlanFromSession(cleaned, plan)
-      toast.success('Session saved')
+      toast.success(autoNamed
+        ? `Session saved (${autoNamed} exercise${autoNamed > 1 ? 's' : ''} kept as "Unnamed exercise")`
+        : 'Session saved')
       onFinished()
     } catch (e) { toast.error(e.message) }
   }
@@ -988,7 +1042,7 @@ function DatabaseTab({ db, onSaved }) {
 
 /* ═══════════════ History ═══════════════ */
 
-function HistoryTab({ sessions, onEdit, onTab, bodyweightKg = 70 }) {
+function HistoryTab({ sessions, onEdit, onTab, bodyweightKg = 70, activeSessionId }) {
   const [filter, setFilter] = useState('all')
   const confirm = useConfirm()
   const all = sessions.data || []
@@ -1004,7 +1058,7 @@ function HistoryTab({ sessions, onEdit, onTab, bodyweightKg = 70 }) {
     for (let i = 0; i < 91; i++) {
       const d = new Date(start)
       d.setDate(start.getDate() + i)
-      const iso = d.toISOString().slice(0, 10)
+      const iso = dateKey(d)
       const day = all.filter((s) => s.date === iso)
       const vol = day.reduce((n, s) => n + sessionVolume(s, bodyweightKg), 0)
       const mins = day.reduce((n, s) => n + Math.round((s.durationSec || 0) / 60), 0)
@@ -1021,7 +1075,7 @@ function HistoryTab({ sessions, onEdit, onTab, bodyweightKg = 70 }) {
     const dates = new Set(all.map((s) => s.date))
     const d = new Date()
     for (;;) {
-      const iso = d.toISOString().slice(0, 10)
+      const iso = dateKey(d)
       if (dates.has(iso)) { n++; d.setDate(d.getDate() - 1) }
       else if (n === 0 && iso === today()) d.setDate(d.getDate() - 1)
       else break
@@ -1108,9 +1162,24 @@ function HistoryTab({ sessions, onEdit, onTab, bodyweightKg = 70 }) {
                       </div>
                       <small style={{ display: 'block', fontSize: 10, color: 'var(--text-3)', fontWeight: 700 }}>kg vol</small>
                     </div>
-                    <button className="btn btn-icon btn-sm" aria-label="Edit"
-                      onClick={() => { onEdit({ ...s }); onTab('log') }}>
-                      <Icon name="edit" size={15} />
+                    {/* Editing a past session used to call onEdit (=
+                        setSession) with no guard at all, so opening History
+                        while a workout was still in progress silently wiped
+                        it — no confirmation, no undo. Same arm-then-confirm
+                        shape as the delete button beside it, keyed
+                        separately so the two don't fight over one pending
+                        state. Editing the session that's already open needs
+                        no confirmation — nothing would be lost. */}
+                    <button className={`btn btn-icon btn-sm${confirm.isArmed('edit-' + s.id) ? ' btn-danger' : ''}`}
+                      aria-label={confirm.isArmed('edit-' + s.id) ? 'Replace active session?' : 'Edit'}
+                      title={confirm.isArmed('edit-' + s.id) ? 'Replace active session? Tap again to confirm' : 'Edit'}
+                      onClick={() => {
+                        if (activeSessionId && activeSessionId !== s.id && !confirm.isArmed('edit-' + s.id)) {
+                          return confirm.arm('edit-' + s.id)
+                        }
+                        onEdit({ ...s }); onTab('log')
+                      }}>
+                      <Icon name={confirm.isArmed('edit-' + s.id) ? 'error_outline' : 'edit'} size={15} />
                     </button>
                     <button className={`btn btn-icon btn-sm${confirm.isArmed(s.id) ? ' btn-danger' : ''}`}
                       onClick={async () => {
@@ -1362,7 +1431,7 @@ function ProgressTab({ sessions, exGoals, db, bodyweightKg = 70 }) {
 
   const prsThisMonth = useMemo(() => {
     const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 30)
-    const cutoffIso = cutoff.toISOString().slice(0, 10)
+    const cutoffIso = dateKey(cutoff)
     return evaluated.filter((e) => e.lastImprovedDate && e.lastImprovedDate >= cutoffIso).length
   }, [evaluated])
 

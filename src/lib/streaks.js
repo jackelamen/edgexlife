@@ -15,13 +15,9 @@
   for Wellness anyway (unlike Health, it has no settings blob today).
 */
 
-export const MILESTONES = [7, 14, 30, 60, 100, 365]
+import { dateKey } from './dates'
 
-function localDateKey(d = new Date()) {
-  const x = new Date(d)
-  x.setMinutes(x.getMinutes() - x.getTimezoneOffset())
-  return x.toISOString().slice(0, 10)
-}
+export const MILESTONES = [7, 14, 30, 60, 100, 365]
 
 /** Consecutive days ending today (or yesterday, if nothing's logged yet
     today — so a fresh morning doesn't read as a broken streak). `dates` is
@@ -29,11 +25,11 @@ function localDateKey(d = new Date()) {
     lib/goals.js's goalStreak, same anchoring rule, different data source. */
 export function currentStreak(dates) {
   const set = new Set(dates)
-  const todayKey = localDateKey()
+  const todayKey = dateKey()
   let n = 0
   const d = new Date()
   for (;;) {
-    const iso = localDateKey(d)
+    const iso = dateKey(d)
     if (set.has(iso)) { n++; d.setDate(d.getDate() - 1) }
     else if (n === 0 && iso === todayKey) d.setDate(d.getDate() - 1)
     else break

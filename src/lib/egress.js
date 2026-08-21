@@ -106,8 +106,15 @@ export async function cachedQuery(key, fetcher, opts = {}) {
   }
 
   // Collapse concurrent callers so mounting three components that all want
-  // the same data results in one network round trip, not three.
-  if (inflight.has(key)) return inflight.get(key)
+  // the same data results in one network round trip, not three — but only
+  // for non-forced callers. A force:true caller is explicitly asking for a
+  // fresh read (this is how every read-modify-write in the app works —
+  // see addExerciseMinutes), and joining someone else's already-in-flight,
+  // possibly-stale promise instead of actually forcing silently defeats
+  // that. That was a real bug: two addExerciseMinutes calls close enough
+  // together meant the second read-modify-write could operate on data
+  // read before the first one's write landed, dropping it.
+  if (!force && inflight.has(key)) return inflight.get(key)
 
   const p = (async () => {
     const data = await fetcher()
@@ -118,8 +125,10 @@ export async function cachedQuery(key, fetcher, opts = {}) {
       /* over quota: serve from memory this session, don't break */
     }
     return data
-  })().finally(() => inflight.delete(key))
+  })().finally(() => { if (inflight.get(key) === p) inflight.delete(key) })
 
+  // Always registered (even for force) so a subsequent NON-forced caller
+  // still collapses onto this fetch rather than issuing its own.
   inflight.set(key, p)
   return p
 }

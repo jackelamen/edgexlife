@@ -1,7 +1,22 @@
 import { format, subDays } from 'date-fns'
 
 export const iso = (d) => format(d, 'yyyy-MM-dd')
-export const today = () => iso(new Date())
+
+/*
+ * THE single date-key helper. `format()` reads a Date's Y/M/D directly in
+ * the browser's local timezone — no UTC conversion happens anywhere in
+ * this call. That makes it safe by construction, unlike
+ * `d.toISOString().slice(0, 10)`, which converts to UTC first and returns
+ * YESTERDAY for anyone east of Greenwich between midnight and their UTC
+ * offset (e.g. Asia/Seoul, UTC+9, is wrong from 00:00 to 09:00 daily).
+ *
+ * Every "what day is this" computation in the app must go through this
+ * function (or `iso`, its twin) — never construct a date key with
+ * `toISOString()`. Banned by the `no-restricted-syntax` rule in
+ * eslint.config.js.
+ */
+export const dateKey = (d = new Date()) => iso(d)
+export const today = () => dateKey()
 export const daysAgo = (n) => iso(subDays(new Date(), n))
 
 /** Shift an arbitrary ISO date by N days (positive or negative), not just "from today". */

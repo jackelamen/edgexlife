@@ -4,14 +4,14 @@ import toast from 'react-hot-toast'
 import Icon from '../components/ui/Icon'
 import { View } from '../components/shell/Shell'
 import {
-  Card, CardHead, PageHeader, Ring, Empty, Loading, Badge, Field, RangeScale,
+  Card, CardHead, PageHeader, Ring, Empty, Loading, Badge, Field, RangeScale, ErrorNote,
 } from '../components/ui/Kit'
 import { useAsync } from '../hooks/useAsync'
 import {
   fetchGoals, fetchGoalRollup, fetchHabits, fetchHabitLogs,
   fetchHealthIndex, fetchHealthLogs, fetchHealthSettings, saveHealthLog,
   fetchWellnessIndex, fetchWellnessCheckins, saveCheckin, logHabit, unlogHabit,
-  fetchSprints, fetchSprintPhases, fetchSprintTactics, saveSprint,
+  fetchSprints, fetchSprintPhases, fetchSprintTactics, mergeSprintWeekChecks,
 } from '../lib/data'
 import { healthDetails, clarityDetails, healthLabel, weakestComponent } from '../lib/scores'
 import { currentStreak, longestStreak } from '../lib/streaks'
@@ -183,12 +183,12 @@ export default function TodayPage() {
     if (a.kind === 'xpw') {
       if (a.done) {
         // clear whichever slot was marked today
-        const stamp = new Date().toISOString().slice(0, 10)
+        const stamp = today()
         Object.keys(wkChecks).forEach((k) => {
           if (k.startsWith(`${tacticKeyId(a.tac)}_`) && wkChecks[k] === stamp) delete wkChecks[k]
         })
       } else {
-        wkChecks[`${tacticKeyId(a.tac)}_${a.slot}`] = new Date().toISOString().slice(0, 10)
+        wkChecks[`${tacticKeyId(a.tac)}_${a.slot}`] = today()
       }
     } else {
       const key = a.kind === 'day' ? checkKey(a.tac, a.dayIdx) : tacticKeyId(a.tac)
@@ -196,7 +196,7 @@ export default function TodayPage() {
       else wkChecks[key] = true
     }
     try {
-      await saveSprint({ ...a.sp, week_checks: { ...(a.sp.week_checks || {}), [a.wk]: wkChecks } })
+      await mergeSprintWeekChecks(a.sp.id, a.wk, wkChecks)
       sprints.reload()
     } catch (e) { toast.error(e.message) }
   }
@@ -391,6 +391,13 @@ export default function TodayPage() {
         title="Mission control"
         sub="Everything that wants you today, and the state of all three systems."
       />
+
+      {/* Every other page has this; Today was the one page without it,
+          which meant a network failure here rendered indistinguishable
+          from "you have never logged anything" — an empty state with the
+          same visual weight as a real one, on the one page most likely to
+          get checked first thing in the morning on a flaky connection. */}
+      <ErrorNote error={healthIdx.error || wellnessIdx.error || sprints.error || habits.error} />
 
       {/* ── Command banner ──────────────────────────────────────────────
              Rebuilt 2026-08-19. Three panes instead of copy-plus-ring:

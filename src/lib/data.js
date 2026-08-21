@@ -143,6 +143,28 @@ export async function saveSprint(s) {
   return data.id
 }
 
+/**
+ * A single week's checkpoint toggles, merged into `week_checks` in one
+ * atomic server-side UPDATE (see the `life_merge_sprint_week_checks`
+ * migration). Use this — never `saveSprint` — for a checkbox tap.
+ *
+ * Why: saveSprint writes the WHOLE row from whatever the client happened
+ * to hold in state. Two rapid checkbox taps race: the second tap's React
+ * closure still has the pre-first-tap snapshot of week_checks, so its
+ * save silently reverts the first tap the instant it lands. Rare in a
+ * single click, easy to hit on a real "check off today's list" pass.
+ * Routing checkbox writes through this RPC instead means each toggle is
+ * a read-merge-write done by Postgres in one statement — there is no
+ * client-held snapshot to go stale.
+ */
+export async function mergeSprintWeekChecks(sprintId, week, checks) {
+  const { error } = await supabase.rpc('life_merge_sprint_week_checks', {
+    p_sprint_id: sprintId, p_week: week, p_checks: checks,
+  })
+  if (error) throw error
+  invalidate('sprints')
+}
+
 export async function deleteSprint(id) {
   const { error } = await supabase.from('sprints').delete().eq('id', id)
   if (error) throw error
@@ -370,8 +392,13 @@ export async function setRoutineCheck(date, routineId, done) {
    sessions — a capped jsonb array, upsert-by-id.
    Session: { id, startedAt, endedAt|null, targetHours, method, notes }
    endedAt === null means the fast is still running. */
+// p_limit was 60 while every UI consumer's stat labels say "all time" —
+// silently wrong after ~3 months at a handful of fasts/workouts a week.
+// 365 covers a full year of real use; still bounded (not literally
+// "everything ever"), which matters here specifically because this app
+// already blew through a Supabase egress allowance once — see egress.js.
 export const fetchFastingSessions = (o) => cachedQuery('fasting-sessions',
-  async () => (await rpc('life_get_fasting_sessions', { p_limit: 60 })) || [], { ttlMs: TTL.health, ...o })
+  async () => (await rpc('life_get_fasting_sessions', { p_limit: 365 })) || [], { ttlMs: TTL.health, ...o })
 
 export async function saveFastingSession(session) {
   await rpc('life_save_fasting_session', { p_session: session })
@@ -392,7 +419,7 @@ export async function saveWorkoutPlan(plan) {
 }
 
 export const fetchWorkoutSessions = (o) => cachedQuery('workout-sessions',
-  async () => (await rpc('life_get_workout_sessions', { p_limit: 60 })) || [], { ttlMs: TTL.health, ...o })
+  async () => (await rpc('life_get_workout_sessions', { p_limit: 365 })) || [], { ttlMs: TTL.health, ...o })
 
 /** Write one day of the plan rather than the whole object. */
 export async function savePlanDay(date, day) {
@@ -450,16 +477,29 @@ export async function deleteExerciseGoal(id) {
  * Finishing a session feeds its minutes back into that day's health log, so
  * training shows up in the Health Score. Mirrors wkAdjustHealthExerciseMinutes
  * in the original.
+ *
+ * Two things fixed here that used to make a finished workout invisible to
+ * the Health Score:
+ *  - `exercisedToday` (the ONLY field scores.js reads for the movement
+ *    bonus — see lib/scores.js:113) was never set by this path at all.
+ *    Only the manual checkbox on the Health page ever set it, so a
+ *    logged, saved workout session earned zero movement credit unless
+ *    you ALSO went and ticked an unrelated box.
+ *  - `if (!deltaMins) return` skipped this function entirely for a
+ *    session with no timed duration (e.g. logged sets without running
+ *    the clock), which meant exercisedToday never got set for that
+ *    session either — "I did a workout" and "I logged 0 minutes" were
+ *    being treated as the same as "nothing happened".
  */
 export async function addExerciseMinutes(date, deltaMins, type) {
-  if (!deltaMins) return
   const [existing] = await fetchHealthLogs(date, date, { force: true })
   const current = existing?.exerciseMins || 0
   const types = new Set(existing?.exerciseTypes || [])
   if (type) types.add(type)
   await saveHealthLog(date, {
-    exerciseMins: Math.max(0, current + deltaMins),
+    exerciseMins: Math.max(0, current + (deltaMins || 0)),
     exerciseTypes: [...types],
+    exercisedToday: true,
   })
 }
 

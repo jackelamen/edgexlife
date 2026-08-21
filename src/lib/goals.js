@@ -10,6 +10,7 @@
 */
 
 import { AREA_COLORS } from './design'
+import { dateKey } from './dates'
 
 // Colour is sourced from lib/design.js's AREA_COLORS, not hardcoded here.
 // The old hex (health #26C281, family #EF5350) sat almost on top of the
@@ -59,11 +60,11 @@ export const sprintProgressPct = (sp) => Math.round((sprintCurrentWeek(sp) / 12)
     local-midnight math below. */
 export function isSprintActive(sp) {
   if (!sp.start_date || !sp.end_date) return false
-  const t = localDateKey()
+  const t = dateKey()
   return sp.start_date <= t && t <= sp.end_date
 }
 export function isSprintUpcoming(sp) {
-  return sp.start_date ? sp.start_date > localDateKey() : false
+  return sp.start_date ? sp.start_date > dateKey() : false
 }
 
 /** Weeks 1-4 -> phase 0, 5-8 -> phase 1, 9-12 -> phase 2 (fixed 3-phase structure). */
@@ -152,7 +153,7 @@ export function xpwDoneCount(t, checks) {
 }
 export function xpwDoneToday(t, checks) {
   const n = xpwTarget(t)
-  const today = localDateKey()
+  const today = dateKey()
   let c = 0
   for (let i = 0; i < n; i++) if (checks[`${tacticKeyId(t)}_${i}`] === today) c++
   return c
@@ -180,11 +181,7 @@ export function tacticActiveToday(t) {
   return true
 }
 
-export function localDateKey() {
-  const d = new Date()
-  d.setMinutes(d.getMinutes() - d.getTimezoneOffset())
-  return d.toISOString().slice(0, 10)
-}
+// localDateKey removed — use dateKey() from lib/dates.js (imported above).
 
 /**
  * Execution score for one week: ratio of checked to possible checkpoints.
@@ -292,7 +289,7 @@ export function autoEndDate(startDate) {
   if (!startDate) return ''
   const d = new Date(startDate + 'T12:00:00')
   d.setDate(d.getDate() + 7 * 12 - 1)
-  return d.toISOString().slice(0, 10)
+  return dateKey(d)
 }
 
 export const DEFAULT_PHASES = [
@@ -328,7 +325,7 @@ export function completedCheckDates(sprints) {
         if (!m) continue
         const d = new Date(start)
         d.setDate(d.getDate() + (week - 1) * 7 + Number(m[1]))
-        dates.add(d.toISOString().slice(0, 10))
+        dates.add(dateKey(d))
       }
     }
   }
@@ -340,11 +337,11 @@ export function completedCheckDates(sprints) {
     least one completed tactic across every cycle. */
 export function goalStreak(sprints) {
   const dates = completedCheckDates(sprints)
-  const t = localDateKey()
+  const t = dateKey()
   let n = 0
   const d = new Date()
   for (;;) {
-    const iso = d.toISOString().slice(0, 10)
+    const iso = dateKey(d)
     if (dates.has(iso)) { n++; d.setDate(d.getDate() - 1) }
     else if (n === 0 && iso === t) d.setDate(d.getDate() - 1)
     else break

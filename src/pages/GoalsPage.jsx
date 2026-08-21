@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
 import Icon from '../components/ui/Icon'
 import { View } from '../components/shell/Shell'
@@ -11,7 +11,7 @@ import {
   AREAS, GOAL_STATUSES, METRIC_TYPES,
   fetchGoals, saveGoal, deleteGoal, fetchVisions, saveVision,
   fetchGoalMetrics, saveMetric, deleteMetric, fetchMetricLogs, logMetric,
-  fetchSprints, saveSprint, deleteSprint, setSprintArchived, fetchSprintPhases, savePhase, deletePhase,
+  fetchSprints, saveSprint, mergeSprintWeekChecks, deleteSprint, setSprintArchived, fetchSprintPhases, savePhase, deletePhase,
   fetchSprintTactics, saveTactic, deleteTactic, fetchGoalRollup, fetchSavingsGoals,
   fetchGoalTasks, fetchUnlinkedTasks, linkTaskToGoal,
   fetchHabits, linkHabitToGoal,
@@ -222,8 +222,7 @@ function CycleCard({ sprint, phases, tactics, goal, compact, onChanged, onDelete
     const nextChecks = { ...checks, [key]: !checks[key] || undefined }
     if (!nextChecks[key]) delete nextChecks[key]
     else nextChecks[key] = true
-    const week_checks = { ...(sprint.week_checks || {}), [week]: nextChecks }
-    await saveSprint({ ...sprint, week_checks })
+    await mergeSprintWeekChecks(sprint.id, week, nextChecks)
     onChanged()
   }
 
@@ -232,9 +231,8 @@ function CycleCard({ sprint, phases, tactics, goal, compact, onChanged, onDelete
     const already = checks[key]
     const nextChecks = { ...checks }
     if (already) delete nextChecks[key]
-    else nextChecks[key] = new Date().toISOString().slice(0, 10)
-    const week_checks = { ...(sprint.week_checks || {}), [week]: nextChecks }
-    await saveSprint({ ...sprint, week_checks })
+    else nextChecks[key] = today()
+    await mergeSprintWeekChecks(sprint.id, week, nextChecks)
     onChanged()
   }
 
@@ -885,6 +883,13 @@ function CycleEditor({ sprint, cloneFrom, goals, seedGoalId, onClose, onSaved })
   })
   const [phaseDrafts, setPhaseDrafts] = useState(DEFAULT_PHASES.map((p) => ({ ...p, tactics: [] })))
   const [saving, setSaving] = useState(false)
+  // Tactic ids that existed on disk and got removed from the draft this
+  // edit. removeTactic only ever mutates local phaseDrafts state — save()
+  // upserted whatever survived in the draft but never deleted a tactic
+  // the draft dropped, so "remove" toasted "Cycle saved" while the row
+  // stayed in the database untouched. This ref is the fix: it tracks what
+  // needs an actual DELETE, applied in save() below.
+  const removedTacticIds = useRef([])
   const existingPhases = useAsync((f) => fetchSprintPhases({ force: f }), [sprint?.id], { enabled: Boolean(sprint?.id) })
   const existingTactics = useAsync((f) => fetchSprintTactics({ force: f }), [sprint?.id], { enabled: Boolean(sprint?.id) })
 
@@ -905,6 +910,7 @@ function CycleEditor({ sprint, cloneFrom, goals, seedGoalId, onClose, onSaved })
   const [showOutcome, setShowOutcome] = useState(false)
   useEffect(() => {
     if (!open) return
+    removedTacticIds.current = []
     if (cloneFrom) {
       // Duplicating an existing cycle: same goal/outcome/phases/tactics,
       // fresh dates and a blank slate for checks/retro (those live on the
@@ -949,6 +955,10 @@ function CycleEditor({ sprint, cloneFrom, goals, seedGoalId, onClose, onSaved })
     setPhaseDrafts(next)
   }
   function removeTactic(pi, ti) {
+    const removed = phaseDrafts[pi].tactics[ti]
+    // Only an already-saved row (has a real id) needs a DELETE on save —
+    // a tactic added and removed within the same edit was never written.
+    if (removed?.id) removedTacticIds.current = [...removedTacticIds.current, removed.id]
     const next = [...phaseDrafts]
     next[pi] = { ...next[pi], tactics: next[pi].tactics.filter((_, i) => i !== ti) }
     setPhaseDrafts(next)
@@ -980,6 +990,13 @@ function CycleEditor({ sprint, cloneFrom, goals, seedGoalId, onClose, onSaved })
           await saveTactic({ ...t, id: t.id, phase_id: phaseId, sprint_id: id })
         }
       }
+      // Actually delete whatever removeTactic marked for removal — see the
+      // comment on removedTacticIds above. Deletes only, never fabricated
+      // from a diff: this is the exact set the user clicked "remove" on.
+      for (const tacticId of removedTacticIds.current) {
+        await deleteTactic(tacticId)
+      }
+      removedTacticIds.current = []
       toast.success('Cycle saved')
       setS(null); onSaved(); onClose()
     } catch (e) { toast.error(e.message) } finally { setSaving(false) }
@@ -1151,7 +1168,7 @@ function RoadmapView({ goals, sprints }) {
     months.push({ label: cur.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }), pct: ((cur - minDate) / totalMs) * 100 })
     cur.setMonth(cur.getMonth() + 1)
   }
-  const todayPct = pctOf(today_.toISOString().slice(0, 10))
+  const todayPct = pctOf(today())
   const activeGoals = (goals.data || []).filter((g) => g.status !== 'completed')
 
   return (

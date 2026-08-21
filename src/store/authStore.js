@@ -6,8 +6,21 @@ export const useAuth = create((set) => ({
   ready: false,
 
   init: async () => {
-    const { data } = await supabase.auth.getSession()
-    set({ user: data?.session?.user ?? null, ready: true })
+    // getSession() had no try/catch: any rejection (cold start offline
+    // being the realistic one — an installed PWA with no network yet)
+    // left this promise permanently unsettled, `ready` never became
+    // true, and App.jsx's loading placeholder never got past "xLife" —
+    // a splash with no way out short of force-quitting the app.
+    // Falling back to signed-out on failure isn't a great outcome, but
+    // it's a recoverable one: it reaches the login screen instead of a
+    // dead splash, and a real session resumes correctly the moment
+    // getSession() actually works.
+    try {
+      const { data } = await supabase.auth.getSession()
+      set({ user: data?.session?.user ?? null, ready: true })
+    } catch {
+      set({ user: null, ready: true })
+    }
     supabase.auth.onAuthStateChange((_e, session) => {
       set({ user: session?.user ?? null, ready: true })
     })
