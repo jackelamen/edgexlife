@@ -18,6 +18,7 @@ import {
   REVIEW_PROMPTS, PLAN_PROMPTS, EMPTY_REVIEW, weekIdFor, weekRange, prevWeekId, nextWeekId,
   prettyWeek, gatherWeek, tacticBreakdown, isReviewStarted, reviewTargetWeekId,
 } from '../lib/review'
+import { IDENTITY_STATEMENT } from '../lib/identity'
 
 /*
   Weekly review.
@@ -166,6 +167,15 @@ export default function ReviewPage() {
         }
       />
 
+      {/* Same statement, same wording, as Today — see lib/identity.js.
+          This is the page that closes the loop on it weekly; the
+          "Identity check" reflection further down is where it actually
+          gets answered to, not just displayed. */}
+      <div className="north-star">
+        <Icon name="north_star" size={13} />
+        <span>{IDENTITY_STATEMENT}</span>
+      </div>
+
       <ErrorNote error={reviews.error || healthLogs.error} />
 
       <Tabs value={tab} onChange={setTab} options={[
@@ -245,7 +255,28 @@ export default function ReviewPage() {
             </Card>
           )}
 
-          {/* ── 4. The reflection ── */}
+          {/* ── 4. Identity check ──────────────────────────────────────
+              The reason this whole app exists, and the one question
+              nothing else on this page can answer for you — the data
+              above says what happened, this asks what it meant. Its own
+              card, not folded into "How was it" below: naming it
+              separately is the difference between a real checkpoint and
+              one more textarea in a list. Written to `module_notes`, a
+              column that already existed in the schema and had no
+              consumer anywhere in the app until this. */}
+          <Card style={{ marginTop: 14 }} className="rv-identity">
+            <CardHead title="Identity check"
+              sub="Where this week actually served it, and where it didn't." />
+            <p className="rv-hint">
+              Be specific — "led with compassion" or "cut a corner on integrity" is
+              something you can act on next week; "did okay" isn't.
+            </p>
+            <textarea value={draft.module_notes || ''} rows={4}
+              placeholder="Where did you live it? Where did you fall short?"
+              onChange={(e) => edit({ module_notes: e.target.value })} />
+          </Card>
+
+          {/* ── 5. The reflection ── */}
           <Card style={{ marginTop: 14 }}>
             <CardHead title="How was it" sub="Your read on the week, in your words." />
 
@@ -276,7 +307,7 @@ export default function ReviewPage() {
             ))}
           </Card>
 
-          {/* ── 5. Forward ── */}
+          {/* ── 6. Forward ── */}
           <Card style={{ marginTop: 14 }}>
             <CardHead title="Next week"
               sub="Three things, not ten. These come back to you in next week's review." />

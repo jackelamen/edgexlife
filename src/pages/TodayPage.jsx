@@ -25,6 +25,7 @@ import { MODULES, STATUS, metric } from '../lib/design'
 import { today, daysAgo, pretty, shiftDate } from '../lib/dates'
 import { fetchReviewIndex } from '../lib/data'
 import { isReviewWindow, reviewTargetWeekId, prettyWeek } from '../lib/review'
+import { IDENTITY_STATEMENT } from '../lib/identity'
 
 /*
   Mission control.
@@ -391,6 +392,12 @@ export default function TodayPage() {
         title="Mission control"
         sub="Everything that wants you today, and the state of all three systems."
       />
+
+      {/* The reason any of the rest of this page exists. See lib/identity.js. */}
+      <div className="north-star">
+        <Icon name="north_star" size={13} />
+        <span>{IDENTITY_STATEMENT}</span>
+      </div>
 
       {/* Every other page has this; Today was the one page without it,
           which meant a network failure here rendered indistinguishable

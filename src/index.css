@@ -210,6 +210,24 @@ h1, h2, h3, h4, .page-title {
 .page-title { font-size: 34px; font-weight: 800; }
 .page-sub { font-size: 14px; color: var(--text-2); margin-top: 5px; }
 
+/* ── Identity anchor ───────────────────────────────────────────
+   Jack's identity statement (lib/identity.js), shown quietly on Today
+   and Review — the two pages that respectively open every day and close
+   every week. Deliberately NOT module-accent-colored: it isn't owned by
+   Health, Goals, or Wellness, it sits above all three, so it stays on
+   the neutral --text-3 ink regardless of which page's accent is active.
+   Small and unbolded on purpose — present daily without competing with
+   the hero above/below it or curdling into wallpaper you stop reading. */
+.north-star {
+  display: flex; align-items: flex-start; gap: 8px;
+  font-size: 12px; font-style: italic; line-height: 1.5;
+  color: var(--text-3); margin: -6px 0 16px; padding: 0 1px;
+}
+.north-star .icon { flex-shrink: 0; margin-top: 2px; opacity: .65; }
+@media (max-width: 480px) {
+  .north-star { font-size: 11px; margin-bottom: 14px; }
+}
+
 /* ── Surfaces ──────────────────────────────────────────────── */
 .card {
   background: var(--white); border: none;
@@ -1408,6 +1426,12 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
 .rv-due-txt { flex: 1; min-width: 0; }
 .rv-due-txt strong { display: block; font-size: 14px; font-weight: 800; }
 .rv-due-txt small { display: block; font-size: 12px; opacity: .82; margin-top: 2px; }
+
+/* Identity check — the one card on this page with a border, so it reads
+   as a named checkpoint rather than just another reflection field in
+   the list below it. Review's own accent (navy), not a new color. */
+.rv-identity { border: 1.5px solid var(--accent-dim); }
+.rv-identity textarea { margin-top: 4px; }
 
 @media (max-width: 1023px) {
   .rv-stats { grid-template-columns: repeat(3, 1fr); }
