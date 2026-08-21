@@ -362,8 +362,16 @@ export function Ring({ score, size = 150, stroke = 13, sub, onAccent = true }) {
  * `metricKey` — the same colour as that metric's tile above it, which is
  * the whole point of the system.
  */
-export function ScoreRow({ label, detail, value, weight, metricKey }) {
+export function ScoreRow({ label, detail, value, weight, maxPoints, metricKey }) {
   const m = metricKey ? metric(metricKey) : null
+  // maxPoints — this row's real worst-case point impact on the score —
+  // over a raw `weight` percentage. For most rows those say the same
+  // thing (weight*100 == maxPoints), but Pain in the Health Score
+  // doesn't: it's declared weight 0.14 while actually costing up to 35
+  // points, and "14% wt" flatly contradicted the score it sat under. See
+  // lib/scores.js. Falls back to weight*100 for any component that
+  // doesn't pass maxPoints (nothing in this codebase currently doesn't).
+  const impact = maxPoints ?? (weight != null ? Math.round(weight * 100) : null)
   return (
     <div className="score-row">
       <div>
@@ -375,7 +383,7 @@ export function ScoreRow({ label, detail, value, weight, metricKey }) {
       </div>
       <span className="tnum" style={{ fontSize: 14, fontWeight: 800, textAlign: 'right' }}>
         {Math.round(value)}
-        {weight != null && <span className="score-weight" style={{ display: 'block' }}>{Math.round(weight * 100)}% wt</span>}
+        {impact != null && <span className="score-weight" style={{ display: 'block' }}>up to {impact} pt</span>}
       </span>
     </div>
   )

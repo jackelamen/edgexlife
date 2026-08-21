@@ -8,6 +8,34 @@
     .15  nutrition .15, minus (pain * 7) — then Movement, BELOW, adds up to
     MOVEMENT_BONUS_POINTS on top. Clamped 0–100 only at the very end.
 
+  Fixed 2026-08-21 (xLife review — "Instrument critiques"), two things,
+  neither of which touches the formula above (continuity preserved,
+  every score reads exactly as it did before):
+
+  1. Pain's declared `weight: 0.14` never matched what the formula
+     actually does. The six components above are blended as
+     `value * weight` and their weights genuinely sum to 1.00 — for
+     those six, "24% weight" and "worst case 24 points" are the same
+     claim. Pain isn't blended that way; it's subtracted directly as
+     `pain * 7` (pain is 0–5, so up to 35 points), which the UI's own
+     "14% wt" label flatly contradicted. Every component below now also
+     carries `maxPoints`, its REAL worst-case point impact — 24 for
+     sleep, 35 for pain — and the breakdown UI (ScoreRow) now reads that
+     instead of a `weight` percentage that was only ever honest for six
+     of the seven rows.
+  2. Missing-data defaults used to be asymmetric: an unlogged sleep,
+     steps, or water field scored as a flat 0 (100% penalty), while an
+     unlogged energy, sleep quality, or nutrition rating scored as
+     "3 of 5" / "6 of 10" (60% credit) — not a deliberate call anywhere
+     in the codebase or comments, just three components add()ing a
+     `parseFloat(undefined) -> NaN -> fallback 0` and three others
+     add()ing an explicit non-zero fallback. A day with a genuinely
+     empty sleep/steps/water field now defaults to the same 60%-of-target
+     credit as the other three — an unlogged number no longer reads as
+     "you did none of this," which was never true, just unmeasured. A
+     day where you explicitly logged 0 (0 steps, 0 water) is unaffected:
+     that's a real number, not a missing one, and still scores as 0.
+
   Movement is intentionally NOT one of the six weighted components above —
   it's a flat bonus, added after the weighted base is computed, worth
   MOVEMENT_BONUS_POINTS if `log.exercisedToday` is checked and worth
@@ -46,6 +74,12 @@ const i = (v, fallback = 0) => {
   return Number.isFinite(x) ? x : fallback
 }
 
+// A field genuinely wasn't logged (null/undefined/empty string) — distinct
+// from an explicit 0, which is a real number and scores as one. Needed
+// because `n(log.sleepHours)` alone can't tell those apart: both produce
+// the same fallback. See the missing-data fix in the header comment.
+const isMissing = (v) => v === undefined || v === null || v === ''
+
 /* ── Health ──────────────────────────────────────────────── */
 
 export function healthScore(log, settings) {
@@ -61,9 +95,18 @@ export function healthDetails(log, settings) {
     waterTarget: settings?.waterTarget ?? 2,
   }
 
-  const sleep = Math.min(100, (n(log.sleepHours) / s.sleepTarget) * 100)
-  const steps = Math.min(100, (i(log.steps) / s.stepTarget) * 100)
-  const water = Math.min(100, (n(log.water) / s.waterTarget) * 100)
+  // Sleep/steps/water used to default a missing field to 0 — a flat 100%
+  // penalty for something that was never measured, not something that
+  // was measured at zero. energy/quality/nutrition below already default
+  // an unrated day to 60% of their scale; sleep/steps/water now match
+  // that instead of the harsher, unintentional 0.
+  const sleepHoursVal = isMissing(log.sleepHours) ? s.sleepTarget * 0.6 : n(log.sleepHours)
+  const stepsVal = isMissing(log.steps) ? s.stepTarget * 0.6 : i(log.steps)
+  const waterVal = isMissing(log.water) ? s.waterTarget * 0.6 : n(log.water)
+
+  const sleep = Math.min(100, (sleepHoursVal / s.sleepTarget) * 100)
+  const steps = Math.min(100, (stepsVal / s.stepTarget) * 100)
+  const water = Math.min(100, (waterVal / s.waterTarget) * 100)
   const energy = (i(log.energy, 3) / 5) * 100
   const quality = (i(log.sleepQuality, 3) / 5) * 100
   const pain = i(log.pain, 0)
@@ -75,22 +118,25 @@ export function healthDetails(log, settings) {
   const nutrition = (nutritionRating / 10) * 100
 
   const components = [
-    { key: 'sleepHours', label: 'Sleep', value: sleep, weight: 0.24,
-      detail: `${hmLabel(n(log.sleepHours)) || '0h'} / ${hmLabel(s.sleepTarget)}`,
+    { key: 'sleepHours', label: 'Sleep', value: sleep, weight: 0.24, maxPoints: 24,
+      detail: isMissing(log.sleepHours) ? `Not logged — assumed 60% of ${hmLabel(s.sleepTarget)}`
+        : `${hmLabel(n(log.sleepHours)) || '0h'} / ${hmLabel(s.sleepTarget)}`,
       advice: 'Add an earlier shutdown cue or protect tomorrow morning from late-night drift.' },
-    { key: 'steps', label: 'Steps', value: steps, weight: 0.15,
-      detail: `${i(log.steps).toLocaleString()} / ${s.stepTarget.toLocaleString()}`,
+    { key: 'steps', label: 'Steps', value: steps, weight: 0.15, maxPoints: 15,
+      detail: isMissing(log.steps) ? `Not logged — assumed 60% of ${s.stepTarget.toLocaleString()}`
+        : `${i(log.steps).toLocaleString()} / ${s.stepTarget.toLocaleString()}`,
       advice: 'Add a 10-minute walk to a transition you already have.' },
-    { key: 'water', label: 'Water', value: water, weight: 0.11,
-      detail: `${n(log.water).toFixed(1)}L / ${s.waterTarget}L`,
+    { key: 'water', label: 'Water', value: water, weight: 0.11, maxPoints: 11,
+      detail: isMissing(log.water) ? `Not logged — assumed 60% of ${s.waterTarget}L`
+        : `${n(log.water).toFixed(1)}L / ${s.waterTarget}L`,
       advice: 'Put water in reach and pair the next glass with food or a work start.' },
-    { key: 'energy', label: 'Energy', value: energy, weight: 0.20,
+    { key: 'energy', label: 'Energy', value: energy, weight: 0.20, maxPoints: 20,
       detail: `${i(log.energy, 3)} / 5`,
       advice: 'Reduce friction: food, daylight, a short walk, or a lower-demand plan.' },
-    { key: 'sleepQuality', label: 'Sleep quality', value: quality, weight: 0.15,
+    { key: 'sleepQuality', label: 'Sleep quality', value: quality, weight: 0.15, maxPoints: 15,
       detail: `${i(log.sleepQuality, 3)} / 5`,
       advice: 'Improve the pre-sleep environment before adding more effort tomorrow.' },
-    { key: 'nutrition', label: 'Nutrition', value: nutrition, weight: 0.15,
+    { key: 'nutrition', label: 'Nutrition', value: nutrition, weight: 0.15, maxPoints: 15,
       detail: `${nutritionRating} / 10${log.isFastingDay ? ' · fasting day' : ''}`,
       advice: METRIC_ADVICE.nutrition },
     // Label is 'Pain', not 'Low pain' — this is the one driver where the
@@ -104,7 +150,13 @@ export function healthDetails(log, settings) {
     // `detail` (the raw "N / 5 strain" reading) rather than `value` in any
     // UI that surfaces this driver by itself, since `value` alone doesn't
     // carry the inversion.
-    { key: 'pain', label: 'Pain', value: painScore, weight: 0.14,
+    //
+    // `weight: 0.14` is kept as-is for backward compatibility (nothing
+    // else reads it), but it is NOT what pain actually costs — the
+    // formula below subtracts `pain * 7` directly (pain is 0-5, so up to
+    // 35 points), not `painScore * 0.14` (which would cap at 14). Read
+    // `maxPoints`, not `weight`, for pain's real worst-case impact.
+    { key: 'pain', label: 'Pain', value: painScore, weight: 0.14, maxPoints: 35,
       detail: `${pain} / 5 strain`,
       advice: 'De-load today: mobility, easy walking, or rest instead of forcing intensity.' },
   ]
@@ -219,13 +271,17 @@ export function clarityDetails(c) {
   return {
     score,
     components: [
-      { key: 'mood', label: 'Mood', value: moodScore, weight: 0.22, detail: MOOD_LABELS[mood] || '--',
+      // Clarity's four weights genuinely sum to 1.00 and are blended
+      // with no subtraction step (unlike Pain above), so maxPoints here
+      // is just weight*100 — included for a consistent field name in
+      // ScoreRow, not because anything was wrong with these four.
+      { key: 'mood', label: 'Mood', value: moodScore, weight: 0.22, maxPoints: 22, detail: MOOD_LABELS[mood] || '--',
         advice: 'Do one small thing that changes emotional tone: light, music, food, movement, or honest contact.' },
-      { key: 'stress', label: 'Stress ease', value: stressScore, weight: 0.24, detail: `${stress} / 5 stress`,
+      { key: 'stress', label: 'Stress ease', value: stressScore, weight: 0.24, maxPoints: 24, detail: `${stress} / 5 stress`,
         advice: 'Downshift before deciding: longer exhales, fewer inputs, or a ten-minute pause.' },
-      { key: 'clarity', label: 'Clarity', value: clarityVal, weight: 0.28, detail: `${clarity} / 5`,
+      { key: 'clarity', label: 'Clarity', value: clarityVal, weight: 0.28, maxPoints: 28, detail: `${clarity} / 5`,
         advice: 'Externalize the fog. Write the next three concerns as separate lines.' },
-      { key: 'grounded', label: 'Groundedness', value: groundedScore, weight: 0.26, detail: `${grounded} / 5`,
+      { key: 'grounded', label: 'Groundedness', value: groundedScore, weight: 0.26, maxPoints: 26, detail: `${grounded} / 5`,
         advice: 'Use the body as the anchor: walk, stretch, breathe, or name five things you see.' },
     ],
   }

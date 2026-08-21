@@ -167,13 +167,13 @@ function TodayView({ settings, index, onEdit, onNavFasting }) {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5">
         <Card>
-          <CardHead title="What's driving your score" sub="Same hue as the tile above — heaviest weight first." />
+          <CardHead title="What's driving your score" sub="Same hue as the tile above — biggest point impact first." />
           {details ? (
             [...details.components]
-              .sort((a, b) => b.weight - a.weight)
+              .sort((a, b) => (b.maxPoints ?? b.weight * 100) - (a.maxPoints ?? a.weight * 100))
               .map((c) => (
                 <ScoreRow key={c.key} metricKey={c.key} label={c.label} detail={c.detail}
-                  value={c.value} weight={c.weight} />
+                  value={c.value} weight={c.weight} maxPoints={c.maxPoints} />
               ))
           ) : (
             <Empty icon="monitor_heart" title="No log today">
