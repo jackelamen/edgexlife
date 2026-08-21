@@ -395,7 +395,7 @@ export default function TodayPage() {
 
       {/* The reason any of the rest of this page exists. See lib/identity.js. */}
       <div className="north-star">
-        <Icon name="north_star" size={13} />
+        <Icon name="star" size={13} />
         <span>{IDENTITY_STATEMENT}</span>
       </div>
 

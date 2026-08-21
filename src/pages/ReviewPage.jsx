@@ -172,7 +172,7 @@ export default function ReviewPage() {
           "Identity check" reflection further down is where it actually
           gets answered to, not just displayed. */}
       <div className="north-star">
-        <Icon name="north_star" size={13} />
+        <Icon name="star" size={13} />
         <span>{IDENTITY_STATEMENT}</span>
       </div>
 
