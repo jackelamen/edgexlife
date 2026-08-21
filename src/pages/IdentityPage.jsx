@@ -2,12 +2,12 @@ import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import Icon from '../components/ui/Icon'
 import { View } from '../components/shell/Shell'
-import { Card, CardHead, PageHeader, Empty, Loading, Badge, ErrorNote } from '../components/ui/Kit'
+import { Card, CardHead, PageHeader, Empty, Loading, Badge, ErrorNote, Ring } from '../components/ui/Kit'
 import { useAsync } from '../hooks/useAsync'
 import {
   fetchGoals, fetchSprints, fetchSprintPhases, fetchSprintTactics, fetchWeeklyReviews,
 } from '../lib/data'
-import { avgExecScore, isSprintActive } from '../lib/goals'
+import { avgExecScore, isSprintActive, scoreColor, scoreBadgeTone } from '../lib/goals'
 import { MODULES } from '../lib/design'
 import { IDENTITY_STATEMENT, IDENTITY_THREADS } from '../lib/identity'
 import { weekIdFor, prevWeekId, prettyWeek } from '../lib/review'
@@ -33,7 +33,23 @@ import { today } from '../lib/dates'
   correlations.js both got a real pass (2026-08-21) for overclaiming —
   dressing up self-report and heuristics as measurement. A single number
   for something as genuinely unquantifiable as character would repeat
-  that exact mistake, worse. Coverage is honest; a score wouldn't be.
+  that exact mistake, worse. Coverage is honest; a score wouldn't be. The
+  Ring in the hero shows COVERAGE (X of 6 threads tagged), not a score —
+  same widget Health/Wellness use for their real scores, repurposed for
+  a number that's actually honest to show.
+
+  Visual pass 2026-08-21: the first version of this page was a plain
+  bordered white Card for the statement and plain white Cards for every
+  thread — technically everything the module needed, but next to Health
+  and Wellness's saturated .hero-card treatment it read as an
+  afterthought, which undercuts the entire point of the page. Now: the
+  statement itself sits in a .hero-card (the same component Health uses
+  for its Ring), thread cards get the .tile-ic colour chip pattern
+  METRICS tiles already use elsewhere, and each goal's execution gets a
+  real .score-meter bar (status-coloured via scoreColor/scoreBadgeTone,
+  same helpers Goals uses) instead of a bare percentage badge. Nothing
+  here invents new visual language — every piece is something this app
+  already does elsewhere, just not yet on this page.
 
   Recent Review "Identity check" answers (module_notes) round out the
   page underneath the six thread cards — the part of this that isn't
@@ -80,6 +96,7 @@ export default function IdentityPage() {
   const reflections = (reviews.data || []).filter((r) => r.module_notes && r.module_notes.trim())
 
   const taggedCount = IDENTITY_THREADS.reduce((n, t) => n + (goalsByThread[t.key]?.length ? 1 : 0), 0)
+  const coveragePct = Math.round((taggedCount / IDENTITY_THREADS.length) * 100)
 
   return (
     <View>
@@ -89,14 +106,28 @@ export default function IdentityPage() {
         sub="Everything else in this app measures something. This is the standard the measuring is for."
       />
 
-      <Card style={{ borderLeft: `4px solid ${MODULES.identity.color}`, marginBottom: 14 }}>
-        <p style={{ fontSize: 16, fontStyle: 'italic', lineHeight: 1.65, color: 'var(--text)' }}>
-          &ldquo;{IDENTITY_STATEMENT}&rdquo;
-        </p>
-        <p style={{ fontSize: 12.5, color: 'var(--text-3)', marginTop: 10 }}>
-          {taggedCount} of {IDENTITY_THREADS.length} threads have an active goal behind them right now.
-        </p>
-      </Card>
+      {/* Same .hero-card treatment Health and Wellness use for their own
+          headline number — this page's headline isn't a score (see the
+          no-Identity-Score note below), it's the statement itself, so the
+          quote takes the spot the big number usually sits in and the Ring
+          moves to showing thread COVERAGE instead of a score. A plain
+          bordered card here read as an afterthought next to how loud
+          every other module's hero is; this is the fix for that. */}
+      <div className="hero-card hero-identity" style={{ marginBottom: 14 }}>
+        <div className="hero-content">
+          <div>
+            <div className="hero-eyebrow">Your identity statement</div>
+            <p style={{ fontSize: 21, fontStyle: 'italic', fontWeight: 600, lineHeight: 1.45, margin: '0 0 12px' }}>
+              &ldquo;{IDENTITY_STATEMENT}&rdquo;
+            </p>
+            <p className="hero-copy">
+              {taggedCount} of {IDENTITY_THREADS.length} threads have an active goal behind them right now.
+              {taggedCount < IDENTITY_THREADS.length && ' The uncovered ones are below, named — not hidden.'}
+            </p>
+          </div>
+          <Ring score={coveragePct} sub={`${taggedCount} of ${IDENTITY_THREADS.length}`} />
+        </div>
+      </div>
 
       {goals.error && <ErrorNote>{goals.error.message}</ErrorNote>}
 
@@ -104,14 +135,14 @@ export default function IdentityPage() {
         {IDENTITY_THREADS.map((t) => {
           const list = goalsByThread[t.key] || []
           return (
-            <Card key={t.key}>
+            <Card key={t.key} style={{ borderLeft: `3px solid ${MODULES.identity.color}` }}>
               <CardHead
                 title={t.label}
                 sub={t.hint}
                 right={
-                  <span style={{ color: MODULES.identity.color, display: 'flex' }}>
-                    <Icon name={t.icon} size={18} />
-                  </span>
+                  <div className="tile-ic" style={{ background: MODULES.identity.tint, color: MODULES.identity.color }}>
+                    <Icon name={t.icon} size={17} />
+                  </div>
                 }
               />
               {loading ? <Loading /> : !list.length ? (
@@ -120,15 +151,22 @@ export default function IdentityPage() {
                   No active goal is serving this thread right now.
                 </Empty>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {list.map((g) => {
                     const exec = execForGoal(g.id)
                     return (
-                      <div key={g.id} className="mini-item">
-                        <span>{g.title}</span>
-                        {exec != null
-                          ? <Badge tone={exec >= 85 ? 'green' : exec >= 60 ? 'orange' : 'red'}>{exec}% exec</Badge>
-                          : <Badge tone="muted">no live cycle</Badge>}
+                      <div key={g.id}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 5 }}>
+                          <span style={{ fontSize: 13, fontWeight: 700 }}>{g.title}</span>
+                          {exec != null
+                            ? <Badge tone={scoreBadgeTone(exec)}>{exec}% exec</Badge>
+                            : <Badge tone="muted">no live cycle</Badge>}
+                        </div>
+                        {exec != null && (
+                          <div className="score-meter" style={{ height: 6 }}>
+                            <span style={{ width: `${exec}%`, background: scoreColor(exec) }} />
+                          </div>
+                        )}
                       </div>
                     )
                   })}

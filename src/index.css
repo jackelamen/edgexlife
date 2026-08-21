@@ -869,6 +869,14 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
   .hero-eyebrow { font-size: 9.5px; margin-bottom: 4px; }
   .hero-h { font-size: 22px; margin-bottom: 9px; }
   .hero-copy { font-size: 12.5px; }
+  /* Identity's hero holds the full statement, not a short .hero-h — on a
+     phone that's 8-10 wrapped lines, and "ring beside the copy" above
+     vertically centers an 84px ring against the MIDDLE of that block,
+     landing it on top of the text rather than beside it. Scoped back to
+     stacked, same reasoning .hero-mc gets its own block instead of
+     inheriting .hero-content further up this file. */
+  .hero-identity .hero-content { grid-template-columns: 1fr; }
+  .hero-identity .score-ring { margin: 10px auto 0; }
   /* Phones inherit the stacked layout from the tablet block above and
      just tighten it. Three 76px rings fit comfortably across 360px — no
      system gets dropped for width, since showing all three at once is the
