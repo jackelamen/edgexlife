@@ -561,6 +561,9 @@ function SessionTab({ session, setSession, db, goals, plan, pastSessions, exerci
   const [secs, setSecs] = useState(0)
   const [running, setRunning] = useState(false)
   const [openEx, setOpenEx] = useState(0)
+  // Which exercise's Repeat button is armed for a destructive replace.
+  // -1 = none. See repeatLast().
+  const [armedRepeat, setArmedRepeat] = useState(-1)
   const startedAt = useRef(0)
   const base = useRef(0)
   // The duration this session ALREADY carried when it was loaded into the
@@ -576,6 +579,41 @@ function SessionTab({ session, setSession, db, goals, plan, pastSessions, exerci
   // card during logging, not just on a separate Progress tab you have to
   // remember to visit. This is the moment the number is actually
   // actionable, so it's the moment it should be visible.
+  /* Previous session per exercise name, for the "last time" rail and the
+     ghosted input placeholders. Keyed off the joined names rather than the
+     exercises array itself, so typing reps doesn't re-scan history on
+     every keystroke — only renaming an exercise or adding one does. */
+  const exerciseNameKey = (session?.exercises || []).map((e) => (e.name || '').trim()).join('|')
+  const lastByExercise = useMemo(() => {
+    const map = {}
+    ;(session?.exercises || []).forEach((ex) => {
+      const n = (ex.name || '').trim()
+      if (!n || map[n] !== undefined) return
+      map[n] = lastExerciseSession(pastSessions, n, session?.id)
+    })
+    return map
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [exerciseNameKey, session?.id, pastSessions])
+
+  /* Repeat is destructive, so it only fires unguarded when there is
+     nothing to destroy. With anything typed in the grid the first tap
+     arms and relabels the button, the second applies — the same
+     arm-then-confirm shape the delete buttons use, rather than a native
+     confirm() mid-workout. */
+  function repeatLast(i, last) {
+    const ex = session.exercises[i]
+    const dirty = (ex.sets || []).some((x) => String(x.reps ?? '').trim() || String(x.weight ?? '').trim())
+    if (dirty && armedRepeat !== i) { setArmedRepeat(i); return }
+    updateEx(i, {
+      sets: (last.sets || []).map((x) => ({
+        reps: x.reps ? String(x.reps) : '',
+        weight: x.weight ? String(x.weight) : '',
+        done: false,
+      })),
+    })
+    setArmedRepeat(-1)
+  }
+
   const goalsByExercise = useMemo(() => {
     const map = {}
     ;(exerciseGoals || []).forEach((g) => {
@@ -704,9 +742,11 @@ function SessionTab({ session, setSession, db, goals, plan, pastSessions, exerci
           const open = openEx === i
           const done = (ex.sets || []).filter((s) => s.done).length
           const exGoalsHere = goalsByExercise[ex.name] || []
+          const last = lastByExercise[(ex.name || '').trim()] || null
+          const lastSummary = last ? fmtLastSets(last.sets) : null
           return (
             <div key={i} className={`ex-card${open ? ' open' : ''}`}>
-              <div className="ex-card-hdr" onClick={() => setOpenEx(open ? -1 : i)}>
+              <div className="ex-card-hdr" onClick={() => { setOpenEx(open ? -1 : i); setArmedRepeat(-1) }}>
                 <input
                   className="ex-name"
                   value={ex.name}
@@ -742,6 +782,21 @@ function SessionTab({ session, setSession, db, goals, plan, pastSessions, exerci
 
               {open && (
                 <div className="ex-sets">
+                  {lastSummary && (
+                    <div className="last-time">
+                      <div className="last-time-txt">
+                        <span className="last-time-k">Last time</span>
+                        <span className="last-time-v">{lastSummary}</span>
+                        <span className="last-time-d">{prettyShort(last.date)}</span>
+                      </div>
+                      <button
+                        className={`last-time-btn${armedRepeat === i ? ' armed' : ''}`}
+                        onClick={() => repeatLast(i, last)}
+                        title={`Fill this grid with ${lastSummary}`}>
+                        {armedRepeat === i ? 'Replace?' : 'Repeat'}
+                      </button>
+                    </div>
+                  )}
                   <div className="sets-grid">
                     <span className="set-label">#</span>
                     <span className="set-label">Reps</span>
@@ -749,14 +804,22 @@ function SessionTab({ session, setSession, db, goals, plan, pastSessions, exerci
                     <span className="set-label">Vol</span>
                     <span />
                   </div>
-                  {(ex.sets || []).map((s, si) => (
+                  {(ex.sets || []).map((s, si) => {
+                    /* Each input's placeholder is the matching set from last
+                       time, so the guidance is per-set rather than only the
+                       summary above — set 3 shows what set 3 was, which is
+                       what you need on a descending or pyramid scheme. */
+                    const ghost = last?.sets?.[si]
+                    return (
                     <div key={si} className="set-row">
                       <span className="set-num">{si + 1}</span>
-                      <input className="set-input" inputMode="decimal" value={s.reps} placeholder="—"
+                      <input className="set-input" inputMode="decimal" value={s.reps}
+                        placeholder={ghost?.reps ? String(ghost.reps) : '—'}
                         onChange={(e) => updateEx(i, {
                           sets: ex.sets.map((x, j) => j === si ? { ...x, reps: e.target.value } : x),
                         })} />
-                      <input className="set-input" inputMode="decimal" value={s.weight} placeholder="—"
+                      <input className="set-input" inputMode="decimal" value={s.weight}
+                        placeholder={ghost?.weight ? String(ghost.weight) : '—'}
                         onChange={(e) => updateEx(i, {
                           sets: ex.sets.map((x, j) => j === si ? { ...x, weight: e.target.value } : x),
                         })} />
@@ -770,7 +833,8 @@ function SessionTab({ session, setSession, db, goals, plan, pastSessions, exerci
                         <Icon name="check" size={16} />
                       </button>
                     </div>
-                  ))}
+                    )
+                  })}
                   <button className="ex-add-set"
                     onClick={() => updateEx(i, { sets: [...(ex.sets || []), { reps: '', weight: '', done: false }] })}>
                     <Icon name="add" size={16} /> Add set
@@ -1116,6 +1180,46 @@ function exerciseHistory(sessions, name, bodyweightKg = 70) {
       const est1RM = topWeight > 0 ? topWeight * (1 + (topSet?.reps || 0) / 30) : 0
       return { date: s.date, sessionId: s.id, sets, topWeight, volume, est1RM, topReps, totalReps, setCount: sets.length }
     })
+}
+
+/* ── "Last time" lookup ───────────────────────────────────────
+   exerciseHistory already had everything needed to answer "what did I do
+   last time?", but it only ever surfaced on the Progress tab and the
+   Explorer — i.e. never at the moment you're standing over the bar
+   deciding what to load. These two helpers put it in the set grid.
+
+   `excludeId` matters when re-opening an already-finished session from
+   Session Log: without it the session would find ITSELF as the previous
+   one and echo back the numbers you're currently editing. */
+function lastExerciseSession(sessions, name, excludeId) {
+  const n = (name || '').trim()
+  if (!n) return null
+  const rows = exerciseHistory((sessions || []).filter((s) => s.id !== excludeId), n)
+  return rows.length ? rows[rows.length - 1] : null
+}
+
+/* "3x5 @ 100kg · 2x5 @ 90kg" — consecutive identical sets collapse into a
+   count, because that's how the set was actually performed and how you'd
+   say it out loud. Capped at three groups so a 6-set pyramid can't push
+   the repeat button off a phone screen. Sets logged with neither reps nor
+   weight are skipped rather than rendered as "0". */
+function fmtLastSets(sets) {
+  const groups = []
+  for (const set of sets || []) {
+    const reps = Number(set.reps) || 0
+    const weight = Number(set.weight) || 0
+    if (!reps && !weight) continue
+    const prev = groups[groups.length - 1]
+    if (prev && prev.reps === reps && prev.weight === weight) prev.n += 1
+    else groups.push({ n: 1, reps, weight })
+  }
+  if (!groups.length) return null
+  const parts = groups.slice(0, 3).map((g) => {
+    const rep = g.n > 1 ? `${g.n}\u00d7${g.reps}` : `${g.reps}`
+    return g.weight ? `${rep} @ ${g.weight}kg` : rep
+  })
+  if (groups.length > 3) parts.push('\u2026')
+  return parts.join(' \u00b7 ')
 }
 
 /* ── Goal evaluation ─────────────────────────────────────────

@@ -629,6 +629,37 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
   text-align: center; font-weight: 800; font-size: 14px; padding: 8px 4px;
 }
 .set-input:focus { border-color: var(--accent); background: var(--white); box-shadow: 0 0 0 3px var(--accent-dim); }
+/* Ghosted "last time" values sitting in the empty inputs. Muted and
+   lighter-weight than a real entry so a placeholder can never be misread
+   as a logged set — the numbers you see are what you DID, not what's
+   recorded. */
+.set-input::placeholder { color: var(--text-3); font-weight: 600; opacity: .8; }
+
+/* ── "Last time" rail ─────────────────────────────────────────────
+   Sits directly above the set grid, inside the open exercise card. The
+   data came from exerciseHistory, which already computed it but only
+   ever showed it on the Progress tab and in the Explorer — i.e. never at
+   the moment you're actually deciding what to load. */
+.last-time {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 10px;
+  padding: 7px 8px 7px 11px; border-radius: var(--radius-sm);
+  background: var(--accent-dim); border: 1px solid var(--border);
+}
+.last-time-txt { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 3px 8px; }
+.last-time-k { font-size: 9.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); }
+.last-time-v { font-size: 12.5px; font-weight: 800; color: var(--text); font-variant-numeric: tabular-nums; }
+.last-time-d { font-size: 11px; font-weight: 600; color: var(--text-3); }
+.last-time-btn {
+  flex: none; min-height: 34px; padding: 7px 14px; border-radius: 999px;
+  border: 1.5px solid var(--border-med); background: var(--white); color: var(--accent-dark);
+  font-family: inherit; font-size: 11.5px; font-weight: 800; cursor: pointer; white-space: nowrap;
+  transition: background .15s, border-color .15s, color .15s;
+}
+.last-time-btn:hover { background: var(--accent-light); border-color: var(--accent); }
+/* Armed state: the grid already has entries, so the next tap overwrites
+   them. Borrows the status ramp's "short" amber because this genuinely is
+   a warning, not an identity. */
+.last-time-btn.armed { background: var(--s-short-bg); border-color: var(--s-short); color: var(--s-short); }
 .set-done-btn {
   width: 32px; height: 32px; border-radius: 8px; border: 1.5px solid var(--border);
   background: var(--white-soft); cursor: pointer; display: flex; align-items: center;
@@ -905,6 +936,9 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
   .sets-grid, .set-row { grid-template-columns: 18px 1fr 1fr 1fr 30px; gap: 4px; }
   .sets-grid .set-label { font-size: 9px; }
   .set-input { font-size: 12.5px; padding: 7px 2px; }
+  .last-time { gap: 7px; padding: 6px 6px 6px 9px; }
+  .last-time-v { font-size: 12px; }
+  .last-time-btn { padding: 7px 11px; font-size: 11px; }
   .set-done-btn { width: 28px; height: 28px; }
 
   .db-editor-grid { grid-template-columns: 1fr; }
