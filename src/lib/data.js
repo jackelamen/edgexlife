@@ -663,10 +663,80 @@ export async function removePushSubscription(endpoint) {
   if (error) throw error
 }
 
+/* ═══════════════════════ REVIEW ═══════════════════════
+
+   `weekly_reviews` predates this module: two reviews from April and May
+   2026 were written in an earlier surface and the table came across with
+   the rest of the schema. Everything here is built against those exact
+   columns so the old entries load as first-class history.
+
+   Plain PostgREST rather than a life_* RPC, and deliberately so: the RPC
+   layer exists to slice and MERGE the shared `traction_data` blob, and
+   this is a real table with its own row per week, RLS scoped to
+   `auth.uid() = user_id`, `user_id` defaulting to auth.uid(), and a
+   unique index on (user_id, week_id) that makes the upsert exact. There
+   is no blob to protect here, so there is nothing for an RPC to add. */
+
+const REVIEW_COLS =
+  'id,week_id,score,wins,challenges,learning,gratitude,energy,other,' +
+  'module_notes,theme_word,priority_1,priority_2,priority_3,protect,let_go,ai_insight,updated_at'
+
+/* Date-bounded like every other history read. `from`/`to` are week ids
+   (Mondays), compared as text, which sorts correctly for ISO dates. */
+export const fetchWeeklyReviews = (from, to, o) =>
+  cachedQuery(`weekly-reviews:${from}:${to}`, async () =>
+    unwrap(await supabase.from('weekly_reviews')
+      .select(REVIEW_COLS)
+      .gte('week_id', from).lte('week_id', to)
+      .order('week_id', { ascending: false })), { ttlMs: TTL.goals, ...o })
+
+/* The index is week ids only — enough to render "which weeks exist" and
+   to drive the due prompt without pulling any prose. Same shape of trick
+   as fetchHealthIndex: ask what days exist before asking what is in them. */
+export const fetchReviewIndex = (o) =>
+  cachedQuery('review-index', async () =>
+    (unwrap(await supabase.from('weekly_reviews')
+      .select('week_id,updated_at')
+      .order('week_id', { ascending: false })) || []), { ttlMs: TTL.goals, ...o })
+
+export async function saveWeeklyReview(review) {
+  const payload = {
+    week_id: review.week_id,
+    score: num(review.score),
+    wins: review.wins || null,
+    challenges: review.challenges || null,
+    learning: review.learning || null,
+    gratitude: review.gratitude || null,
+    energy: review.energy || null,
+    other: review.other || null,
+    module_notes: review.module_notes || null,
+    theme_word: review.theme_word || null,
+    priority_1: review.priority_1 || null,
+    priority_2: review.priority_2 || null,
+    priority_3: review.priority_3 || null,
+    protect: review.protect || null,
+    let_go: review.let_go || null,
+    updated_at: new Date().toISOString(),
+  }
+  const { data, error } = await supabase.from('weekly_reviews')
+    .upsert({ ...payload, user_id: await uid() }, { onConflict: 'user_id,week_id' })
+    .select('id').single()
+  if (error) throw error
+  invalidate('weekly-reviews'); invalidate('review-index')
+  return data.id
+}
+
+export async function deleteWeeklyReview(weekId) {
+  const { error } = await supabase.from('weekly_reviews').delete().eq('week_id', weekId)
+  if (error) throw error
+  invalidate('weekly-reviews'); invalidate('review-index')
+}
+
 export function refreshAll() {
   ;['goals', 'visions', 'goal-metrics', 'metric-logs', 'sprints', 'sprint-phases',
     'sprint-tactics', 'goal-rollup', 'vision-board', 'vision-items', 'health-logs',
     'health-index', 'health-settings', 'routines', 'checks', 'workout-plan',
     'workout-sessions', 'wellness-index', 'wellness-checkins', 'wellness-notes',
-    'habits', 'habit-logs', 'goal-tasks', 'unlinked-tasks', 'reminder-prefs'].forEach(invalidate)
+    'habits', 'habit-logs', 'goal-tasks', 'unlinked-tasks', 'reminder-prefs',
+    'weekly-reviews', 'review-index'].forEach(invalidate)
 }

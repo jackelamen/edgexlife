@@ -16,16 +16,21 @@ const NAV = [
   { to: '/goals', label: 'Goals', icon: 'flag', module: 'goals' },
   { to: '/health', label: 'Health', icon: 'monitor_heart', module: 'health' },
   { to: '/wellness', label: 'Wellness', icon: 'self_improvement', module: 'wellness' },
+  { section: 'Rhythm' },
+  { to: '/review', label: 'Review', icon: 'event_note', module: 'review' },
   { section: 'System' },
   { to: '/settings', label: 'Settings', icon: 'settings', module: 'settings' },
 ]
 
 const LINKS = NAV.filter((n) => n.to)
 
-/* Phone bottom bar: the four modules only. Today leads because it's the
-   home surface; Settings stays in the drawer with sign-out rather than
-   spending a quarter of the bar on something opened once a month. */
-const BOTTOM_NAV = LINKS.filter((n) => n.module !== 'settings')
+/* Phone bottom bar: the four daily modules only. Today leads because it's
+   the home surface; Settings stays in the drawer with sign-out rather than
+   spending a quarter of the bar on something opened once a month. Review
+   is excluded on the same logic — it's a weekly ritual, and it reaches you
+   through the prompt on Today when it's actually due rather than by
+   occupying a fifth of the bar all week. */
+const BOTTOM_NAV = LINKS.filter((n) => n.module !== 'settings' && n.module !== 'review')
 
 function useModuleTheme(pathname) {
   const mod = LINKS.find((n) => (n.end ? pathname === n.to : pathname.startsWith(n.to)))?.module || 'today'

@@ -97,6 +97,14 @@ html[data-module="health"] {
   --accent-rgb: 14, 95, 82;
   --accent-grad-2: #14806e;
 }
+html[data-module="review"] {
+  --accent: #23456b;
+  --accent-dark: #162c46;
+  --accent-dim: rgba(35, 69, 107, 0.10);
+  --accent-light: #e2e8f1;
+  --accent-rgb: 35, 69, 107;
+  --accent-grad-2: #33608f;
+}
 html[data-module="wellness"] {
   --accent: #5b2c63;
   --accent-dark: #3f1e45;
@@ -1317,4 +1325,98 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
+
+
+/* ══════════════ Weekly review ══════════════ */
+
+.rv-weeknav { display: flex; gap: 6px; align-items: center; }
+.rv-status { display: flex; align-items: center; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+.rv-unsaved { font-size: 11.5px; font-weight: 700; color: var(--text-3); }
+.rv-hint { font-size: 11.5px; color: var(--text-3); margin: 2px 0 6px; line-height: 1.45; }
+
+/* The auto-gathered strip. Every tile carries its own coverage line,
+   because an average over two logged days is a different claim from an
+   average over seven and the review is where that difference matters. */
+.rv-stats { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; }
+.rv-stat { padding: 11px 12px; border-radius: var(--radius-sm); background: var(--white-soft); border: 1px solid var(--border); }
+.rv-stat-v { font-size: 24px; font-weight: 800; letter-spacing: -.02em; line-height: 1.05; }
+.rv-stat-v small { font-size: 13px; font-weight: 700; opacity: .6; }
+.rv-stat-k { font-size: 11.5px; font-weight: 800; margin-top: 3px; }
+.rv-stat-s { font-size: 10.5px; font-weight: 600; color: var(--text-3); margin-top: 2px; line-height: 1.3; }
+
+/* Last week's commitments, read back. */
+.rv-carry { display: flex; flex-direction: column; gap: 8px; }
+.rv-carry-row { display: flex; align-items: flex-start; gap: 10px; font-size: 13.5px; font-weight: 600; line-height: 1.45; }
+.rv-carry-n {
+  flex: none; width: 22px; height: 22px; border-radius: 7px; background: var(--accent-dim);
+  color: var(--accent-dark); font-size: 11.5px; font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+}
+.rv-carry-aside { color: var(--text-2); font-size: 12.5px; align-items: center; }
+
+.rv-tactics { display: flex; flex-direction: column; gap: 7px; }
+.rv-tactic {
+  display: flex; align-items: center; gap: 10px; padding: 9px 12px;
+  border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--white-soft);
+}
+.rv-tactic-bar { flex: none; width: 3px; align-self: stretch; border-radius: 99px; }
+.rv-tactic-txt { flex: 1; min-width: 0; font-size: 13px; font-weight: 700; }
+.rv-tactic-txt small { display: block; font-size: 11px; font-weight: 600; color: var(--text-3); margin-top: 1px; }
+.rv-tactic-n { font-size: 12.5px; font-weight: 800; color: var(--text-2); white-space: nowrap; }
+
+/* 1-10, as buttons rather than a range input: a slider gives you a
+   number you drifted onto, and this is meant to be a judgement. */
+.rv-score { display: grid; grid-template-columns: repeat(10, 1fr); gap: 5px; }
+.rv-score-btn {
+  min-height: 40px; border: 1.5px solid var(--border); background: var(--white-soft);
+  border-radius: var(--radius-sm); font-family: inherit; font-size: 13px; font-weight: 800;
+  color: var(--text-2); cursor: pointer; transition: background .15s, border-color .15s, color .15s;
+}
+.rv-score-btn:hover { border-color: var(--accent); }
+.rv-score-btn.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+.rv-prio { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.rv-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+
+.rv-save { display: flex; align-items: center; gap: 12px; margin-top: 16px; flex-wrap: wrap; }
+
+.rv-history { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.rv-hist-row {
+  display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
+  padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--white); font-family: inherit; cursor: pointer; transition: border-color .15s;
+}
+.rv-hist-row:hover { border-color: var(--accent); }
+.rv-hist-score { flex: none; width: 34px; font-size: 20px; font-weight: 800; text-align: center; }
+.rv-hist-txt { flex: 1; min-width: 0; }
+.rv-hist-txt strong { display: block; font-size: 13.5px; font-weight: 800; }
+.rv-hist-txt small { display: block; font-size: 11.5px; color: var(--text-3); font-weight: 600; margin-top: 2px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Today's due prompt. Uses Review's own navy so it reads as a pointer to
+   another surface rather than another Today alert. */
+.rv-due {
+  display: flex; align-items: center; gap: 12px; margin-bottom: 14px;
+  padding: 14px 16px; border-radius: var(--radius); color: #fff;
+  background: linear-gradient(135deg, #23456b, #33608f);
+}
+.rv-due-ic {
+  flex: none; width: 38px; height: 38px; border-radius: 12px; background: rgba(255,255,255,.16);
+  display: flex; align-items: center; justify-content: center;
+}
+.rv-due-txt { flex: 1; min-width: 0; }
+.rv-due-txt strong { display: block; font-size: 14px; font-weight: 800; }
+.rv-due-txt small { display: block; font-size: 12px; opacity: .82; margin-top: 2px; }
+
+@media (max-width: 1023px) {
+  .rv-stats { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 480px) {
+  .rv-stats { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .rv-stat-v { font-size: 20px; }
+  .rv-pair { grid-template-columns: 1fr; }
+  .rv-score { grid-template-columns: repeat(5, 1fr); }
+  .rv-score-btn { min-height: 44px; }
+  .rv-weeknav .btn { padding: 8px 10px; }
 }

@@ -52,6 +52,10 @@ export const MODULES = {
   health: { label: 'Health', color: '#0e5f52', tint: '#dceceA' },
   goals: { label: 'Goals', color: '#8a4b1f', tint: '#f3e6da' },
   wellness: { label: 'Wellness', color: '#5b2c63', tint: '#eee2f0' },
+  /* Review isn't a fourth system competing with the three — it's the
+     surface that looks back at all of them, so it takes a deep navy from
+     the same darker band rather than a hue any metric could claim. */
+  review: { label: 'Review', color: '#23456b', tint: '#e2e8f1' },
 }
 
 /* ── 1. Metric identity ──────────────────────────────────────────

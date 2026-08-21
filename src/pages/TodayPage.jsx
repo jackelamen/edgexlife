@@ -23,6 +23,8 @@ import {
 } from '../lib/goals'
 import { MODULES, STATUS, metric } from '../lib/design'
 import { today, daysAgo, pretty, shiftDate } from '../lib/dates'
+import { fetchReviewIndex } from '../lib/data'
+import { isReviewWindow, reviewTargetWeekId, prettyWeek } from '../lib/review'
 
 /*
   Mission control.
@@ -47,6 +49,9 @@ export default function TodayPage() {
   const phases = useAsync((f) => fetchSprintPhases({ force: f }))
   const tactics = useAsync((f) => fetchSprintTactics({ force: f }))
 
+  /* Review index is week ids only — enough to know whether this week's
+     review exists without pulling a line of its prose. */
+  const reviewIdx = useAsync((f) => fetchReviewIndex({ force: f }))
   const healthIdx = useAsync((f) => fetchHealthIndex({ force: f }))
   const wellnessIdx = useAsync((f) => fetchWellnessIndex({ force: f }))
   const lastHealthDate = healthIdx.data?.[0] || null
@@ -365,6 +370,15 @@ export default function TodayPage() {
   const checkinStreak = currentStreak((wellnessIdx.data || []).map((x) => x.date))
   const bestStreak = longestStreak(healthIdx.data || [])
 
+  /* The review only asks for you inside its own window (Sat through Tue)
+     and only when it hasn't been written. Outside that it says nothing at
+     all — a prompt that nags every day of the week is one you learn to
+     scroll past, which is exactly how the last attempt at this habit
+     died. */
+  const dueWeekId = reviewTargetWeekId()
+  const reviewDue = isReviewWindow()
+    && !(reviewIdx.data || []).some((r) => r.week_id === dueWeekId)
+
   const hour = new Date().getHours()
   const greeting = hour < 5 ? 'Still up' : hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
   const allClear = !alerts.length
@@ -416,6 +430,17 @@ export default function TodayPage() {
           </div>
         </div>
       </div>
+
+      {reviewDue && (
+        <Link to="/review" className="rv-due">
+          <span className="rv-due-ic"><Icon name="event_note" size={20} /></span>
+          <span className="rv-due-txt">
+            <strong>Close out {prettyWeek(dueWeekId)}</strong>
+            <small>Your weekly review is ready. The numbers are already gathered.</small>
+          </span>
+          <Icon name="arrow_forward" size={18} />
+        </Link>
+      )}
 
       {/* ── Attention queue ── */}
       {!allClear && (

@@ -192,27 +192,43 @@ export function localDateKey() {
  * score until it's over, so a not-yet-due weekly task doesn't drag down a
  * mid-week score.
  */
-export function execScore(phases, tactics, sp, week) {
+/*
+ * The same checkpoint counting as execScore, but returned PER TACTIC
+ * instead of summed. A cycle scoring 68% tells you nothing you can act
+ * on; "Run 5/5, Journal 1/7" names the single commitment dragging it.
+ * execScore is defined in terms of this rather than repeating the
+ * frequency rules, so the headline number and the breakdown under it can
+ * never disagree.
+ */
+export function tacticWeekRows(phases, tactics, sp, week) {
   const weekTactics = tacticsForWeek(phases, tactics, week)
-  if (!weekTactics.length) return null
   const checks = (sp.week_checks || {})[week] || {}
   const isCurrentWeek = week === sprintCurrentWeek(sp)
-  let possible = 0, done = 0
-  weekTactics.forEach((t) => {
+  return weekTactics.map((t) => {
     const freq = t.freq || 'weekly'
+    let possible = 0, done = 0
     if (freq === 'daily') {
       for (let d = 0; d < 7; d++) { possible++; if (checks[checkKey(t, d)]) done++ }
     } else if (freq === 'custom') {
       ;(t.days || []).forEach((d) => { possible++; if (checks[checkKey(t, d)]) done++ })
     } else if (freq === 'xperweek') {
-      const n = xpwTarget(t), c = xpwDoneCount(t, checks)
-      possible += n; done += Math.min(c, n)
+      possible = xpwTarget(t); done = Math.min(xpwDoneCount(t, checks), possible)
     } else if (!isCurrentWeek) {
-      possible++; if (checks[tacticKeyId(t)]) done++
+      // A weekly/one-off tactic only counts against you once the week is
+      // over — mid-week it isn't late yet.
+      possible = 1; done = checks[tacticKeyId(t)] ? 1 : 0
     } else if (checks[tacticKeyId(t)]) {
-      possible++; done++
+      possible = 1; done = 1
     }
+    return { tactic: t, text: t.text || '', freq, done, possible }
   })
+}
+
+export function execScore(phases, tactics, sp, week) {
+  const rows = tacticWeekRows(phases, tactics, sp, week)
+  if (!rows.length) return null
+  let possible = 0, done = 0
+  rows.forEach((r) => { possible += r.possible; done += r.done })
   return possible ? Math.round((done / possible) * 100) : null
 }
 
