@@ -25,7 +25,7 @@ import { MODULES, STATUS, metric } from '../lib/design'
 import { today, daysAgo, pretty, shiftDate } from '../lib/dates'
 import { fetchReviewIndex } from '../lib/data'
 import { isReviewWindow, reviewTargetWeekId, prettyWeek } from '../lib/review'
-import { IDENTITY_STATEMENT } from '../lib/identity'
+import { IDENTITY_STATEMENT, identityThreadByKey } from '../lib/identity'
 
 /*
   Mission control.
@@ -113,6 +113,15 @@ export default function TodayPage() {
   const goalTitle = useMemo(() => {
     const m = {}
     ;(goals.data || []).forEach((g) => { m[g.id] = g.title })
+    return m
+  }, [goals.data])
+
+  // Same idea, for the identity thread a goal is tagged to (see
+  // lib/identity.js) — lets "Due today" show which threads the day's
+  // actual work is serving, not just Today's static anchor line above it.
+  const goalThread = useMemo(() => {
+    const m = {}
+    ;(goals.data || []).forEach((g) => { if (g.identity_thread) m[g.id] = g.identity_thread })
     return m
   }, [goals.data])
 
@@ -544,6 +553,16 @@ export default function TodayPage() {
                       {a.kind === 'once' && ' · weekly'}
                     </small>
                   </span>
+                  {/* Which identity thread this action's goal serves, if
+                      tagged — see lib/identity.js and goalThread above.
+                      Shown here, not just on the goal card, because this
+                      is where the actual work happens. */}
+                  {goalThread[a.sp.goal_id] && identityThreadByKey[goalThread[a.sp.goal_id]] && (
+                    <span title={identityThreadByKey[goalThread[a.sp.goal_id]].label} style={{ flexShrink: 0, marginLeft: 6, display: 'inline-flex' }}>
+                      <Icon name={identityThreadByKey[goalThread[a.sp.goal_id]].icon} size={13}
+                        style={{ color: MODULES.identity.color, opacity: .8 }} />
+                    </span>
+                  )}
                 </button>
               ))}
             </div>

@@ -56,7 +56,25 @@ export const MODULES = {
      surface that looks back at all of them, so it takes a deep navy from
      the same darker band rather than a hue any metric could claim. */
   review: { label: 'Review', color: '#23456b', tint: '#e2e8f1' },
+  /* Identity isn't a sixth system either — same logic as Review, one more
+     deep hue for a surface that sits above the others rather than beside
+     them. A muted olive-gold, picked deliberately far from every other
+     hue already in this file (nothing else here reads as gold) so it
+     never gets mistaken for STATUS.short's much brighter amber. */
+  identity: { label: 'Identity', color: '#6b5b1f', tint: '#efe9d0' },
 }
+
+/* ── 5. Identity threads (Goal tags, not a new hue system) ────────
+   A Goal can optionally tag itself to one of the six threads in
+   lib/identity.js's IDENTITY_THREADS. Deliberately NOT given six more
+   colours of their own — rule 1 above exists so hue keeps one meaning
+   (which metric), and the METRICS palette below is already dense. Every
+   thread badge instead borrows this single Identity hue, the same hue
+   as the Identity module. The badge's icon (see identityThreadByKey in
+   lib/identity.js) is what tells threads apart, the same way STATUS uses
+   one ramp across many different metrics rather than colouring each one
+   differently. */
+export const IDENTITY_ACCENT = MODULES.identity
 
 /* ── 1. Metric identity ──────────────────────────────────────────
    Keys match the `key` field of the component objects returned by

@@ -113,6 +113,16 @@ html[data-module="wellness"] {
   --accent-rgb: 91, 44, 99;
   --accent-grad-2: #7a3c85;
 }
+/* Identity — MODULES.identity in lib/design.js, same deliberately-olive
+   hue used for goal thread badges everywhere else in the app. */
+html[data-module="identity"] {
+  --accent: #6b5b1f;
+  --accent-dark: #4a3f15;
+  --accent-dim: rgba(107, 91, 31, 0.10);
+  --accent-light: #efe9d0;
+  --accent-rgb: 107, 91, 31;
+  --accent-grad-2: #8a7629;
+}
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html { -webkit-font-smoothing: antialiased; }

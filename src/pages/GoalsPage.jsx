@@ -28,6 +28,7 @@ import VisionBoard from '../components/goals/VisionBoard'
 import StreakChart from '../components/goals/StreakChart'
 import DonutChart from '../components/goals/DonutChart'
 import { MODULES } from '../lib/design'
+import { IDENTITY_THREADS, identityThreadByKey } from '../lib/identity'
 
 const VIEWS = [
   { value: 'today', label: 'Today', sub: "What's due today, and how the week is going." },
@@ -523,6 +524,17 @@ function GoalCard({ goal, roll, hasCycle, onStartCycle, open, onToggle, onEdit, 
               made the area-colour system look decorative rather than real. */}
           <span className="badge" style={{ background: areaColor(goal.area), color: '#fff' }}>{areaLabel(goal.area)}</span>
           {goal.status !== 'active' && <Badge tone="muted">{goal.status}</Badge>}
+          {/* Identity thread tag — see lib/identity.js. One shared hue
+              (MODULES.identity) for every thread; the icon is what tells
+              them apart, same reasoning as the design-system comment on
+              IDENTITY_ACCENT in lib/design.js. */}
+          {goal.identity_thread && identityThreadByKey[goal.identity_thread] && (
+            <span className="badge" title={identityThreadByKey[goal.identity_thread].hint}
+              style={{ background: MODULES.identity.tint, color: MODULES.identity.color, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              <Icon name={identityThreadByKey[goal.identity_thread].icon} size={12} />
+              {identityThreadByKey[goal.identity_thread].short}
+            </span>
+          )}
         </div>
         <h3 style={{ fontSize: 16, fontWeight: 800, marginBottom: 6, lineHeight: 1.3 }}>{goal.title}</h3>
         {goal.why && <p style={{ fontSize: 12.5, color: 'var(--text-2)', lineHeight: 1.55, marginBottom: 12 }}>{goal.why}</p>}
@@ -772,6 +784,13 @@ function GoalEditor({ goal, onClose, onSaved }) {
         </div>
         <Field label="Why does this matter?" hint="The reason that will still matter when motivation dips.">
           <textarea value={cur.why || ''} onChange={(e) => setG({ ...cur, why: e.target.value })} />
+        </Field>
+        <Field label="Identity thread (optional)"
+          hint="Which part of your identity statement is this goal actually for? See it rolled up on the Identity page.">
+          <select value={cur.identity_thread || ''} onChange={(e) => setG({ ...cur, identity_thread: e.target.value || null })}>
+            <option value="">— none —</option>
+            {IDENTITY_THREADS.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
+          </select>
         </Field>
       </div>
     </Modal>

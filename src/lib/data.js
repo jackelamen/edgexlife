@@ -51,13 +51,14 @@ export const TACTIC_FREQS = ['daily', 'weekly', 'xperweek', 'custom', 'onetime']
 
 export const fetchGoals = (o) => cachedQuery('goals', async () =>
   unwrap(await supabase.from('goals')
-    .select('id,title,area,why,status,created_at,updated_at')
+    .select('id,title,area,why,status,identity_thread,created_at,updated_at')
     .order('created_at', { ascending: false })), { ttlMs: TTL.goals, ...o })
 
 export async function saveGoal(goal) {
   const payload = {
     title: goal.title, area: goal.area, why: goal.why || null,
-    status: goal.status || 'active', updated_at: new Date().toISOString(),
+    status: goal.status || 'active', identity_thread: goal.identity_thread || null,
+    updated_at: new Date().toISOString(),
   }
   const { error } = goal.id
     ? await supabase.from('goals').update(payload).eq('id', goal.id)
