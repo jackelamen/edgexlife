@@ -1196,6 +1196,18 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
 
 .stat-strip { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; margin-bottom: 24px; }
 
+/* One-day-only callout when goalStreak() lands on a milestone — see
+   streakMilestone() in lib/goals.js. Warm flame-orange rather than the
+   accent colour so it reads as a distinct "moment" next to the hero
+   banner above it, not just another accent-tinted panel. */
+.streak-milestone {
+  display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-radius: var(--radius-lg);
+  background: rgba(249,115,22,.1); border: 1px solid rgba(249,115,22,.28); color: #ea580c;
+  margin-bottom: 16px;
+}
+.streak-milestone-title { font-size: 14px; font-weight: 800; color: #c2410c; }
+.streak-milestone-sub { font-size: 12.5px; font-weight: 600; color: #ea580c; opacity: .85; margin-top: 1px; }
+
 /* Used as a <button> on Today so cycle actions and habits are tickable
    without leaving mission control. */
 .check-row {

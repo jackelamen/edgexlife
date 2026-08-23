@@ -22,7 +22,7 @@ import {
   sprintCurrentWeek, isSprintActive, phaseIdxForWeek, tacticsForWeek,
   xpwTarget, xpwDoneCount, xpwDidToday, tacticCheckpointCount, checkKey,
   execScore, avgExecScore, todayDoneTotals, scoreColor, scoreBadgeTone,
-  autoEndDate, DEFAULT_PHASES, goalStreak, effectiveCustomDays, withDaySwap,
+  autoEndDate, DEFAULT_PHASES, goalStreak, streakMilestone, effectiveCustomDays, withDaySwap,
 } from '../lib/goals'
 import VisionBoard from '../components/goals/VisionBoard'
 import StreakChart from '../components/goals/StreakChart'
@@ -130,6 +130,7 @@ function TodayView({ goals, rollup, cycleData, onStartCycle }) {
 
   const streak = useMemo(() => goalStreak(cycleData.sprints.data || []), [cycleData.sprints.data])
   const streakPct = Math.min(100, Math.round((streak / 7) * 100))
+  const milestone = useMemo(() => streakMilestone(streak), [streak])
 
   const hour = new Date().getHours()
   const greeting = hour < 5 ? 'Still up,' : hour < 12 ? 'Good morning,' : hour < 17 ? 'Good afternoon,' : 'Good evening,'
@@ -161,6 +162,19 @@ function TodayView({ goals, rollup, cycleData, onStartCycle }) {
           </p>
         )}
       </div>
+
+      {/* Fires once, on the exact day the streak lands on a milestone —
+          streakMilestone() only matches that one count, so this clears
+          itself the next day with no dismissal state to track. */}
+      {milestone && (
+        <div className="streak-milestone">
+          <Icon name="local_fire_department" size={22} />
+          <div>
+            <div className="streak-milestone-title">{milestone.days}-day streak</div>
+            <div className="streak-milestone-sub">{milestone.message}</div>
+          </div>
+        </div>
+      )}
 
       {/* Three tiles, matching .stat-strip's fixed 3-column grid — a 4th
           tile here used to wrap onto its own row alone with two-thirds of
@@ -536,8 +550,24 @@ function GoalCard({ goal, roll, hasCycle, onStartCycle, open, onToggle, onEdit, 
             </span>
           )}
         </div>
-        <h3 style={{ fontSize: 16, fontWeight: 800, marginBottom: 6, lineHeight: 1.3 }}>{goal.title}</h3>
-        {goal.why && <p style={{ fontSize: 12.5, color: 'var(--text-2)', lineHeight: 1.55, marginBottom: 12 }}>{goal.why}</p>}
+        {/* The "why" is the motivational hook — the reason this goal exists,
+            not just its label — so when it's set it leads the card as an
+            italic pull-quote (same treatment IdentityPage gives the
+            identity statement) and the title drops to a small caption
+            underneath. A goal with no "why" yet falls back to the title
+            as the headline, same as before. */}
+        {goal.why ? (
+          <>
+            <p style={{ fontSize: 15, fontStyle: 'italic', fontWeight: 700, color: 'var(--text)', lineHeight: 1.42, marginBottom: 8 }}>
+              "{goal.why}"
+            </p>
+            <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 12 }}>
+              {goal.title}
+            </div>
+          </>
+        ) : (
+          <h3 style={{ fontSize: 16, fontWeight: 800, marginBottom: 12, lineHeight: 1.3 }}>{goal.title}</h3>
+        )}
         {/* A brand-new goal used to just sit here with nothing to do next —
             the goal→cycle gap flagged in the critique. A goal with zero
             cycles gets an explicit next step instead of silence. */}

@@ -9,6 +9,7 @@
   (sprint_phases, sprint_tactics with phase_index) joined in JS instead.
 */
 
+import { startOfWeek } from 'date-fns'
 import { AREA_COLORS } from './design'
 import { dateKey } from './dates'
 
@@ -36,12 +37,21 @@ export function todayDayIdx() {
   return (new Date().getDay() + 6) % 7
 }
 
-/** Which week (1–12) of a cycle "today" falls in, clamped to the cycle length. */
+/** Which week (1–12) of a cycle "today" falls in, clamped to the cycle length.
+    Monday-anchored, same as Review's weekIdFor: week 1 starts the Monday
+    on/before start_date, not start_date itself. A cycle that kicks off
+    mid-week (Saturday, say) still gets a real week 1 that runs Mon-Sun like
+    every other week in the app, rather than a "week" that's really a
+    same-length-but-offset 7-day counter from an arbitrary start day. Before
+    this, a cycle starting on a Sat/Sun could show "Week 3" on a day Review
+    would call the third Monday-anchored week's *second* week, because the
+    two systems disagreed about where week boundaries fall. */
 export function sprintCurrentWeek(sp) {
   if (!sp.start_date) return 1
   const today = new Date(); today.setHours(0, 0, 0, 0)
   const start = new Date(sp.start_date + 'T00:00:00'); start.setHours(0, 0, 0, 0)
-  const daysDiff = Math.floor((today - start) / (24 * 3600 * 1000))
+  const anchor = startOfWeek(start, { weekStartsOn: 1 })
+  const daysDiff = Math.floor((today - anchor) / (24 * 3600 * 1000))
   const week = Math.floor(daysDiff / 7) + 1
   return Math.min(Math.max(week, 1), 12)
 }
@@ -347,4 +357,34 @@ export function goalStreak(sprints) {
     else break
   }
   return n
+}
+
+/* ── Streak milestones ──────────────────────────────────────
+   goalStreak() recomputes from scratch every render, so a milestone
+   only matches on the single day the count actually lands on it — the
+   day after, the streak has moved to n+1 and the banner clears itself
+   with no extra bookkeeping. */
+export const STREAK_MILESTONES = [3, 7, 14, 21, 30, 45, 60, 90, 100, 150, 200, 365]
+
+const STREAK_MILESTONE_COPY = {
+  3: 'Three days in a row — the habit is starting to stick.',
+  7: 'A full week, no misses.',
+  14: 'Two weeks straight.',
+  21: 'Three weeks — this is a habit now.',
+  30: 'A month of showing up every day.',
+  45: 'Six and a half weeks. Still going.',
+  60: 'Two months, no gaps.',
+  90: 'A full quarter, every single day.',
+  100: 'Triple digits.',
+  150: 'Five months straight.',
+  200: '200 days. This is who you are now.',
+  365: 'A full year, one day at a time.',
+}
+
+/** Whether today's streak count just landed on a milestone, and if so
+    the plain-language line to show alongside it. Returns null on any
+    other day. */
+export function streakMilestone(streak) {
+  if (!STREAK_MILESTONES.includes(streak)) return null
+  return { days: streak, message: STREAK_MILESTONE_COPY[streak] }
 }
