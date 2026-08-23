@@ -10,7 +10,7 @@
 */
 
 import { startOfWeek } from 'date-fns'
-import { AREA_COLORS } from './design'
+import { AREA_COLORS, statusFor } from './design'
 import { dateKey } from './dates'
 
 // Colour is sourced from lib/design.js's AREA_COLORS, not hardcoded here.
@@ -292,6 +292,19 @@ export function scoreColor(s) {
 export function scoreBadgeTone(s) {
   if (s == null) return 'muted'
   return s >= 85 ? 'green' : s >= 65 ? 'orange' : 'red'
+}
+
+/** Plain-language read on a week's execution score, in place of just a
+    number — a bare percentage reads as a grade; this reads as a coach.
+    Pulled from statusFor() (lib/design.js) rather than its own
+    thresholds, so the words can never disagree with the colour the Ring
+    is already showing for the same score. */
+export function scoreMomentumLine(score) {
+  const status = statusFor(score)
+  if (!status) return null
+  if (status.label === 'On track') return 'Crushing it this week'
+  if (status.label === 'Short') return 'Solid pace this week'
+  return 'This week needs a push'
 }
 
 /** 12 weeks -> phase-name-and-date shell for a brand-new cycle. */

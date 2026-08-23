@@ -22,7 +22,7 @@ import {
   sprintCurrentWeek, isSprintActive, phaseIdxForWeek, tacticsForWeek,
   xpwTarget, xpwDoneCount, xpwDidToday, tacticCheckpointCount, checkKey,
   execScore, avgExecScore, todayDoneTotals, scoreColor, scoreBadgeTone,
-  autoEndDate, DEFAULT_PHASES, goalStreak, streakMilestone, effectiveCustomDays, withDaySwap,
+  autoEndDate, DEFAULT_PHASES, goalStreak, streakMilestone, scoreMomentumLine, effectiveCustomDays, withDaySwap,
 } from '../lib/goals'
 import VisionBoard from '../components/goals/VisionBoard'
 import StreakChart from '../components/goals/StreakChart'
@@ -146,6 +146,16 @@ function TodayView({ goals, rollup, cycleData, onStartCycle }) {
             todayTotals.done === todayTotals.total ? 'Clean day — everything checked off.' :
             `${todayTotals.done} of ${todayTotals.total} actions done today.`}
         </div>
+        {/* The checklist above says WHAT's due; this says WHY it's worth
+            doing — the featured cycle's goal "why", in the same italic
+            pull-quote treatment GoalCard gives it, so Today opens on the
+            reason and not just a checklist. Only renders when that goal
+            actually has a "why" set. */}
+        {featured?.goal?.why && (
+          <p style={{ fontSize: 15, fontStyle: 'italic', fontWeight: 600, lineHeight: 1.45, opacity: .92, margin: '12px 0 0', maxWidth: 460 }}>
+            "{featured.goal.why}"
+          </p>
+        )}
         {todayTotals.total > 0 && (
           <div className="score-meter" style={{ height: 8, background: 'rgba(255,255,255,.22)', marginTop: 12, maxWidth: 320 }}>
             <span style={{ width: `${todayPct}%`, background: '#fff' }} />
@@ -304,7 +314,7 @@ function CycleCard({ sprint, phases, tactics, goal, compact, onChanged, onDelete
             <span>
               Week {week} of 12
               <span style={{ fontWeight: 600, color: 'var(--text-3)', marginLeft: 8, fontSize: 11 }}>
-                · {score == null ? 'nothing to check yet' : `${score}% of this week's actions checked off`}
+                · {score == null ? 'nothing to check yet' : `${scoreMomentumLine(score)} — ${score}% checked off`}
               </span>
             </span>
             <div style={{ display: 'flex', gap: 4 }}>
