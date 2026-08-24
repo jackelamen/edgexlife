@@ -365,21 +365,29 @@ h1, h2, h3, h4, .page-title {
    this column centres it instead. */
 .hero-ring .score-ring { margin-left: 0 !important; }
 
-/* Per-system colour, applied ONLY to the ring's empty track and its
-   label — never to the filled arc. Design rule 3 reserves green/amber/red
-   for performance, and a score ring is named there explicitly; colouring
-   the FILL by module would put a teal-green Health arc next to an ochre
-   Goals arc, which reads exactly like "good" next to "warning". Identity
-   therefore lives on the label and the track, quantity stays white. */
-.hero-ring[data-mod="health"] .score-ring circle:first-of-type { stroke: rgba(17,174,149,.42); }
-.hero-ring[data-mod="wellness"] .score-ring circle:first-of-type { stroke: rgba(149,60,164,.46); }
-.hero-ring[data-mod="goals"] .score-ring circle:first-of-type { stroke: rgba(215,109,36,.42); }
+/* Per-system colour, now on the FILLED arc (the previous v1 put it on
+   the empty track instead — see git history — reasoning being that
+   Health's teal and Goals' ochre sit close enough to STATUS.good/short
+   that a coloured fill could misread as a status verdict rather than a
+   module label. Rather than keep three identical white rings over that
+   worry, the three hues below are deliberately shifted OFF the STATUS
+   ramp (green ~154°, amber ~40°, red ~5°): Health moves to a blue-leaning
+   cyan (~193°, nowhere near STATUS.good's green), Goals uses its own
+   deep, desaturated brown (~28°, but dark/muted rather than vivid like
+   STATUS.short's amber) instead of the brighter ochre v1 used, Wellness'
+   purple was already clear of the ramp and is unchanged. Track stays a
+   flat neutral white for all three — quantity is what "how much of the
+   ring is lit" already says; it doesn't need its own hue too. */
+.hero-ring .score-ring circle:first-of-type { stroke: rgba(255,255,255,.18); }
+.hero-ring[data-mod="health"] .score-ring circle:last-of-type { stroke: #0e88a0; }
+.hero-ring[data-mod="wellness"] .score-ring circle:last-of-type { stroke: #953ca4; }
+.hero-ring[data-mod="goals"] .score-ring circle:last-of-type { stroke: #8a4b1f; }
 /* Ring sets opacity inline on its sub-label, so full-strength hue needs
    the override. */
 .hero-ring .score-ring-sub { opacity: 1 !important; }
-.hero-ring[data-mod="health"] .score-ring-sub { color: #11ae95; }
+.hero-ring[data-mod="health"] .score-ring-sub { color: #0e88a0; }
 .hero-ring[data-mod="wellness"] .score-ring-sub { color: #953ca4; }
-.hero-ring[data-mod="goals"] .score-ring-sub { color: #d76d24; }
+.hero-ring[data-mod="goals"] .score-ring-sub { color: #8a4b1f; }
 
 .hero-delta {
   display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 999px;
@@ -401,9 +409,9 @@ h1, h2, h3, h4, .page-title {
 /* Each stat carries the hue of the system it came from — a 2px rule
    rather than a dot, so the four read as one instrument panel. */
 .hero-stat { padding-left: 11px; border-left: 2px solid rgba(255,255,255,.16); }
-.hero-stat[data-mod="health"] { border-left-color: #11ae95; }
+.hero-stat[data-mod="health"] { border-left-color: #0e88a0; }
 .hero-stat[data-mod="wellness"] { border-left-color: #953ca4; }
-.hero-stat[data-mod="goals"] { border-left-color: #d76d24; }
+.hero-stat[data-mod="goals"] { border-left-color: #8a4b1f; }
 .hero-stat-v { font-size: 24px; font-weight: 800; letter-spacing: -.02em; line-height: 1.05; }
 .hero-stat-v small { font-size: 12px; font-weight: 700; opacity: .68; letter-spacing: 0; }
 .hero-stat-l { font-size: 10.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; opacity: .62; margin-top: 4px; }
