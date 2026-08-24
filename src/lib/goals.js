@@ -195,9 +195,17 @@ export function tacticActiveToday(t) {
 
 /**
  * Execution score for one week: ratio of checked to possible checkpoints.
- * Weekly/onetime tactics are excluded from the CURRENT (in-progress) week's
- * score until it's over, so a not-yet-due weekly task doesn't drag down a
- * mid-week score.
+ * Every frequency is given the same rule for the CURRENT (in-progress)
+ * week: nothing counts against you before its day has actually arrived.
+ * A Mon/Wed/Fri tactic only owes a Wednesday checkpoint once Wednesday
+ * gets here — Monday morning it owes exactly one, not three — and a
+ * flexible weekly/xperweek/onetime target only counts once the week is
+ * over, same as it always has, so "3x this week" doesn't read as behind
+ * on day one. This is what keeps the live number honest: it answers
+ * "how am I doing on what's actually been due so far," not "how much of
+ * the eventual week is done right now" — the two read identically once
+ * the week ends, which is why past weeks in the 12-week chart are
+ * unaffected by any of this.
  */
 /*
  * The same checkpoint counting as execScore, but returned PER TACTIC
@@ -210,16 +218,38 @@ export function tacticActiveToday(t) {
 export function tacticWeekRows(phases, tactics, sp, week) {
   const weekTactics = tacticsForWeek(phases, tactics, week)
   const checks = (sp.week_checks || {})[week] || {}
-  const isCurrentWeek = week === sprintCurrentWeek(sp)
+  // isSprintActive matters here, not just the week number: sprintCurrentWeek
+  // clamps at 12 forever once a cycle's end_date has passed, so a finished
+  // cycle's last week would otherwise look permanently "current" and get
+  // its future days excluded — cutting off real history in Retros for a
+  // week that's fully over. Requiring the sprint to still be live is what
+  // keeps that clamp from leaking into completed-cycle scoring.
+  const isCurrentWeek = week === sprintCurrentWeek(sp) && isSprintActive(sp)
+  const todayIdx = todayDayIdx()
   return weekTactics.map((t) => {
     const freq = t.freq || 'weekly'
     let possible = 0, done = 0
     if (freq === 'daily') {
-      for (let d = 0; d < 7; d++) { possible++; if (checks[checkKey(t, d)]) done++ }
+      for (let d = 0; d < 7; d++) {
+        if (isCurrentWeek && d > todayIdx) continue // that day hasn't happened yet
+        possible++; if (checks[checkKey(t, d)]) done++
+      }
     } else if (freq === 'custom') {
-      ;(t.days || []).forEach((d) => { possible++; if (checks[checkKey(t, d)]) done++ })
+      ;(t.days || []).forEach((d) => {
+        if (isCurrentWeek && d > todayIdx) return
+        possible++; if (checks[checkKey(t, d)]) done++
+      })
     } else if (freq === 'xperweek') {
-      possible = xpwTarget(t); done = Math.min(xpwDoneCount(t, checks), possible)
+      const target = xpwTarget(t)
+      const doneCount = Math.min(xpwDoneCount(t, checks), target)
+      if (!isCurrentWeek) {
+        possible = target; done = doneCount
+      } else {
+        // Same leniency as weekly/onetime below: credit for whatever's
+        // been done so far, no penalty for the remaining flexible-day
+        // target until the week's actually over.
+        possible = doneCount; done = doneCount
+      }
     } else if (!isCurrentWeek) {
       // A weekly/one-off tactic only counts against you once the week is
       // over — mid-week it isn't late yet.
