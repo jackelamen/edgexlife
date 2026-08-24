@@ -324,8 +324,16 @@ function weekIsPartial(sp, week) {
     date lands in, or null if it's before the cycle's own grid begins. */
 export function weekDayForDate(sp, iso) {
   if (!sp.start_date || !iso) return null
-  const anchor = startOfWeek(new Date(sp.start_date + 'T12:00:00'), { weekStartsOn: 1 })
-  const days = Math.round((new Date(iso + 'T12:00:00') - anchor) / 86400000)
+  // startOfWeek zeroes the time to midnight regardless of what's passed
+  // in, so anchor sits at 00:00:00 — but the target date below used to be
+  // built at T12:00:00, comparing a noon timestamp against a midnight
+  // one. That spurious 12-hour gap made every date N days after anchor
+  // measure as N.5 days, and Math.round rounds .5 UP — so every single
+  // date reconstructed as the day AFTER itself. A real Monday checkmark
+  // read back as Tuesday's, every time, for every cycle. Matching both
+  // sides to midnight removes the gap instead of rounding around it.
+  const anchor = startOfWeek(new Date(sp.start_date + 'T00:00:00'), { weekStartsOn: 1 })
+  const days = Math.round((new Date(iso + 'T00:00:00') - anchor) / 86400000)
   if (days < 0) return null
   return { week: Math.floor(days / 7) + 1, dayIdx: days % 7 }
 }
