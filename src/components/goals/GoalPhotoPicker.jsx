@@ -15,8 +15,13 @@ import Icon from '../ui/Icon'
   moment this modal opens.
 */
 export default function GoalPhotoPicker({ open, goalArea, current, onClose, onPick }) {
-  const items = useAsync((f) => fetchVisionItems({ force: f }), [], { enabled: open })
-  const legacy = useAsync((f) => fetchLegacyVision({ force: f }), [], { enabled: open })
+  // useAsync only (re)fetches when its deps array changes, not whenever
+  // `enabled` flips — with deps: [], the fetch ran once at mount, while
+  // this modal was still closed (enabled: false), and never ran again
+  // once `open` actually became true. [open] as the dep is what makes it
+  // actually fetch the first time the picker opens.
+  const items = useAsync((f) => fetchVisionItems({ force: f }), [open], { enabled: open })
+  const legacy = useAsync((f) => fetchLegacyVision({ force: f }), [open], { enabled: open })
   const loading = items.loading || legacy.loading
 
   const all = [
