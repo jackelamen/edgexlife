@@ -276,6 +276,18 @@ function dayIsCountable(sp, week, dayIdx) {
   return d >= sp.start_date && d <= cap
 }
 
+/** Whether `week` ever had all 7 of its calendar days actually belong to
+    the cycle — false for a week truncated by the cycle's own start_date
+    or end_date (a Saturday start means week 1 only really had 2 days,
+    Sat+Sun). A flexible weekly/xperweek/onetime target still expects its
+    FULL amount even in a week like that unless this says otherwise —
+    dayIsCountable alone doesn't help those, since they aren't tied to
+    any particular day the way daily/custom tactics are. */
+function weekIsPartial(sp, week) {
+  for (let d = 0; d < 7; d++) if (!dayIsCountable(sp, week, d)) return true
+  return false
+}
+
 /**
  * Execution score for one week: ratio of checked to possible checkpoints.
  * Daily/custom-day checkpoints only count once their actual calendar date
@@ -309,6 +321,12 @@ export function tacticWeekRows(phases, tactics, sp, week) {
   // weekly/xperweek branches below still need this — daily/custom use
   // dayIsCountable, which folds the same idea into a plain date check.)
   const isCurrentWeek = week === sprintCurrentWeek(sp) && isSprintActive(sp)
+  // A flexible target gets the "credit only, never penalised" treatment
+  // either while its week is still in progress (isCurrentWeek) OR
+  // permanently, if that week was truncated by the cycle's own start/end
+  // date — a week that only ever had 2 real days in it was never a fair
+  // shot at a full weekly target, current or not.
+  const lenient = isCurrentWeek || weekIsPartial(sp, week)
   return weekTactics.map((t) => {
     const freq = t.freq || 'weekly'
     let possible = 0, done = 0
@@ -325,17 +343,18 @@ export function tacticWeekRows(phases, tactics, sp, week) {
     } else if (freq === 'xperweek') {
       const target = xpwTarget(t)
       const doneCount = Math.min(xpwDoneCount(t, checks), target)
-      if (!isCurrentWeek) {
+      if (!lenient) {
         possible = target; done = doneCount
       } else {
-        // Same leniency as weekly/onetime below: credit for whatever's
-        // been done so far, no penalty for the remaining flexible-day
-        // target until the week's actually over.
+        // Credit for whatever's been done so far, no penalty for the
+        // remaining flexible-day target — either the week isn't over
+        // yet, or it never had a fair 7 days to hit the target in.
         possible = doneCount; done = doneCount
       }
-    } else if (!isCurrentWeek) {
-      // A weekly/one-off tactic only counts against you once the week is
-      // over — mid-week it isn't late yet.
+    } else if (!lenient) {
+      // A weekly/one-off tactic only counts against you once its week is
+      // both over AND was a real full week — mid-week it isn't late yet,
+      // and a truncated week never owed the full target to begin with.
       possible = 1; done = checks[tacticKeyId(t)] ? 1 : 0
     } else if (checks[tacticKeyId(t)]) {
       possible = 1; done = 1
