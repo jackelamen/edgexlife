@@ -1,5 +1,5 @@
 import {
-  dayCommitments, dateKeyForWeekDay, sprintWeeks, tacticCommitmentRates, flexibleTargets,
+  dayCommitments, dateKeyForWeekDay, sprintWeeks, sprintCurrentWeek, tacticCommitmentRates, flexibleTargets,
   DAY_LABELS,
 } from '../../lib/goals'
 import { STATUS } from '../../lib/design'
@@ -22,7 +22,7 @@ import { dateKey, pretty } from '../../lib/dates'
   belong to.
 */
 
-const CELL = 15, GAP = 3, LABEL_W = 26
+const CELL = 15, GAP = 3, LABEL_W = 26, HEADER_H = 14
 
 function cellFill(state) {
   if (state === 'all') return STATUS.good.color
@@ -59,9 +59,10 @@ export default function ExecutionHeatmap({ sprint, phases, tactics }) {
   const perTactic = tacticCommitmentRates(phases, tactics, sprint)
     .sort((a, b) => (a.done / a.total) - (b.done / b.total))
   const flex = flexibleTargets(phases, tactics, sprint)
+  const cw = sprintCurrentWeek(sprint)
 
   const W = LABEL_W + weeks * (CELL + GAP)
-  const H = 7 * (CELL + GAP)
+  const H = HEADER_H + 7 * (CELL + GAP)
 
   return (
     <div className="streak-chart-wrap">
@@ -76,14 +77,27 @@ export default function ExecutionHeatmap({ sprint, phases, tactics }) {
 
       <div style={{ overflowX: 'auto' }}>
         <svg viewBox={`0 0 ${W} ${H}`} width={W} style={{ maxWidth: '100%', height: 'auto', display: 'block' }}>
+          {/* Week numbers, one per column — the whole point of asking for
+              these was "so I can see what's what," i.e. tie a cell back
+              to a specific week without having to count columns. The
+              current week's number gets the same blue as today's cell
+              outline below, so both "which week" and "which day" use one
+              consistent visual language. */}
+          {Array.from({ length: weeks }).map((_, wi) => (
+            <text key={wi} x={LABEL_W + wi * (CELL + GAP) + CELL / 2} y={HEADER_H - 4}
+              textAnchor="middle" fontSize="8.5" fontWeight={wi + 1 === cw ? '800' : '700'}
+              fill={wi + 1 === cw ? '#0ea5e9' : 'var(--text-3)'}>
+              {wi + 1}
+            </text>
+          ))}
           {grid.map((row, d) => (
             <g key={d}>
-              <text x={0} y={d * (CELL + GAP) + CELL - 3} fontSize="9" fontWeight="700" fill="var(--text-3)">
+              <text x={0} y={HEADER_H + d * (CELL + GAP) + CELL - 3} fontSize="9" fontWeight="700" fill="var(--text-3)">
                 {DAY_LABELS[d].slice(0, 2)}
               </text>
               {row.map((cell, wi) => {
                 const x = LABEL_W + wi * (CELL + GAP)
-                const y = d * (CELL + GAP)
+                const y = HEADER_H + d * (CELL + GAP)
                 const fill = cellFill(cell.state)
                 if (cell.state === 'outside') return null
                 return (
