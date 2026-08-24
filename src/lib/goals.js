@@ -1,8 +1,9 @@
 /*
   Focus Cycle mechanics, ported verbatim from goals.html's execution-scoring
   engine. This is the part of Goals that's actually a program, not just a
-  form — a 12-week cycle has weekly checkpoints per tactic, and the "how am
-  I doing" number is computed from how many of those checkpoints landed.
+  form — a cycle (1 to 12 weeks, see CYCLE_LENGTHS) has weekly checkpoints
+  per tactic, and the "how am I doing" number is computed from how many of
+  those checkpoints landed.
 
   Adapted for the normalized schema: the original kept phases+tactics
   embedded inside the sprint's own JSON; here they're real rows
@@ -37,15 +38,28 @@ export function todayDayIdx() {
   return (new Date().getDay() + 6) % 7
 }
 
-/** Which week (1–12) of a cycle "today" falls in, clamped to the cycle length.
-    Monday-anchored, same as Review's weekIdFor: week 1 starts the Monday
-    on/before start_date, not start_date itself. A cycle that kicks off
-    mid-week (Saturday, say) still gets a real week 1 that runs Mon-Sun like
-    every other week in the app, rather than a "week" that's really a
-    same-length-but-offset 7-day counter from an arbitrary start day. Before
-    this, a cycle starting on a Sat/Sun could show "Week 3" on a day Review
-    would call the third Monday-anchored week's *second* week, because the
-    two systems disagreed about where week boundaries fall. */
+/** Preset cycle lengths offered when creating a Focus Cycle. Not every goal
+    needs the full 12 weeks — a "clean my room" habit and a "run a 10k"
+    program don't belong on the same clock. */
+export const CYCLE_LENGTHS = [1, 2, 4, 6, 8, 12]
+export const DEFAULT_CYCLE_LENGTH = 12
+
+/** sp.weeks is the source of truth (stored at creation — see saveSprint /
+    autoEndDate); this fallback only matters for rows written before that
+    column existed, which were all 12-week cycles, the only length ever
+    offered until now. */
+export const sprintWeeks = (sp) => sp.weeks || DEFAULT_CYCLE_LENGTH
+
+/** Which week of a cycle "today" falls in, clamped to the cycle's own
+    length (sprintWeeks). Monday-anchored, same as Review's weekIdFor: week
+    1 starts the Monday on/before start_date, not start_date itself. A
+    cycle that kicks off mid-week (Saturday, say) still gets a real week 1
+    that runs Mon-Sun like every other week in the app, rather than a
+    "week" that's really a same-length-but-offset 7-day counter from an
+    arbitrary start day. Before this, a cycle starting on a Sat/Sun could
+    show "Week 3" on a day Review would call the third Monday-anchored
+    week's *second* week, because the two systems disagreed about where
+    week boundaries fall. */
 export function sprintCurrentWeek(sp) {
   if (!sp.start_date) return 1
   const today = new Date(); today.setHours(0, 0, 0, 0)
@@ -53,9 +67,9 @@ export function sprintCurrentWeek(sp) {
   const anchor = startOfWeek(start, { weekStartsOn: 1 })
   const daysDiff = Math.floor((today - anchor) / (24 * 3600 * 1000))
   const week = Math.floor(daysDiff / 7) + 1
-  return Math.min(Math.max(week, 1), 12)
+  return Math.min(Math.max(week, 1), sprintWeeks(sp))
 }
-export const sprintProgressPct = (sp) => Math.round((sprintCurrentWeek(sp) / 12) * 100)
+export const sprintProgressPct = (sp) => Math.round((sprintCurrentWeek(sp) / sprintWeeks(sp)) * 100)
 
 /** Whether "today" (calendar day, not exact timestamp) falls within the
     cycle's date range. Deliberately a plain string comparison of the
@@ -77,14 +91,50 @@ export function isSprintUpcoming(sp) {
   return sp.start_date ? sp.start_date > dateKey() : false
 }
 
-/** Weeks 1-4 -> phase 0, 5-8 -> phase 1, 9-12 -> phase 2 (fixed 3-phase structure). */
-export const phaseIdxForWeek = (w) => (w <= 4 ? 0 : w <= 8 ? 1 : 2)
+/** [startWeek, endWeek] (1-indexed, inclusive) that phase `pi` of
+    `phaseCount` owns within a `totalWeeks`-long cycle, evenly split — a
+    12-week cycle with 3 phases still gets the original 4/4/4 split, a
+    3-week cycle with 3 phases gets 1 week each. When phaseCount exceeds
+    totalWeeks (3 phases on a 1-week cycle, say) the ranges legitimately
+    overlap rather than leaving any phase's tactics permanently
+    unreachable — every phase gets at least the single week it can fit
+    in, even if that means sharing a week with another phase. */
+export function phaseWeekRange(pi, totalWeeks, phaseCount) {
+  if (!phaseCount || !totalWeeks) return [1, 1]
+  const start = Math.floor((pi * totalWeeks) / phaseCount) + 1
+  const end = Math.max(start, Math.floor(((pi + 1) * totalWeeks) / phaseCount))
+  return [start, end]
+}
 
-/** Tactics scoped to a given week, from the phase that owns that week. */
-export function tacticsForWeek(phases, tactics, week) {
-  const phase = [...phases].sort((a, b) => a.phase_index - b.phase_index)[phaseIdxForWeek(week)]
-  if (!phase) return []
-  return tactics.filter((t) => t.phase_id === phase.id)
+/** The single phase a given week "belongs to" for display purposes (a
+    ring's sub-label, say) where naming more than one would be awkward —
+    the last phase whose range has already started. Agrees with
+    phaseWeekRange in the normal non-overlapping case; tacticsForWeek
+    below doesn't use this, since it needs every overlapping phase, not
+    just one. */
+export function phaseIdxForWeek(week, totalWeeks, phaseCount) {
+  let idx = 0
+  for (let pi = 0; pi < phaseCount; pi++) {
+    if (phaseWeekRange(pi, totalWeeks, phaseCount)[0] <= week) idx = pi
+  }
+  return idx
+}
+
+/** Tactics scoped to a given week, from every phase whose range covers
+    that week — plural, not "the" phase, because a short cycle can
+    compress multiple phases onto the same week (see phaseWeekRange). */
+export function tacticsForWeek(phases, tactics, week, sp) {
+  const sorted = [...phases].sort((a, b) => a.phase_index - b.phase_index)
+  const totalWeeks = sprintWeeks(sp)
+  const phaseCount = sorted.length
+  const phaseIds = sorted
+    .filter((_, pi) => {
+      const [start, end] = phaseWeekRange(pi, totalWeeks, phaseCount)
+      return week >= start && week <= end
+    })
+    .map((p) => p.id)
+  if (!phaseIds.length) return []
+  return tactics.filter((t) => phaseIds.includes(t.phase_id))
 }
 
 /** The stable identity used as a checks-object key — see saveTactic in data.js. */
@@ -216,7 +266,7 @@ export function tacticActiveToday(t) {
  * never disagree.
  */
 export function tacticWeekRows(phases, tactics, sp, week) {
-  const weekTactics = tacticsForWeek(phases, tactics, week)
+  const weekTactics = tacticsForWeek(phases, tactics, week, sp)
   const checks = (sp.week_checks || {})[week] || {}
   // isSprintActive matters here, not just the week number: sprintCurrentWeek
   // clamps at 12 forever once a cycle's end_date has passed, so a finished
@@ -285,7 +335,7 @@ export function avgExecScore(phases, tactics, sp) {
 /** Obligations due TODAY across a cycle's active-week tactics. */
 export function todayDoneTotals(phases, tactics, sp) {
   const wk = sprintCurrentWeek(sp)
-  const weekTactics = tacticsForWeek(phases, tactics, wk)
+  const weekTactics = tacticsForWeek(phases, tactics, wk, sp)
   const checks = (sp.week_checks || {})[wk] || {}
   const todayIdx = todayDayIdx()
   const isSunday = todayIdx === 6
@@ -337,11 +387,11 @@ export function scoreMomentumLine(score) {
   return 'This week needs a push'
 }
 
-/** 12 weeks -> phase-name-and-date shell for a brand-new cycle. */
-export function autoEndDate(startDate) {
+/** End date for a new cycle of the given length, starting from `startDate`. */
+export function autoEndDate(startDate, weeks = DEFAULT_CYCLE_LENGTH) {
   if (!startDate) return ''
   const d = new Date(startDate + 'T12:00:00')
-  d.setDate(d.getDate() + 7 * 12 - 1)
+  d.setDate(d.getDate() + 7 * weeks - 1)
   return dateKey(d)
 }
 

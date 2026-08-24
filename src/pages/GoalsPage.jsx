@@ -19,7 +19,8 @@ import {
 import { today, pretty, prettyShort } from '../lib/dates'
 import {
   areaLabel, areaColor, DAY_LABELS, todayDayIdx,
-  sprintCurrentWeek, isSprintActive, phaseIdxForWeek, tacticsForWeek,
+  sprintCurrentWeek, sprintWeeks, sprintProgressPct, isSprintActive, phaseWeekRange, tacticsForWeek,
+  CYCLE_LENGTHS, DEFAULT_CYCLE_LENGTH,
   xpwTarget, xpwDoneCount, xpwDidToday, tacticCheckpointCount, checkKey,
   execScore, avgExecScore, todayDoneTotals, scoreColor, scoreBadgeTone,
   autoEndDate, DEFAULT_PHASES, goalStreak, streakMilestone, scoreMomentumLine, effectiveCustomDays, withDaySwap,
@@ -34,7 +35,7 @@ import { IDENTITY_THREADS, identityThreadByKey } from '../lib/identity'
 const VIEWS = [
   { value: 'today', label: 'Today', sub: "What's due today, and how the week is going." },
   { value: 'goals', label: 'Goals', sub: 'Every active goal, by life area, with what feeds it.' },
-  { value: 'cycles', label: 'Cycles', sub: '12-week focus cycles — phases, actions, execution.' },
+  { value: 'cycles', label: 'Cycles', sub: 'Focus cycles, 1 to 12 weeks — phases, actions, execution.' },
   { value: 'roadmap', label: 'Roadmap', sub: 'Every cycle plotted against the calendar.' },
   { value: 'visions', label: 'Visions', sub: 'The future state you’re building toward, by area.' },
   { value: 'retros', label: 'Retros', sub: 'What a finished cycle taught you.' },
@@ -227,7 +228,7 @@ function TodayView({ goals, rollup, cycleData, onStartCycle }) {
         <Card>
           <Empty icon="rocket_launch" title="Nothing in motion yet"
             action={<button className="btn btn-primary btn-sm" onClick={onStartCycle}>Start a Cycle</button>}>
-            Start a 12-week Focus Cycle and your daily actions will show up here.
+            Start a Focus Cycle — a week, a month, or the full 12 — and your daily actions will show up here.
           </Empty>
         </Card>
       ) : (
@@ -257,9 +258,10 @@ function CycleCard({ sprint, phases, tactics, goal, compact, onChanged, onDelete
   const [open, setOpen] = useState(!compact)
   const [week, setWeek] = useState(sprintCurrentWeek(sprint))
   const cw = sprintCurrentWeek(sprint)
+  const totalWeeks = sprintWeeks(sprint)
   const score = execScore(phases, tactics, sprint, week)
   const avg = avgExecScore(phases, tactics, sprint)
-  const weekTactics = tacticsForWeek(phases, tactics, week)
+  const weekTactics = tacticsForWeek(phases, tactics, week, sprint)
   const checks = (sprint.week_checks || {})[week] || {}
 
   async function toggle(t, dayIdx) {
@@ -332,7 +334,7 @@ function CycleCard({ sprint, phases, tactics, goal, compact, onChanged, onDelete
         <div className="cycle-section">
           <div className="cycle-section-title">
             <span>
-              Week {week} of 12
+              Week {week} of {totalWeeks}
               <span style={{ fontWeight: 600, color: 'var(--text-3)', marginLeft: 8, fontSize: 11 }}>
                 · {score == null ? 'nothing to check yet' : `${scoreMomentumLine(score)} — ${score}% checked off`}
               </span>
@@ -344,7 +346,7 @@ function CycleCard({ sprint, phases, tactics, goal, compact, onChanged, onDelete
               {week !== cw && (
                 <button className="btn btn-secondary btn-sm" onClick={() => setWeek(cw)}>Today</button>
               )}
-              <button className="btn btn-icon btn-sm" onClick={() => setWeek(Math.min(12, week + 1))}>
+              <button className="btn btn-icon btn-sm" onClick={() => setWeek(Math.min(totalWeeks, week + 1))}>
                 <Icon name="chevron_right" size={15} />
               </button>
             </div>
@@ -916,7 +918,7 @@ function CyclesView({ goals, cycleData, cycleIntent }) {
     const myPhases = (phases.data || []).filter((p) => p.sprint_id === s.id).sort((a, b) => a.phase_index - b.phase_index)
     const myTactics = (tactics.data || []).filter((x) => x.sprint_id === s.id)
     setCloneFrom({
-      name: `${s.name} (Copy)`, outcome: s.outcome || '', goal_id: s.goal_id,
+      name: `${s.name} (Copy)`, outcome: s.outcome || '', goal_id: s.goal_id, weeks: sprintWeeks(s),
       phases: myPhases.length
         ? myPhases.map((p) => ({
             name: p.name, description: p.description || '',
@@ -990,7 +992,8 @@ function CycleEditor({ sprint, cloneFrom, goals, seedGoalId, onClose, onSaved })
   // "No cycle yet" button does) — pre-fills the goal picker instead of
   // defaulting to whichever goal happens to be first in the list.
   const cur = s ?? (sprint?.id ? sprint : {
-    name: '', outcome: '', goal_id: seedGoalId || goals[0]?.id || '', start_date: today(), end_date: autoEndDate(today()),
+    name: '', outcome: '', goal_id: seedGoalId || goals[0]?.id || '', weeks: DEFAULT_CYCLE_LENGTH,
+    start_date: today(), end_date: autoEndDate(today(), DEFAULT_CYCLE_LENGTH),
   })
   const [phaseDrafts, setPhaseDrafts] = useState(DEFAULT_PHASES.map((p) => ({ ...p, tactics: [] })))
   const [saving, setSaving] = useState(false)
@@ -1005,7 +1008,7 @@ function CycleEditor({ sprint, cloneFrom, goals, seedGoalId, onClose, onSaved })
   const existingTactics = useAsync((f) => fetchSprintTactics({ force: f }), [sprint?.id], { enabled: Boolean(sprint?.id) })
 
   // Quick setup: skip building three phases by hand and just ask for one
-  // action, applied across the whole 12 weeks. Only offered for brand-new,
+  // action, applied across the whole cycle. Only offered for brand-new,
   // non-cloned cycles — editing an existing one, or duplicating one that
   // already has real phases, always shows the full structure so nothing
   // gets silently collapsed. "Full setup" is still one click away for
@@ -1029,7 +1032,8 @@ function CycleEditor({ sprint, cloneFrom, goals, seedGoalId, onClose, onSaved })
       // from cloneFrom.phases, feed the save below).
       setQuickMode(false)
       setS({ name: cloneFrom.name, outcome: cloneFrom.outcome, goal_id: cloneFrom.goal_id,
-        start_date: today(), end_date: autoEndDate(today()) })
+        weeks: cloneFrom.weeks || DEFAULT_CYCLE_LENGTH,
+        start_date: today(), end_date: autoEndDate(today(), cloneFrom.weeks || DEFAULT_CYCLE_LENGTH) })
       setPhaseDrafts(cloneFrom.phases)
       return
     }
@@ -1113,7 +1117,17 @@ function CycleEditor({ sprint, cloneFrom, goals, seedGoalId, onClose, onSaved })
     } catch (e) { toast.error(e.message) } finally { setSaving(false) }
   }
 
-  const PHASE_BADGES = [['Weeks 1–4', 'blue'], ['Weeks 5–8', 'purple'], ['Weeks 9–12', 'orange']]
+  // Badge label/tone per phase, computed from the cycle's own length
+  // instead of a fixed "Weeks 1–4 / 5–8 / 9–12" — see phaseWeekRange in
+  // lib/goals.js. Tones just cycle through the same 3 so a 5-phase cycle
+  // doesn't run out, rather than trying to invent a distinct colour per
+  // phase count.
+  const PHASE_TONES = ['blue', 'purple', 'orange']
+  const cycleWeeks = cur.weeks || DEFAULT_CYCLE_LENGTH
+  const phaseBadge = (pi) => {
+    const [start, end] = phaseWeekRange(pi, cycleWeeks, phaseDrafts.length)
+    return { label: start === end ? `Week ${start}` : `Weeks ${start}–${end}`, tone: PHASE_TONES[pi % PHASE_TONES.length] }
+  }
 
   return (
     <Modal open={open} onClose={() => { setS(null); onClose() }}
@@ -1144,7 +1158,7 @@ function CycleEditor({ sprint, cloneFrom, goals, seedGoalId, onClose, onSaved })
             </div>
             <p style={{ fontSize: 11.5, color: 'var(--text-3)', fontWeight: 600 }}>
               {quickMode
-                ? 'One action, applied across all 12 weeks. Switch to Full anytime to break it into phases.'
+                ? `One action, applied across all ${cur.weeks || DEFAULT_CYCLE_LENGTH} week${(cur.weeks || DEFAULT_CYCLE_LENGTH) === 1 ? '' : 's'}. Switch to Full anytime to break it into phases.`
                 : 'Build out Foundation, Build, and Peak phases with their own actions up front.'}
             </p>
           </div>
@@ -1166,15 +1180,24 @@ function CycleEditor({ sprint, cloneFrom, goals, seedGoalId, onClose, onSaved })
             </select>
           </Field>
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-3 gap-3">
+          <Field label="Length">
+            <select value={cur.weeks || DEFAULT_CYCLE_LENGTH}
+              onChange={(e) => {
+                const weeks = Number(e.target.value)
+                setS({ ...cur, weeks, end_date: autoEndDate(cur.start_date, weeks) })
+              }}>
+              {CYCLE_LENGTHS.map((n) => <option key={n} value={n}>{n} week{n === 1 ? '' : 's'}</option>)}
+            </select>
+          </Field>
           <Field label="Start Date">
             <input type="date" value={cur.start_date || ''}
-              onChange={(e) => setS({ ...cur, start_date: e.target.value, end_date: autoEndDate(e.target.value) })} />
+              onChange={(e) => setS({ ...cur, start_date: e.target.value, end_date: autoEndDate(e.target.value, cur.weeks || DEFAULT_CYCLE_LENGTH) })} />
           </Field>
           <Field label="End Date (auto)"><input type="date" value={cur.end_date || ''} readOnly style={{ opacity: .5 }} /></Field>
         </div>
         {(!isQuickNew || showOutcome) ? (
-          <Field label="What does success look like at week 12?">
+          <Field label={`What does success look like by week ${cur.weeks || DEFAULT_CYCLE_LENGTH}?`}>
             <input value={cur.outcome || ''} onChange={(e) => setS({ ...cur, outcome: e.target.value })} placeholder="e.g. Running 3× per week consistently" />
           </Field>
         ) : (
@@ -1211,7 +1234,7 @@ function CycleEditor({ sprint, cloneFrom, goals, seedGoalId, onClose, onSaved })
         {phaseDrafts.map((phase, pi) => (
           <div key={pi} className="card-inner" style={{ padding: 14, borderRadius: 12, border: '1px solid var(--border)', background: 'var(--white-soft)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-              <Badge tone={PHASE_BADGES[pi][1]}>{PHASE_BADGES[pi][0]}</Badge>
+              <Badge tone={phaseBadge(pi).tone}>{phaseBadge(pi).label}</Badge>
               <input value={phase.name} style={{ maxWidth: 160, fontSize: 13, fontWeight: 700 }}
                 onChange={(e) => { const n = [...phaseDrafts]; n[pi] = { ...n[pi], name: e.target.value }; setPhaseDrafts(n) }} />
             </div>
@@ -1312,7 +1335,7 @@ function RoadmapView({ goals, sprints }) {
                   const left = pctOf(sp.start_date), right = pctOf(sp.end_date)
                   const width = Math.max(right - left, 1)
                   const isAct = isSprintActive(sp)
-                  const prog = sprintCurrentWeek(sp) / 12 * 100
+                  const prog = sprintProgressPct(sp)
                   return (
                     <div key={sp.id} className="roadmap-bar" title={sp.name}
                       style={{ left: `${left}%`, width: `${width}%`, top: 6, background: color, opacity: isAct ? 1 : .55 }}>

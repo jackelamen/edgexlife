@@ -133,13 +133,14 @@ export async function deleteMetricLog(id) {
 
 export const fetchSprints = (o) => cachedQuery('sprints', async () =>
   unwrap(await supabase.from('sprints')
-    .select('id,goal_id,name,outcome,start_date,end_date,week_checks,reflections,retro,archived,day_swaps')
+    .select('id,goal_id,name,outcome,start_date,end_date,weeks,week_checks,reflections,retro,archived,day_swaps')
     .order('start_date', { ascending: false, nullsFirst: false })), { ttlMs: TTL.goals, ...o })
 
 export async function saveSprint(s) {
   const payload = {
     goal_id: s.goal_id, name: s.name, outcome: s.outcome || null,
     start_date: s.start_date || null, end_date: s.end_date || null,
+    weeks: s.weeks || 12,
     week_checks: s.week_checks ?? {}, reflections: s.reflections ?? {},
     retro: s.retro ?? null, archived: s.archived ?? false, day_swaps: s.day_swaps ?? {},
     updated_at: new Date().toISOString(),

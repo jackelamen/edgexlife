@@ -1,20 +1,22 @@
-import { execScore, sprintCurrentWeek } from '../../lib/goals'
+import { execScore, sprintCurrentWeek, sprintWeeks } from '../../lib/goals'
 import { STATUS } from '../../lib/design'
 
 // Execution % is a performance read, so it uses the reserved STATUS ramp
 // (lib/design.js rule 3) instead of its own green/orange/red.
 const barStatus = (s) => (s >= 85 ? STATUS.good : s >= 65 ? STATUS.short : STATUS.risk)
 
-/** 12-week execution bar chart, ported from goals.html's streakChartHTML. */
+/** Execution bar chart, one bar per week of the cycle's own length (not a
+    fixed 12) — ported from goals.html's streakChartHTML. */
 export default function StreakChart({ sprint, phases, tactics }) {
   const cw = sprintCurrentWeek(sprint)
+  const totalWeeks = sprintWeeks(sprint)
   const scores = []
-  for (let w = 1; w <= 12; w++) scores.push(w <= cw ? execScore(phases, tactics, sprint, w) : null)
+  for (let w = 1; w <= totalWeeks; w++) scores.push(w <= cw ? execScore(phases, tactics, sprint, w) : null)
 
   const W = 440, H = 90, barW = 22, gap = 10
   const padL = 28, padB = 18
   const innerW = W - padL
-  const totalW = 12 * (barW + gap) - gap
+  const totalW = totalWeeks * (barW + gap) - gap
   const startX = padL + (innerW - totalW) / 2
 
   const completed = scores.filter((s) => s !== null)
@@ -26,7 +28,7 @@ export default function StreakChart({ sprint, phases, tactics }) {
   return (
     <div className="streak-chart-wrap">
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-        <div className="streak-chart-title" style={{ marginBottom: 0 }}>12-Week Execution Streak</div>
+        <div className="streak-chart-title" style={{ marginBottom: 0 }}>{totalWeeks}-Week Execution Streak</div>
         {avgScore != null && <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)' }}>avg {avgScore}%</span>}
       </div>
       <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ overflow: 'visible' }}>

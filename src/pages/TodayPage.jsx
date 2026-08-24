@@ -17,7 +17,7 @@ import { healthDetails, clarityDetails, healthLabel, weakestComponent } from '..
 import { currentStreak, longestStreak } from '../lib/streaks'
 import { findPatterns } from '../lib/correlations'
 import {
-  isSprintActive, sprintCurrentWeek, tacticsForWeek,
+  isSprintActive, sprintCurrentWeek, sprintWeeks, tacticsForWeek,
   checkKey, tacticKeyId, todayDayIdx, xpwTarget, xpwDoneCount, xpwDidToday,
   effectiveCustomDays, originalDayFor,
 } from '../lib/goals'
@@ -157,7 +157,7 @@ export default function TodayPage() {
       const checks = (sp.week_checks || {})[wk] || {}
       const dayIdx = todayDayIdx()
 
-      tacticsForWeek(myPhases, myTactics, wk).forEach((tac) => {
+      tacticsForWeek(myPhases, myTactics, wk, sp).forEach((tac) => {
         const freq = tac.freq || 'weekly'
         if (freq === 'daily') {
           out.push({ sp, tac, wk, dayIdx, done: Boolean(checks[checkKey(tac, dayIdx)]), kind: 'day' })
@@ -642,7 +642,7 @@ export default function TodayPage() {
                 <div key={g.id} className="goal-line">
                   <span className="goal-line-bar" style={{ background: MODULES.goals.color }} />
                   <span style={{ fontWeight: 700, flex: 1, minWidth: 0 }}>{g.title}</span>
-                  {cyc && <Badge tone="green">Week {sprintCurrentWeek(cyc)}/12</Badge>}
+                  {cyc && <Badge tone="green">Week {sprintCurrentWeek(cyc)}/{sprintWeeks(cyc)}</Badge>}
                   <span style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 700, whiteSpace: 'nowrap' }}>
                     {r?.open_tasks ?? 0} open · {r?.habits ?? 0} habits
                   </span>
