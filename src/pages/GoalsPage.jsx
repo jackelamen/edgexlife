@@ -426,8 +426,14 @@ function TacticRow({ tactic: t, checks, sprint, week, onToggleDay, onToggleXpw, 
               onClick={() => onToggleXpw(i)} title={`${i + 1}`}>{i + 1}</button>
           ))}
           {(t.freq === 'weekly' || t.freq === 'onetime') && (
+            // Every other dot type (day letters, xperweek numbers) shows
+            // something neutral until it's actually done and only changes
+            // colour on completion — this one used to render the checkmark
+            // glyph unconditionally, so an UNCHECKED weekly tactic still
+            // visually read as "done" at a glance, regardless of the fill
+            // colour underneath it. Only show the check once it's real.
             <button className={`wk-dot${checks[t.local_id || t.id] ? ' done' : ''}`} onClick={() => onToggleDay(null)}>
-              <Icon name="check" size={13} />
+              {checks[t.local_id || t.id] && <Icon name="check" size={13} />}
             </button>
           )}
         </div>

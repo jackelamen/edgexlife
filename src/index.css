@@ -1272,11 +1272,31 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
   transition: background .15s, border-color .15s, color .15s; flex-shrink: 0;
 }
 .wk-dot:hover { border-color: var(--border-med); color: var(--text-2); background: var(--bg); }
-.wk-dot.done { background: var(--accent-dim); border-color: var(--accent); color: var(--accent-dark); }
+/* A faint accent-tinted background read as "maybe done, maybe just
+   hovered" — not the reward a checked-off action should feel like.
+   Solid STATUS.good (the app's own reserved "done/on-track" colour —
+   day dots are named explicitly in design.js rule 3) with a white mark
+   and a little glow reads as an actual win, and the pop keyframe below
+   fires once on the transition to done rather than replaying on every
+   re-render, since the animation only (re)starts when the class is
+   freshly added. */
+.wk-dot.done {
+  background: var(--s-good); border-color: var(--s-good); color: #fff;
+  box-shadow: 0 3px 10px -2px rgba(23,145,92,.55);
+  animation: wkDotPop .32s cubic-bezier(.34,1.56,.64,1);
+}
 .wk-dot.partial { background: rgba(249,115,22,.12); border-color: #f97316; color: #ea580c; }
 .wk-dot.current { border-color: #0ea5e9; color: #0ea5e9; border-width: 2px; }
-.wk-dot.done.current { background: var(--accent-dim); border-color: var(--accent); border-width: 2px; }
+.wk-dot.done.current { border-color: #0ea5e9; border-width: 2px; }
 .wk-dot:disabled { cursor: not-allowed; opacity: .4; }
+@keyframes wkDotPop {
+  0% { transform: scale(.7); }
+  60% { transform: scale(1.14); }
+  100% { transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wk-dot.done { animation: none; }
+}
 
 /* Border-left colour comes from areaColor() inline on the element
    (GoalsPage.jsx), same as .goal-card — a cycle belongs to a life area
