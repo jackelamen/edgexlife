@@ -1316,7 +1316,14 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
 }
 .cycle-toggle-btn:hover { background: var(--bg); color: var(--text-2); border-color: var(--text-3); }
 
-.goals-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
+/* auto-fill reserves a full track's width for every column that WOULD
+   fit, even ones with no card in them — with 1-2 goals on a wide screen
+   that's several empty 280px tracks doing nothing, which is why the grid
+   used to read as "two small cards adrift in a mostly-blank page."
+   auto-fit collapses those empty tracks instead, so existing cards grow
+   via the 1fr to fill freed space — capped at 360px so 1-2 goals grow
+   into a reasonable width rather than one card stretching edge to edge. */
+.goals-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 360px)); gap: 20px; }
 .goal-card {
   background: var(--white); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); border: 1px solid var(--border);
   border-left-width: 4px; overflow: hidden; cursor: pointer; display: flex; flex-direction: column;
@@ -1330,6 +1337,33 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
    is how a health goal's card and the donut's health slice went out of
    sync. */
 .goal-grid-body { flex: 1; padding: 22px 22px 18px; display: flex; flex-direction: column; gap: 0; min-width: 0; }
+
+/* The live-cycle strip on a Goal card — a solid white pill regardless of
+   whether the card behind it is a photo or plain white, so the ring's
+   statusColor (lib/design.js) always reads against a known, consistent
+   ground rather than fighting an unpredictable photo. */
+.goal-cycle-strip {
+  display: flex; align-items: center; gap: 10px; width: 100%; margin-bottom: 12px; padding: 7px 10px 7px 7px;
+  border-radius: 12px; background: rgba(255,255,255,.96); border: 1px solid rgba(20,20,15,.07);
+  box-shadow: 0 1px 3px rgba(20,20,15,.08); cursor: pointer; text-align: left; font-family: inherit;
+  transition: box-shadow .15s, transform .15s;
+}
+.goal-cycle-strip:hover { box-shadow: 0 3px 10px rgba(20,20,15,.14); transform: translateY(-1px); }
+.goal-cycle-strip-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.goal-cycle-strip-text strong { font-size: 12.5px; font-weight: 800; color: var(--text); }
+.goal-cycle-strip-text small { font-size: 11px; font-weight: 600; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.goal-cycle-strip > .icon:last-child { color: var(--text-3); flex-shrink: 0; }
+
+/* GoalDetail (metrics/tasks/habits), expanded under a Goal card. Used to
+   be a flat white slab dropped under the photo header with a hard 1px
+   line between them — this fades the seam with an inset shadow instead
+   of a ruled line, so it reads as one continuous card rather than two
+   stacked, unrelated ones. The area-colour border-left already carries
+   through from .goal-card, so no extra accent is needed here. */
+.goal-detail-panel {
+  padding: 20px 22px 22px; background: var(--white);
+  box-shadow: inset 0 8px 10px -10px rgba(20,20,15,.12);
+}
 
 .filter-tabs { display: flex; gap: 4px; flex-wrap: wrap; }
 .filter-tab {

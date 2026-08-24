@@ -29,7 +29,6 @@ import { useGoalPhoto } from '../lib/areaPhoto'
 import VisionBoard from '../components/goals/VisionBoard'
 import GoalPhotoPicker from '../components/goals/GoalPhotoPicker'
 import StreakChart from '../components/goals/StreakChart'
-import DonutChart from '../components/goals/DonutChart'
 import { MODULES } from '../lib/design'
 import { IDENTITY_THREADS, identityThreadByKey } from '../lib/identity'
 
@@ -76,8 +75,9 @@ export default function GoalsPage() {
       <Tabs value={view} onChange={setView} options={VIEWS} />
 
       {view === 'today' && <TodayView goals={goals} rollup={rollup} cycleData={cycleData} onStartCycle={() => { setView('cycles'); startCycle() }} />}
-      {view === 'goals' && <GoalRoom goals={goals} rollup={rollup} sprints={sprints} onEdit={setEditGoal}
-        onStartCycle={(goalId) => { setView('cycles'); startCycle(goalId) }} />}
+      {view === 'goals' && <GoalRoom goals={goals} rollup={rollup} cycleData={cycleData} onEdit={setEditGoal}
+        onStartCycle={(goalId) => { setView('cycles'); startCycle(goalId) }}
+        onOpenCycles={() => setView('cycles')} />}
       {view === 'cycles' && <CyclesView goals={goals} cycleData={cycleData} cycleIntent={cycleIntent} />}
       {view === 'roadmap' && <RoadmapView goals={goals} sprints={sprints} />}
       {view === 'visions' && <VisionsView />}
@@ -473,7 +473,8 @@ function TacticRow({ tactic: t, checks, sprint, week, onToggleDay, onToggleXpw, 
 
 /* ══════════════════ Goal Room ══════════════════ */
 
-function GoalRoom({ goals, rollup, sprints, onEdit, onStartCycle }) {
+function GoalRoom({ goals, rollup, cycleData, onEdit, onStartCycle, onOpenCycles }) {
+  const { sprints, phases, tactics } = cycleData
   const [filter, setFilter] = useState('active')
   const [open, setOpen] = useState(null)
   const confirm = useConfirm()
@@ -488,6 +489,26 @@ function GoalRoom({ goals, rollup, sprints, onEdit, onStartCycle }) {
   const rollupBy = {}
   ;(rollup.data || []).forEach((r) => { rollupBy[r.goal_id] = r })
 
+  const activeGoals = (goals.data || []).filter((g) => g.status === 'active')
+  // A goal's LIVE cycle, with its own phases/tactics scoped out of the
+  // module-wide lists — this is what GoalRoom was missing before: it only
+  // ever got a bare "does a cycle exist" boolean (CyclesView.hasCycle),
+  // never enough to actually show how that cycle is going.
+  const liveCycleFor = (goalId) => {
+    const sp = (sprints.data || []).find((s) => s.goal_id === goalId && isSprintActive(s) && !s.archived)
+    if (!sp) return null
+    return {
+      sprint: sp,
+      phases: (phases.data || []).filter((p) => p.sprint_id === sp.id),
+      tactics: (tactics.data || []).filter((t) => t.sprint_id === sp.id),
+    }
+  }
+  const liveCycles = activeGoals.map((g) => liveCycleFor(g.id)).filter(Boolean)
+  const avgExecution = (() => {
+    const scores = liveCycles.map((c) => avgExecScore(c.phases, c.tactics, c.sprint)).filter((s) => s != null)
+    return scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : null
+  })()
+
   const balance = AREAS.map((a) => ({
     label: areaLabel(a), color: areaColor(a),
     value: (goals.data || []).filter((g) => g.area === a && g.status === 'active').length,
@@ -495,25 +516,35 @@ function GoalRoom({ goals, rollup, sprints, onEdit, onStartCycle }) {
 
   return (
     <>
+      {/* Real numbers instead of a corner donut nobody was reading as
+          more than decoration — how many goals are actually live, how
+          many have a cycle running, and how that running work is
+          actually going, at a glance before you scroll to any one card. */}
+      <div className="stat-strip" style={{ marginBottom: 18 }}>
+        <StatCard label="Active goals" value={activeGoals.length}
+          sub={`${goals.data?.length || 0} total`} icon="explore" color={MODULES.goals.color} tint={MODULES.goals.tint} />
+        <StatCard label="Live cycles" value={liveCycles.length}
+          sub={`${activeGoals.length - liveCycles.length} without one`} icon="loop" color={MODULES.goals.color} tint={MODULES.goals.tint} />
+        <StatCard label="Avg execution" value={avgExecution != null ? `${avgExecution}%` : '—'}
+          sub="across live cycles" icon="target" pct={avgExecution} color={MODULES.goals.color} tint={MODULES.goals.tint} />
+      </div>
+      {balance.length > 1 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 18, flexWrap: 'wrap' }}>
+          {balance.map((d) => (
+            <span key={d.label} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 700, color: 'var(--text-2)' }}>
+              <span style={{ width: 9, height: 9, borderRadius: '50%', background: d.color, display: 'inline-block' }} />
+              {d.label} · {d.value}
+            </span>
+          ))}
+        </div>
+      )}
+
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18, flexWrap: 'wrap', gap: 12 }}>
         <div className="filter-tabs">
           {[['active', 'Active'], ['completed', 'Done'], ['paused', 'Paused'], ['all', 'All']].map(([v, l]) => (
             <button key={v} className={`filter-tab${filter === v ? ' active' : ''}`} onClick={() => setFilter(v)}>{l}</button>
           ))}
         </div>
-        {balance.length > 1 && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <DonutChart data={balance} size={56} />
-            <div style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 700 }}>
-              {balance.map((d) => (
-                <div key={d.label} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                  <span style={{ width: 7, height: 7, borderRadius: 2, background: d.color, display: 'inline-block' }} />
-                  {d.label} · {d.value}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
 
       <ErrorNote error={goals.error} />
@@ -529,6 +560,7 @@ function GoalRoom({ goals, rollup, sprints, onEdit, onStartCycle }) {
           {list.map((g) => (
             <GoalCard key={g.id} goal={g} roll={rollupBy[g.id]}
               hasCycle={(sprints?.data || []).some((s) => s.goal_id === g.id)}
+              cycle={liveCycleFor(g.id)} onOpenCycle={onOpenCycles}
               onStartCycle={() => onStartCycle?.(g.id)}
               open={open === g.id} onToggle={() => setOpen(open === g.id ? null : g.id)}
               onEdit={() => onEdit(g)}
@@ -572,7 +604,7 @@ function GoalRoom({ goals, rollup, sprints, onEdit, onStartCycle }) {
   )
 }
 
-function GoalCard({ goal, roll, hasCycle, onStartCycle, open, onToggle, onEdit, onDelete, armed }) {
+function GoalCard({ goal, roll, hasCycle, cycle, onOpenCycle, onStartCycle, open, onToggle, onEdit, onDelete, armed }) {
   const iconFor = { health: 'favorite', work: 'work', family: 'diversity_3', personal: 'spa' }
   // A photo tagged to this goal's own life area, when one exists — see
   // lib/areaPhoto.js. Only the closed-card header (goal-grid-body) gets
@@ -642,6 +674,31 @@ function GoalCard({ goal, roll, hasCycle, onStartCycle, open, onToggle, onEdit, 
             <Icon name="add_circle" size={14} /> No cycle yet — start one
           </button>
         )}
+        {/* The one thing this card was missing entirely: how the live
+            cycle attached to this goal is actually going, without a trip
+            to the Cycles tab. A solid white pill regardless of photo/no-
+            photo state so the ring's statusColor reads clearly either
+            way — see .goal-cycle-strip in index.css. */}
+        {cycle && (() => {
+          const week = sprintCurrentWeek(cycle.sprint)
+          const weeks = sprintWeeks(cycle.sprint)
+          const score = execScore(cycle.phases, cycle.tactics, cycle.sprint, week)
+          const avg = avgExecScore(cycle.phases, cycle.tactics, cycle.sprint)
+          return (
+            <button type="button" className="goal-cycle-strip"
+              onClick={(e) => { e.stopPropagation(); onOpenCycle?.() }}>
+              <Ring score={score} size={36} stroke={4} onAccent={false} />
+              <span className="goal-cycle-strip-text">
+                <strong>Week {week} of {weeks}</strong>
+                <small>
+                  {score == null ? 'nothing to check yet' : scoreMomentumLine(score)}
+                  {avg != null ? ` · avg ${avg}%` : ''}
+                </small>
+              </span>
+              <Icon name="chevron_right" size={16} />
+            </button>
+          )
+        })()}
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, fontSize: 12, color: photo ? 'rgba(255,255,255,.85)' : 'var(--text-3)', marginTop: 'auto' }}>
           <span><Icon name="checklist" size={14} /> {roll?.open_tasks ?? 0}</span>
           <span><Icon name="repeat" size={14} /> {roll?.habits ?? 0}</span>
@@ -696,7 +753,7 @@ function GoalDetail({ goal }) {
   }
 
   return (
-    <div className="cycle-section" onClick={(e) => e.stopPropagation()}>
+    <div className="goal-detail-panel" onClick={(e) => e.stopPropagation()}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
         <span className="form-section-label" style={{ marginBottom: 0 }}>Metrics</span>
         <button className="btn btn-ghost btn-sm" onClick={() => setMetricOpen(true)}><Icon name="add" size={14} /> Add</button>
