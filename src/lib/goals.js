@@ -243,19 +243,51 @@ export function tacticActiveToday(t) {
 
 // localDateKey removed — use dateKey() from lib/dates.js (imported above).
 
+/** The actual calendar date a (week, dayIdx) grid slot falls on, using the
+    same Monday-anchored reconstruction sprintCurrentWeek does. Week 1's
+    grid always runs a full Mon-Sun even when the cycle itself started
+    mid-week (a Saturday start, say) — this is what lets callers tell
+    "this slot is before the cycle even began" apart from "this slot
+    hasn't happened yet." */
+function dateKeyForWeekDay(sp, week, dayIdx) {
+  if (!sp.start_date) return null
+  const start = new Date(sp.start_date + 'T12:00:00')
+  const anchor = startOfWeek(start, { weekStartsOn: 1 })
+  const d = new Date(anchor)
+  d.setDate(d.getDate() + (week - 1) * 7 + dayIdx)
+  return dateKey(d)
+}
+
+/** Whether a (week, dayIdx) checkpoint should count toward the possible/
+    done totals at all — true only for dates that both (a) fall on or
+    after the cycle's own start_date, so a Mon/Tue that happened before a
+    Saturday-start cycle even began can't drag week 1's score down for
+    something there was never a chance to do, and (b) have actually
+    arrived (capped at end_date once the cycle's over, so a finished
+    cycle's history doesn't grow extra "not yet due" gaps). Past weeks
+    and the current week are handled by the exact same rule — there's no
+    separate isCurrentWeek branch here, because "hasn't happened yet" and
+    "happened before this cycle started" are the same kind of gap. */
+function dayIsCountable(sp, week, dayIdx) {
+  const d = dateKeyForWeekDay(sp, week, dayIdx)
+  if (!d || !sp.start_date) return true
+  const today = dateKey()
+  const cap = sp.end_date && sp.end_date < today ? sp.end_date : today
+  return d >= sp.start_date && d <= cap
+}
+
 /**
  * Execution score for one week: ratio of checked to possible checkpoints.
- * Every frequency is given the same rule for the CURRENT (in-progress)
- * week: nothing counts against you before its day has actually arrived.
- * A Mon/Wed/Fri tactic only owes a Wednesday checkpoint once Wednesday
- * gets here — Monday morning it owes exactly one, not three — and a
- * flexible weekly/xperweek/onetime target only counts once the week is
- * over, same as it always has, so "3x this week" doesn't read as behind
- * on day one. This is what keeps the live number honest: it answers
- * "how am I doing on what's actually been due so far," not "how much of
- * the eventual week is done right now" — the two read identically once
- * the week ends, which is why past weeks in the 12-week chart are
- * unaffected by any of this.
+ * Daily/custom-day checkpoints only count once their actual calendar date
+ * has both arrived AND falls within the cycle's own [start_date, end_date]
+ * — a Mon/Wed/Fri tactic only owes a Wednesday checkpoint once Wednesday
+ * gets here, and a cycle that started on a Saturday never owed anything
+ * for the Monday-Friday before it began, so week 1 isn't punished for a
+ * week that was really only 2 days long. Flexible weekly/xperweek/onetime
+ * targets only count once the week is over, same as always, so "3x this
+ * week" doesn't read as behind on day one. This is what keeps the live
+ * number honest: it answers "how am I doing on what's actually been due,"
+ * not "how much of the eventual week is done right now."
  */
 /*
  * The same checkpoint counting as execScore, but returned PER TACTIC
@@ -273,20 +305,21 @@ export function tacticWeekRows(phases, tactics, sp, week) {
   // cycle's last week would otherwise look permanently "current" and get
   // its future days excluded — cutting off real history in Retros for a
   // week that's fully over. Requiring the sprint to still be live is what
-  // keeps that clamp from leaking into completed-cycle scoring.
+  // keeps that clamp from leaking into completed-cycle scoring. (Only the
+  // weekly/xperweek branches below still need this — daily/custom use
+  // dayIsCountable, which folds the same idea into a plain date check.)
   const isCurrentWeek = week === sprintCurrentWeek(sp) && isSprintActive(sp)
-  const todayIdx = todayDayIdx()
   return weekTactics.map((t) => {
     const freq = t.freq || 'weekly'
     let possible = 0, done = 0
     if (freq === 'daily') {
       for (let d = 0; d < 7; d++) {
-        if (isCurrentWeek && d > todayIdx) continue // that day hasn't happened yet
+        if (!dayIsCountable(sp, week, d)) continue
         possible++; if (checks[checkKey(t, d)]) done++
       }
     } else if (freq === 'custom') {
       ;(t.days || []).forEach((d) => {
-        if (isCurrentWeek && d > todayIdx) return
+        if (!dayIsCountable(sp, week, d)) return
         possible++; if (checks[checkKey(t, d)]) done++
       })
     } else if (freq === 'xperweek') {
@@ -416,14 +449,18 @@ export const DEFAULT_PHASES = [
    over. week_checks doesn't store absolute dates for daily/custom
    tactics (just a week number + day index relative to that sprint's own
    grid), so a real date has to be reconstructed from the sprint's
-   start_date. xperweek and weekly/onetime checks store the ISO date they
-   were completed on (see CycleCard's toggle/toggleXpw), so those need no
-   reconstruction — the string-value branch below just adds it directly. */
+   start_date via dateKeyForWeekDay (the SAME Monday-anchored reconstruction
+   sprintCurrentWeek and dayIsCountable use — this used to anchor day-0
+   directly at start_date instead of the Monday on/before it, which meant
+   every daily/custom date reconstructed here was wrong by up to 6 days
+   whenever a cycle didn't start on a Monday). xperweek and weekly/onetime
+   checks store the ISO date they were completed on (see CycleCard's
+   toggle/toggleXpw), so those need no reconstruction — the string-value
+   branch below just adds it directly. */
 export function completedCheckDates(sprints) {
   const dates = new Set()
   for (const sp of sprints || []) {
     if (!sp.start_date) continue
-    const start = new Date(sp.start_date + 'T12:00:00')
     const weeks = sp.week_checks || {}
     for (const wkStr of Object.keys(weeks)) {
       const week = Number(wkStr)
@@ -434,9 +471,8 @@ export function completedCheckDates(sprints) {
         if (typeof val === 'string') { dates.add(val); continue } // xperweek stores the ISO date
         const m = key.match(/_(\d)$/) // daily/custom: `${tacticId}_${dayIdx}`
         if (!m) continue
-        const d = new Date(start)
-        d.setDate(d.getDate() + (week - 1) * 7 + Number(m[1]))
-        dates.add(dateKey(d))
+        const d = dateKeyForWeekDay(sp, week, Number(m[1]))
+        if (d) dates.add(d)
       }
     }
   }
