@@ -1192,13 +1192,38 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
 .hero-banner > * { position: relative; z-index: 1; }
 
 /* Goals' Today hero, when the featured goal's area has a Vision Board
-   photo — see lib/areaPhoto.js. The gradient is baked into the same
-   background-image as the photo (GoalsPage.jsx) rather than a separate
-   ::before layer, so it can't be knocked out by the decorative circle
-   below; that circle is just suppressed here since a real photo already
-   gives the banner texture. */
-.hero-banner-photo { background-size: cover; background-position: center; }
+   photo — see lib/areaPhoto.js. A full-bleed cover crop across the whole
+   ~4:1 banner butchers a normal (portrait or square) phone photo — most
+   of the frame ends up off-screen and whatever lands in the vertical
+   centre is arbitrary, which is how a face gets cropped at the chin.
+   Splitting the banner into a text panel (guaranteed-contrast solid
+   ground, no gradient guesswork) and a narrower photo panel keeps the
+   crop's aspect ratio close enough to the source photo's own that the
+   framing stays sane without needing per-photo focal-point data. */
+.hero-banner-photo {
+  display: flex; align-items: stretch; padding: 0; overflow: hidden;
+}
 .hero-banner-photo::before { display: none; }
+.hero-photo-text {
+  flex: 1 1 auto; min-width: 0; padding: 28px 30px 26px;
+  display: flex; flex-direction: column; justify-content: center;
+}
+.hero-photo-panel {
+  flex: 0 0 34%; min-width: 200px; background-size: cover; background-position: center 30%;
+  position: relative;
+}
+/* Soft seam into the text panel's solid ground, rather than a hard
+   vertical edge between photo and colour. */
+.hero-photo-panel::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(90deg, var(--accent) 0%, transparent 22%);
+}
+
+@media (max-width: 640px) {
+  .hero-banner-photo { flex-direction: column; }
+  .hero-photo-panel { flex-basis: 130px; min-width: 0; }
+  .hero-photo-panel::before { background: linear-gradient(180deg, transparent 55%, var(--accent) 100%); }
+}
 .hero-greeting { font-size: 13px; font-weight: 600; opacity: .7; margin-bottom: 6px; letter-spacing: .02em; }
 .hero-title { font-size: 26px; font-weight: 800; letter-spacing: -.02em; line-height: 1.25; margin-bottom: 20px; }
 .hero-body { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; flex-wrap: wrap; }

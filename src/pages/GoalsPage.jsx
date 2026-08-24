@@ -145,40 +145,46 @@ function TodayView({ goals, rollup, cycleData, onStartCycle }) {
 
   return (
     <>
-      <div className={`hero-banner${heroPhoto ? ' hero-banner-photo' : ''}`}
-        style={heroPhoto ? { backgroundImage: `linear-gradient(180deg, rgba(20,16,10,.18) 0%, rgba(15,12,8,.7) 72%, rgba(11,9,6,.86) 100%), url(${heroPhoto})` } : undefined}>
-        <div className="hero-greeting">{greeting} {todayFmt}</div>
-        <div className="hero-title">
-          {!live.length ? 'Nothing in motion yet.' :
-            todayTotals.total === 0 ? 'Nothing due today. Rest counts.' :
-            todayTotals.done === todayTotals.total ? 'Clean day — everything checked off.' :
-            `${todayTotals.done} of ${todayTotals.total} actions done today.`}
-        </div>
-        {/* The checklist above says WHAT's due; this says WHY it's worth
-            doing — the featured cycle's goal "why", in the same italic
-            pull-quote treatment GoalCard gives it, so Today opens on the
-            reason and not just a checklist. Only renders when that goal
-            actually has a "why" set. */}
-        {featured?.goal?.why && (
-          <p style={{ fontSize: 15, fontStyle: 'italic', fontWeight: 600, lineHeight: 1.45, opacity: .92, margin: '12px 0 0', maxWidth: 460 }}>
-            "{featured.goal.why}"
-          </p>
-        )}
-        {todayTotals.total > 0 && (
-          <div className="score-meter" style={{ height: 8, background: 'rgba(255,255,255,.22)', marginTop: 12, maxWidth: 320 }}>
-            <span style={{ width: `${todayPct}%`, background: '#fff' }} />
+      <div className={`hero-banner${heroPhoto ? ' hero-banner-photo' : ''}`}>
+        <div className={heroPhoto ? 'hero-photo-text' : undefined}>
+          <div className="hero-greeting">{greeting} {todayFmt}</div>
+          <div className="hero-title">
+            {!live.length ? 'Nothing in motion yet.' :
+              todayTotals.total === 0 ? 'Nothing due today. Rest counts.' :
+              todayTotals.done === todayTotals.total ? 'Clean day — everything checked off.' :
+              `${todayTotals.done} of ${todayTotals.total} actions done today.`}
           </div>
-        )}
-        {/* Second Stop: what the headline number is actually about, not just
-            a repeat of it. Also gives the hero a reason to hold the width it
-            has — previously the whole right two-thirds sat empty once the
-            three duplicate badges were removed from here. */}
-        {featured && (
-          <p style={{ fontSize: 13, fontWeight: 600, opacity: .82, marginTop: 14, maxWidth: 420 }}>
-            {live.length > 1 ? 'Up next: ' : ''}<strong>{featured.sp.name}</strong>
-            {featured.goal?.title ? ` · ${featured.goal.title}` : ''}
-          </p>
-        )}
+          {/* The checklist above says WHAT's due; this says WHY it's worth
+              doing — the featured cycle's goal "why", in the same italic
+              pull-quote treatment GoalCard gives it, so Today opens on the
+              reason and not just a checklist. Only renders when that goal
+              actually has a "why" set. */}
+          {featured?.goal?.why && (
+            <p style={{ fontSize: 15, fontStyle: 'italic', fontWeight: 600, lineHeight: 1.45, opacity: .92, margin: '12px 0 0', maxWidth: 460 }}>
+              "{featured.goal.why}"
+            </p>
+          )}
+          {todayTotals.total > 0 && (
+            <div className="score-meter" style={{ height: 8, background: 'rgba(255,255,255,.22)', marginTop: 12, maxWidth: 320 }}>
+              <span style={{ width: `${todayPct}%`, background: '#fff' }} />
+            </div>
+          )}
+          {/* Second Stop: what the headline number is actually about, not just
+              a repeat of it. Also gives the hero a reason to hold the width it
+              has — previously the whole right two-thirds sat empty once the
+              three duplicate badges were removed from here. */}
+          {featured && (
+            <p style={{ fontSize: 13, fontWeight: 600, opacity: .82, marginTop: 14, maxWidth: 420 }}>
+              {live.length > 1 ? 'Up next: ' : ''}<strong>{featured.sp.name}</strong>
+              {featured.goal?.title ? ` · ${featured.goal.title}` : ''}
+            </p>
+          )}
+        </div>
+        {/* Photo confined to its own narrower panel rather than stretched
+            full-bleed across the whole ~4:1 banner — see index.css for
+            why: a full-width cover crop on a normal phone photo tends to
+            cut heads off. */}
+        {heroPhoto && <div className="hero-photo-panel" style={{ backgroundImage: `url(${heroPhoto})` }} />}
       </div>
 
       {/* Fires once, on the exact day the streak lands on a milestone —
@@ -557,7 +563,7 @@ function GoalCard({ goal, roll, hasCycle, onStartCycle, open, onToggle, onEdit, 
       <div className="goal-grid-body" style={{ position: 'relative' }}>
         {photo && (
           <div aria-hidden style={{
-            position: 'absolute', inset: 0, zIndex: 0, backgroundSize: 'cover', backgroundPosition: 'center',
+            position: 'absolute', inset: 0, zIndex: 0, backgroundSize: 'cover', backgroundPosition: 'center 30%',
             backgroundImage: `linear-gradient(180deg, rgba(20,16,10,.14) 0%, rgba(14,11,7,.66) 65%, rgba(10,8,5,.85) 100%), url(${photo})`,
           }} />
         )}
