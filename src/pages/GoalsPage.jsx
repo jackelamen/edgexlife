@@ -24,6 +24,7 @@ import {
   execScore, avgExecScore, todayDoneTotals, scoreColor, scoreBadgeTone,
   autoEndDate, DEFAULT_PHASES, goalStreak, streakMilestone, scoreMomentumLine, effectiveCustomDays, withDaySwap,
 } from '../lib/goals'
+import { useAreaPhoto } from '../lib/areaPhoto'
 import VisionBoard from '../components/goals/VisionBoard'
 import StreakChart from '../components/goals/StreakChart'
 import DonutChart from '../components/goals/DonutChart'
@@ -136,9 +137,16 @@ function TodayView({ goals, rollup, cycleData, onStartCycle }) {
   const greeting = hour < 5 ? 'Still up,' : hour < 12 ? 'Good morning,' : hour < 17 ? 'Good afternoon,' : 'Good evening,'
   const todayFmt = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
 
+  // A photo tagged to the featured goal's own life area, when one exists —
+  // see lib/areaPhoto.js. Falls back to the plain module-colour hero
+  // (unchanged) when that area has no vision photos yet, so this is
+  // additive, never a broken/empty state.
+  const heroPhoto = useAreaPhoto(featured?.goal?.area)
+
   return (
     <>
-      <div className="hero-banner">
+      <div className={`hero-banner${heroPhoto ? ' hero-banner-photo' : ''}`}
+        style={heroPhoto ? { backgroundImage: `linear-gradient(180deg, rgba(20,16,10,.18) 0%, rgba(15,12,8,.7) 72%, rgba(11,9,6,.86) 100%), url(${heroPhoto})` } : undefined}>
         <div className="hero-greeting">{greeting} {todayFmt}</div>
         <div className="hero-title">
           {!live.length ? 'Nothing in motion yet.' :
@@ -538,9 +546,22 @@ function GoalRoom({ goals, rollup, sprints, onEdit, onStartCycle }) {
 
 function GoalCard({ goal, roll, hasCycle, onStartCycle, open, onToggle, onEdit, onDelete, armed }) {
   const iconFor = { health: 'favorite', work: 'work', family: 'diversity_3', personal: 'spa' }
+  // A photo tagged to this goal's own life area, when one exists — see
+  // lib/areaPhoto.js. Only the closed-card header (goal-grid-body) gets
+  // the photo treatment; GoalDetail below (metrics/tasks/habits editing)
+  // stays on the normal white surface when expanded, since that content
+  // was never designed to sit on top of an image.
+  const photo = useAreaPhoto(goal.area)
   return (
     <div className={`goal-card ${goal.area}`} style={{ borderLeftColor: areaColor(goal.area) }} onClick={onToggle}>
-      <div className="goal-grid-body">
+      <div className="goal-grid-body" style={{ position: 'relative' }}>
+        {photo && (
+          <div aria-hidden style={{
+            position: 'absolute', inset: 0, zIndex: 0, backgroundSize: 'cover', backgroundPosition: 'center',
+            backgroundImage: `linear-gradient(180deg, rgba(20,16,10,.14) 0%, rgba(14,11,7,.66) 65%, rgba(10,8,5,.85) 100%), url(${photo})`,
+          }} />
+        )}
+        <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
           {/* Area badge now takes its colour from the same areaColor() the
               card's own border-left uses — previously this said "blue" for
@@ -568,15 +589,15 @@ function GoalCard({ goal, roll, hasCycle, onStartCycle, open, onToggle, onEdit, 
             as the headline, same as before. */}
         {goal.why ? (
           <>
-            <p style={{ fontSize: 15, fontStyle: 'italic', fontWeight: 700, color: 'var(--text)', lineHeight: 1.42, marginBottom: 8 }}>
+            <p style={{ fontSize: 15, fontStyle: 'italic', fontWeight: 700, color: photo ? '#fff' : 'var(--text)', lineHeight: 1.42, marginBottom: 8 }}>
               "{goal.why}"
             </p>
-            <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 12 }}>
+            <div style={{ fontSize: 11.5, fontWeight: 700, color: photo ? 'rgba(255,255,255,.75)' : 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 12 }}>
               {goal.title}
             </div>
           </>
         ) : (
-          <h3 style={{ fontSize: 16, fontWeight: 800, marginBottom: 12, lineHeight: 1.3 }}>{goal.title}</h3>
+          <h3 style={{ fontSize: 16, fontWeight: 800, marginBottom: 12, lineHeight: 1.3, color: photo ? '#fff' : undefined }}>{goal.title}</h3>
         )}
         {/* A brand-new goal used to just sit here with nothing to do next —
             the goal→cycle gap flagged in the critique. A goal with zero
@@ -587,7 +608,7 @@ function GoalCard({ goal, roll, hasCycle, onStartCycle, open, onToggle, onEdit, 
             <Icon name="add_circle" size={14} /> No cycle yet — start one
           </button>
         )}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, fontSize: 12, color: 'var(--text-3)', marginTop: 'auto' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, fontSize: 12, color: photo ? 'rgba(255,255,255,.85)' : 'var(--text-3)', marginTop: 'auto' }}>
           <span><Icon name="checklist" size={14} /> {roll?.open_tasks ?? 0}</span>
           <span><Icon name="repeat" size={14} /> {roll?.habits ?? 0}</span>
           <span style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
@@ -596,6 +617,7 @@ function GoalCard({ goal, roll, hasCycle, onStartCycle, open, onToggle, onEdit, 
             <button className={`btn btn-icon btn-sm${armed ? ' btn-danger' : ''}`}
               onClick={(e) => { e.stopPropagation(); onDelete() }}><Icon name="delete" size={14} /></button>
           </span>
+        </div>
         </div>
       </div>
       {open && <GoalDetail goal={goal} />}

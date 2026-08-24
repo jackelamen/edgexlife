@@ -1190,6 +1190,15 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
   background: rgba(255,255,255,.09); top: -150px; right: -90px; pointer-events: none;
 }
 .hero-banner > * { position: relative; z-index: 1; }
+
+/* Goals' Today hero, when the featured goal's area has a Vision Board
+   photo — see lib/areaPhoto.js. The gradient is baked into the same
+   background-image as the photo (GoalsPage.jsx) rather than a separate
+   ::before layer, so it can't be knocked out by the decorative circle
+   below; that circle is just suppressed here since a real photo already
+   gives the banner texture. */
+.hero-banner-photo { background-size: cover; background-position: center; }
+.hero-banner-photo::before { display: none; }
 .hero-greeting { font-size: 13px; font-weight: 600; opacity: .7; margin-bottom: 6px; letter-spacing: .02em; }
 .hero-title { font-size: 26px; font-weight: 800; letter-spacing: -.02em; line-height: 1.25; margin-bottom: 20px; }
 .hero-body { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
