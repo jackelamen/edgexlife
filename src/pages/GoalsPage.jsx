@@ -266,9 +266,16 @@ function CycleCard({ sprint, phases, tactics, goal, compact, onChanged, onDelete
 
   async function toggle(t, dayIdx) {
     const key = checkKey(t, dayIdx)
-    const nextChecks = { ...checks, [key]: !checks[key] || undefined }
-    if (!nextChecks[key]) delete nextChecks[key]
-    else nextChecks[key] = true
+    const willCheck = !checks[key]
+    const nextChecks = { ...checks }
+    if (!willCheck) delete nextChecks[key]
+    // Daily/custom keys already bake the day into the key itself, so a
+    // bare `true` is unambiguous. Weekly/onetime keys don't — the key is
+    // just the tactic id, good for the whole week — so the value has to
+    // carry the actual date, same as xperweek already does (toggleXpw
+    // below), otherwise "done today" can't be told apart from "done on
+    // some other day this week" (see todayDoneTotals in lib/goals.js).
+    else nextChecks[key] = (t.freq === 'weekly' || t.freq === 'onetime') ? today() : true
     await mergeSprintWeekChecks(sprint.id, week, nextChecks)
     onChanged()
   }

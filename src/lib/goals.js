@@ -358,8 +358,17 @@ export function todayDoneTotals(phases, tactics, sp) {
       const didToday = xpwDidToday(t, checks)
       if (didToday || c < n) { total++; if (didToday) done++ }
     } else {
-      const checked = Boolean(checks[tacticKeyId(t)])
-      if (isSunday || checked) { total++; if (checked) done++ }
+      // weekly/onetime now store the ISO date they were checked on (see
+      // CycleCard's toggle), not a bare boolean — so "done today" can
+      // mean exactly that, not "done on any day this week." A weekly
+      // tactic finished on Monday shouldn't keep inflating every later
+      // day's "done today" count through Saturday; it's just not part
+      // of today's tally anymore once its own day has passed. Sunday is
+      // still the deadline: unchecked-and-Sunday counts as owed today.
+      const doneDate = checks[tacticKeyId(t)]
+      const doneToday = doneDate === dateKey()
+      if (doneToday) { total++; done++ }
+      else if (!doneDate && isSunday) { total++ }
     }
   })
   return { done, total }
@@ -407,10 +416,9 @@ export const DEFAULT_PHASES = [
    over. week_checks doesn't store absolute dates for daily/custom
    tactics (just a week number + day index relative to that sprint's own
    grid), so a real date has to be reconstructed from the sprint's
-   start_date. xperweek checks already store the ISO date they were
-   completed on. weekly/onetime checks are a bare boolean with no date
-   attached and can't contribute to a day-level streak — that's a known,
-   acceptable gap (they're the least common tactic type). */
+   start_date. xperweek and weekly/onetime checks store the ISO date they
+   were completed on (see CycleCard's toggle/toggleXpw), so those need no
+   reconstruction — the string-value branch below just adds it directly. */
 export function completedCheckDates(sprints) {
   const dates = new Set()
   for (const sp of sprints || []) {
