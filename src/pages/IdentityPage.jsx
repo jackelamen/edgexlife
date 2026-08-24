@@ -7,7 +7,7 @@ import { useAsync } from '../hooks/useAsync'
 import {
   fetchGoals, fetchSprints, fetchSprintPhases, fetchSprintTactics, fetchWeeklyReviews,
 } from '../lib/data'
-import { avgExecScore, isSprintActive, scoreColor, scoreBadgeTone } from '../lib/goals'
+import { commitmentRate, MIN_RATE_SAMPLE, isSprintActive, scoreColor, scoreBadgeTone } from '../lib/goals'
 import { MODULES } from '../lib/design'
 import { IDENTITY_STATEMENT, IDENTITY_THREADS } from '../lib/identity'
 import { weekIdFor, prevWeekId, prettyWeek } from '../lib/review'
@@ -25,7 +25,7 @@ import { today } from '../lib/dates'
   serves it. This page is a rollup, not a repeat. Per thread, it shows
   which active Goals are tagged to it (goals.identity_thread, set in
   GoalsPage's editor) and how those goals' live cycles are actually
-  executing — not a vibe, the same avgExecScore() everything else on
+  executing — not a vibe, the same commitmentRate() everything else on
   Goals is judged by. An untagged, uncovered thread is left visibly
   empty on purpose: that gap IS the signal this page exists to surface.
 
@@ -83,14 +83,17 @@ export default function IdentityPage() {
   function execForGoal(goalId) {
     const mySprints = (sprints.data || []).filter((s) => s.goal_id === goalId && isSprintActive(s))
     if (!mySprints.length) return null
-    const scores = mySprints
-      .map((s) => {
-        const myPhases = (phases.data || []).filter((p) => p.sprint_id === s.id)
-        const myTactics = (tactics.data || []).filter((t) => t.sprint_id === s.id)
-        return avgExecScore(myPhases, myTactics, s)
-      })
-      .filter((v) => v != null)
-    return scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : null
+    // Pools raw commitment counts across the goal's live cycles rather
+    // than averaging their percentages — see the Scoring v2 note in
+    // lib/goals.js for why averaging percentages was wrong.
+    let done = 0, total = 0
+    mySprints.forEach((s) => {
+      const myPhases = (phases.data || []).filter((p) => p.sprint_id === s.id)
+      const myTactics = (tactics.data || []).filter((t) => t.sprint_id === s.id)
+      const r = commitmentRate(myPhases, myTactics, s)
+      done += r.done; total += r.total
+    })
+    return total >= MIN_RATE_SAMPLE ? Math.round((done / total) * 100) : null
   }
 
   const reflections = (reviews.data || []).filter((r) => r.module_notes && r.module_notes.trim())

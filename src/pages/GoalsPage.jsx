@@ -22,13 +22,14 @@ import {
   sprintCurrentWeek, sprintWeeks, sprintProgressPct, isSprintActive, phaseWeekRange, tacticsForWeek,
   CYCLE_LENGTHS, DEFAULT_CYCLE_LENGTH,
   xpwTarget, xpwDoneCount, xpwDidToday, tacticCheckpointCount, checkKey,
-  execScore, avgExecScore, todayDoneTotals, scoreColor, scoreBadgeTone,
+  tacticWeekRows, commitmentRate, consistency, snapToMonday, MIN_RATE_SAMPLE,
+  todayDoneTotals, scoreColor, scoreBadgeTone,
   autoEndDate, DEFAULT_PHASES, goalStreak, streakMilestone, scoreMomentumLine, effectiveCustomDays, withDaySwap,
 } from '../lib/goals'
 import { useGoalPhoto } from '../lib/areaPhoto'
 import VisionBoard from '../components/goals/VisionBoard'
 import GoalPhotoPicker from '../components/goals/GoalPhotoPicker'
-import StreakChart from '../components/goals/StreakChart'
+import ExecutionHeatmap from '../components/goals/ExecutionHeatmap'
 import { MODULES } from '../lib/design'
 import { IDENTITY_THREADS, identityThreadByKey } from '../lib/identity'
 
@@ -140,6 +141,7 @@ function TodayView({ goals, rollup, cycleData, onStartCycle }) {
   const streak = useMemo(() => goalStreak(cycleData.sprints.data || []), [cycleData.sprints.data])
   const streakPct = Math.min(100, Math.round((streak / 7) * 100))
   const milestone = useMemo(() => streakMilestone(streak), [streak])
+  const consist = useMemo(() => consistency(cycleData.sprints.data || []), [cycleData.sprints.data])
 
   const hour = new Date().getHours()
   const greeting = hour < 5 ? 'Still up,' : hour < 12 ? 'Good morning,' : hour < 17 ? 'Good afternoon,' : 'Good evening,'
@@ -215,12 +217,21 @@ function TodayView({ goals, rollup, cycleData, onStartCycle }) {
           instead of getting a whole card each. Real fill (rule 2) replaces
           the hero's old badges, which just repeated these same numbers. */}
       <div className="stat-strip">
+        {/* No pct here on purpose: today isn't over, so a red "0%" at
+            06:00 is punishing you for a day you haven't had yet. The
+            fraction already says everything true about right now. */}
         <StatCard label="Today" value={todayTotals.total ? `${todayTotals.done}/${todayTotals.total}` : '—'}
-          sub="actions done" icon="today" pct={todayPct} color={MODULES.goals.color} tint={MODULES.goals.tint} />
+          sub="due today" icon="today" color={MODULES.goals.color} tint={MODULES.goals.tint} />
         <StatCard label="Streak" value={streak} sub={streak === 1 ? 'day' : 'days'} icon="local_fire_department"
           pct={streak > 0 ? streakPct : null} color={MODULES.goals.color} tint={MODULES.goals.tint} />
-        <StatCard label="Live cycles" value={live.length}
-          sub={`${active.length} active goal${active.length === 1 ? '' : 's'}`} />
+        {/* Consistency (rolling 14 days) rather than a live-cycle count:
+            the question this view exists to answer is "am I showing up,"
+            and unlike a week-scoped score it can't be dragged down just
+            because a new week (or a new cycle) only started yesterday. */}
+        <StatCard label="Consistency" value={`${consist.hit}/${consist.days}`}
+          sub="days showed up" icon="event_available"
+          pct={Math.round((consist.hit / consist.days) * 100)}
+          color={MODULES.goals.color} tint={MODULES.goals.tint} />
       </div>
 
       {cycleData.sprints.loading ? (
@@ -260,10 +271,18 @@ function CycleCard({ sprint, phases, tactics, goal, compact, onChanged, onDelete
   const [week, setWeek] = useState(sprintCurrentWeek(sprint))
   const cw = sprintCurrentWeek(sprint)
   const totalWeeks = sprintWeeks(sprint)
-  const score = execScore(phases, tactics, sprint, week)
-  const avg = avgExecScore(phases, tactics, sprint)
+  // Scoring v2 (lib/goals.js): the headline is a commitment rate over
+  // fully-elapsed commitment-days, not a percentage of one week's
+  // shifting denominator. `pct` stays null until there's enough sample,
+  // in which case the raw fraction is shown instead of a number a single
+  // checkbox could swing 30 points.
+  const rate = commitmentRate(phases, tactics, sprint)
   const weekTactics = tacticsForWeek(phases, tactics, week, sprint)
   const checks = (sprint.week_checks || {})[week] || {}
+  // This week's raw progress — deliberately a fraction, never a percent.
+  const weekRows = tacticWeekRows(phases, tactics, sprint, week)
+  const weekDone = weekRows.reduce((n, r) => n + r.done, 0)
+  const weekPossible = weekRows.reduce((n, r) => n + r.possible, 0)
 
   async function toggle(t, dayIdx) {
     const key = checkKey(t, dayIdx)
@@ -310,8 +329,19 @@ function CycleCard({ sprint, phases, tactics, goal, compact, onChanged, onDelete
             genuine performance read, so off-accent correctly falls back to
             the reserved status ramp (red/amber/green) rather than the
             module accent. */}
-        <div className="cycle-ring-section" title="Execution — checkpoints hit ÷ checkpoints possible, this week">
-          <Ring score={score} size={72} stroke={7} sub={`wk ${week}`} onAccent={false} />
+        <div className="cycle-ring-section"
+          title={`Commitment rate — ${rate.done} of ${rate.total} commitments met on days that have fully elapsed`}>
+          {rate.pct != null ? (
+            <Ring score={rate.pct} size={72} stroke={7} sub="rate" onAccent={false} />
+          ) : (
+            // Too few elapsed commitment-days for a percentage to mean
+            // anything yet — show the raw count rather than a number one
+            // checkbox could swing by 30 points.
+            <div className="cycle-rate-fraction">
+              <strong className="tnum">{rate.done}<span>/{rate.total}</span></strong>
+              <small>so far</small>
+            </div>
+          )}
         </div>
         <div className="cycle-info">
           <div className="cycle-meta">
@@ -322,7 +352,8 @@ function CycleCard({ sprint, phases, tactics, goal, compact, onChanged, onDelete
           <div className="cycle-name">{sprint.name}</div>
           {sprint.outcome && <p style={{ fontSize: 12.5, color: 'var(--text-2)' }}>{sprint.outcome}</p>}
           <div style={{ fontSize: 11.5, color: 'var(--text-3)', marginTop: 4 }}>
-            {sprint.start_date || '—'} → {sprint.end_date || '—'} · avg {avg ?? '--'}%
+            {sprint.start_date || '—'} → {sprint.end_date || '—'}
+            {rate.total > 0 && ` · ${rate.done} of ${rate.total} commitments met`}
           </div>
         </div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
@@ -344,7 +375,7 @@ function CycleCard({ sprint, phases, tactics, goal, compact, onChanged, onDelete
             <span>
               Week {week} of {totalWeeks}
               <span style={{ fontWeight: 600, color: 'var(--text-3)', marginLeft: 8, fontSize: 11 }}>
-                · {score == null ? 'nothing to check yet' : `${scoreMomentumLine(score)} — ${score}% checked off`}
+                · {weekPossible === 0 ? 'nothing due yet' : `${weekDone} of ${weekPossible} done so far`}
               </span>
             </span>
             <div style={{ display: 'flex', gap: 4 }}>
@@ -373,7 +404,7 @@ function CycleCard({ sprint, phases, tactics, goal, compact, onChanged, onDelete
             </div>
           )}
 
-          {!compact && <StreakChart sprint={sprint} phases={phases} tactics={tactics} />}
+          {!compact && <ExecutionHeatmap sprint={sprint} phases={phases} tactics={tactics} />}
         </div>
       )}
     </div>
@@ -505,8 +536,16 @@ function GoalRoom({ goals, rollup, cycleData, onEdit, onStartCycle, onOpenCycles
   }
   const liveCycles = activeGoals.map((g) => liveCycleFor(g.id)).filter(Boolean)
   const avgExecution = (() => {
-    const scores = liveCycles.map((c) => avgExecScore(c.phases, c.tactics, c.sprint)).filter((s) => s != null)
-    return scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : null
+    // Pools the raw commitment counts rather than averaging each cycle's
+    // percentage — averaging percentages weights a cycle with 2 elapsed
+    // commitments the same as one with 40, which is how "avg" ended up
+    // reporting a number nothing on screen agreed with.
+    let done = 0, total = 0
+    liveCycles.forEach((c) => {
+      const r = commitmentRate(c.phases, c.tactics, c.sprint)
+      done += r.done; total += r.total
+    })
+    return { done, total, pct: total >= MIN_RATE_SAMPLE ? Math.round((done / total) * 100) : null }
   })()
 
   const balance = AREAS.map((a) => ({
@@ -525,8 +564,10 @@ function GoalRoom({ goals, rollup, cycleData, onEdit, onStartCycle, onOpenCycles
           sub={`${goals.data?.length || 0} total`} icon="explore" color={MODULES.goals.color} tint={MODULES.goals.tint} />
         <StatCard label="Live cycles" value={liveCycles.length}
           sub={`${activeGoals.length - liveCycles.length} without one`} icon="loop" color={MODULES.goals.color} tint={MODULES.goals.tint} />
-        <StatCard label="Avg execution" value={avgExecution != null ? `${avgExecution}%` : '—'}
-          sub="across live cycles" icon="target" pct={avgExecution} color={MODULES.goals.color} tint={MODULES.goals.tint} />
+        <StatCard label="Commitments met"
+          value={avgExecution.total ? (avgExecution.pct != null ? `${avgExecution.pct}%` : `${avgExecution.done}/${avgExecution.total}`) : '—'}
+          sub={avgExecution.pct != null ? `${avgExecution.done} of ${avgExecution.total} so far` : 'across live cycles'}
+          icon="target" pct={avgExecution.pct} color={MODULES.goals.color} tint={MODULES.goals.tint} />
       </div>
       {balance.length > 1 && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 18, flexWrap: 'wrap' }}>
@@ -682,17 +723,19 @@ function GoalCard({ goal, roll, hasCycle, cycle, onOpenCycle, onStartCycle, open
         {cycle && (() => {
           const week = sprintCurrentWeek(cycle.sprint)
           const weeks = sprintWeeks(cycle.sprint)
-          const score = execScore(cycle.phases, cycle.tactics, cycle.sprint, week)
-          const avg = avgExecScore(cycle.phases, cycle.tactics, cycle.sprint)
+          const rate = commitmentRate(cycle.phases, cycle.tactics, cycle.sprint)
           return (
             <button type="button" className="goal-cycle-strip"
               onClick={(e) => { e.stopPropagation(); onOpenCycle?.() }}>
-              <Ring score={score} size={36} stroke={4} onAccent={false} />
+              {rate.pct != null
+                ? <Ring score={rate.pct} size={36} stroke={4} onAccent={false} />
+                : <span className="goal-cycle-strip-count tnum">{rate.done}/{rate.total}</span>}
               <span className="goal-cycle-strip-text">
                 <strong>Week {week} of {weeks}</strong>
                 <small>
-                  {score == null ? 'nothing to check yet' : scoreMomentumLine(score)}
-                  {avg != null ? ` · avg ${avg}%` : ''}
+                  {rate.total === 0 ? 'nothing due yet'
+                    : rate.pct != null ? `${scoreMomentumLine(rate.pct)} · ${rate.done} of ${rate.total}`
+                    : `${rate.done} of ${rate.total} commitments met`}
                 </small>
               </span>
               <Icon name="chevron_right" size={16} />
@@ -1102,7 +1145,7 @@ function CycleEditor({ sprint, cloneFrom, goals, seedGoalId, onClose, onSaved })
   // defaulting to whichever goal happens to be first in the list.
   const cur = s ?? (sprint?.id ? sprint : {
     name: '', outcome: '', goal_id: seedGoalId || goals[0]?.id || '', weeks: DEFAULT_CYCLE_LENGTH,
-    start_date: today(), end_date: autoEndDate(today(), DEFAULT_CYCLE_LENGTH),
+    start_date: snapToMonday(today()), end_date: autoEndDate(snapToMonday(today()), DEFAULT_CYCLE_LENGTH),
   })
   const [phaseDrafts, setPhaseDrafts] = useState(DEFAULT_PHASES.map((p) => ({ ...p, tactics: [] })))
   const [saving, setSaving] = useState(false)
@@ -1142,7 +1185,8 @@ function CycleEditor({ sprint, cloneFrom, goals, seedGoalId, onClose, onSaved })
       setQuickMode(false)
       setS({ name: cloneFrom.name, outcome: cloneFrom.outcome, goal_id: cloneFrom.goal_id,
         weeks: cloneFrom.weeks || DEFAULT_CYCLE_LENGTH,
-        start_date: today(), end_date: autoEndDate(today(), cloneFrom.weeks || DEFAULT_CYCLE_LENGTH) })
+        start_date: snapToMonday(today()),
+        end_date: autoEndDate(snapToMonday(today()), cloneFrom.weeks || DEFAULT_CYCLE_LENGTH) })
       setPhaseDrafts(cloneFrom.phases)
       return
     }
@@ -1299,9 +1343,16 @@ function CycleEditor({ sprint, cloneFrom, goals, seedGoalId, onClose, onSaved })
               {CYCLE_LENGTHS.map((n) => <option key={n} value={n}>{n} week{n === 1 ? '' : 's'}</option>)}
             </select>
           </Field>
-          <Field label="Start Date">
+          {/* Cycles run Mon-Sun, so whatever date gets picked snaps back
+              to that week's Monday (snapToMonday). A mid-week start meant
+              week 1 was really a 2-day week that no score could represent
+              fairly — see the Scoring v2 note in lib/goals.js. */}
+          <Field label="Start Date" hint="Snaps to Monday — cycles run Mon–Sun.">
             <input type="date" value={cur.start_date || ''}
-              onChange={(e) => setS({ ...cur, start_date: e.target.value, end_date: autoEndDate(e.target.value, cur.weeks || DEFAULT_CYCLE_LENGTH) })} />
+              onChange={(e) => {
+                const start = snapToMonday(e.target.value)
+                setS({ ...cur, start_date: start, end_date: autoEndDate(start, cur.weeks || DEFAULT_CYCLE_LENGTH) })
+              }} />
           </Field>
           <Field label="End Date (auto)"><input type="date" value={cur.end_date || ''} readOnly style={{ opacity: .5 }} /></Field>
         </div>
@@ -1567,7 +1618,7 @@ function RetrosView({ goals, sprints, cycleData }) {
                 const goal = (goals.data || []).find((g) => g.id === s.goal_id)
                 const myPhases = (cycleData?.phases?.data || []).filter((p) => p.sprint_id === s.id)
                 const myTactics = (cycleData?.tactics?.data || []).filter((x) => x.sprint_id === s.id)
-                const avg = avgExecScore(myPhases, myTactics, s)
+                const rate = commitmentRate(myPhases, myTactics, s)
                 return (
                   <div key={s.id} className="hero-card" style={{ background: areaColor(goal?.area) || 'var(--accent)' }}>
                     <div className="hero-content">
@@ -1576,7 +1627,7 @@ function RetrosView({ goals, sprints, cycleData }) {
                         <div className="hero-h" style={{ fontSize: 26 }}>{s.name}</div>
                         <p className="hero-copy">
                           {goal?.title ? `${goal.title} · ` : ''}ran {pretty(s.start_date)} → {pretty(s.end_date)}
-                          {avg != null ? ` · averaged ${avg}% execution` : ''}.
+                          {rate.total > 0 ? ` · met ${rate.done} of ${rate.total} commitments` : ''}.
                         </p>
                         <div className="hero-actions">
                           <button className="btn btn-primary" onClick={() => setEditing(s)}>

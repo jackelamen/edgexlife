@@ -1,9 +1,10 @@
 /*
-  Focus Cycle mechanics, ported verbatim from goals.html's execution-scoring
-  engine. This is the part of Goals that's actually a program, not just a
-  form — a cycle (1 to 12 weeks, see CYCLE_LENGTHS) has weekly checkpoints
-  per tactic, and the "how am I doing" number is computed from how many of
-  those checkpoints landed.
+  Focus Cycle mechanics. This is the part of Goals that's actually a
+  program, not just a form — a cycle (1 to 12 weeks, see CYCLE_LENGTHS)
+  has weekly checkpoints per tactic, and "how am I doing" is computed
+  from how many of those landed. See the Scoring v2 block below for how
+  that computation works and why it replaced the original week-percentage
+  engine ported from goals.html.
 
   Adapted for the normalized schema: the original kept phases+tactics
   embedded inside the sprint's own JSON; here they're real rows
@@ -147,8 +148,8 @@ export const tacticKeyId = (t) => t.local_id || t.id
    instead" — WITHOUT touching the tactic's default schedule going
    forward, and without rewriting history: completion is still recorded
    under the ORIGINAL day's checkKey (see checkKey above), only the day it
-   visually shows up on for that one week changes. This means execScore
-   (week-level, day-blind) needs no changes at all — an obligation is
+   visually shows up on for that one week changes. Scoring needs no
+   changes for this at all (dayCommitments resolves swaps) — an obligation is
    still "1 of N possible checkpoints," full stop, regardless of which
    calendar day displays it. Only the day-specific reads (today's due
    list, the dot row) need to consult a swap.
@@ -249,7 +250,7 @@ export function tacticActiveToday(t) {
     mid-week (a Saturday start, say) — this is what lets callers tell
     "this slot is before the cycle even began" apart from "this slot
     hasn't happened yet." */
-function dateKeyForWeekDay(sp, week, dayIdx) {
+export function dateKeyForWeekDay(sp, week, dayIdx) {
   if (!sp.start_date) return null
   const start = new Date(sp.start_date + 'T12:00:00')
   const anchor = startOfWeek(start, { weekStartsOn: 1 })
@@ -286,6 +287,176 @@ function dayIsCountable(sp, week, dayIdx) {
 function weekIsPartial(sp, week) {
   for (let d = 0; d < 7; d++) if (!dayIsCountable(sp, week, d)) return true
   return false
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   Scoring v2 — commitment-days, keyed by real date
+   ══════════════════════════════════════════════════════════════════
+   The old model scored a WEEK as one percentage, which meant the
+   denominator changed meaning week to week (a week where 2 flexible
+   targets counted vs one where 10 day-checkpoints did), small samples
+   produced wild swings (2 of 3 = "67%, at risk"), and every calendar
+   edge case — mid-week starts, truncated weeks, not-yet-arrived days —
+   needed its own leniency branch. Eight interacting rules for one
+   number, and it still produced a false 100%.
+
+   This model scores the individual COMMITMENT-DAY instead: one tactic,
+   on one real date. Two numbers, each with exactly one job:
+
+     consistency()    — did you show up at all, over a rolling window.
+                        Motivational. Can't be dragged down by a week
+                        that just started.
+     commitmentRate() — of the commitment-days that have FULLY elapsed,
+                        how many did you meet. Diagnostic. Stays a raw
+                        fraction until there's enough sample to make a
+                        percentage mean anything.
+
+   Flexible targets (weekly / xperweek / onetime) can't be pinned to a
+   day, so they never enter the day rate at all — flexibleTargets()
+   resolves them per completed week and reports separately. Blending
+   the two kinds into one ratio is what produced the original mess.
+
+   Partial weeks stop being a special case here: a cycle starting
+   mid-week simply has fewer commitment-days that week. No leniency
+   flag, no suppression, no null. */
+
+/** Inverse of dateKeyForWeekDay — which (week, dayIdx) grid slot a real
+    date lands in, or null if it's before the cycle's own grid begins. */
+export function weekDayForDate(sp, iso) {
+  if (!sp.start_date || !iso) return null
+  const anchor = startOfWeek(new Date(sp.start_date + 'T12:00:00'), { weekStartsOn: 1 })
+  const days = Math.round((new Date(iso + 'T12:00:00') - anchor) / 86400000)
+  if (days < 0) return null
+  return { week: Math.floor(days / 7) + 1, dayIdx: days % 7 }
+}
+
+/** Every date the cycle has actually covered so far — start_date through
+    today (or end_date, whichever came first). */
+export function elapsedCycleDates(sp) {
+  if (!sp.start_date) return []
+  const today = dateKey()
+  const end = sp.end_date && sp.end_date < today ? sp.end_date : today
+  const out = []
+  const d = new Date(sp.start_date + 'T12:00:00')
+  for (let guard = 0; guard < 500 && dateKey(d) <= end; guard++) {
+    out.push(dateKey(d)); d.setDate(d.getDate() + 1)
+  }
+  return out
+}
+
+/** The day-specific commitments (daily / custom-day only) that were due
+    on `iso`, each with whether it got done. Swap-aware, same as
+    todayDoneTotals: an obligation moved onto this day shows up here, and
+    its checkmark is still read from the ORIGINAL day's key. */
+export function dayCommitments(phases, tactics, sp, iso) {
+  const slot = weekDayForDate(sp, iso)
+  if (!slot) return []
+  const { week, dayIdx } = slot
+  const checks = (sp.week_checks || {})[week] || {}
+  const out = []
+  tacticsForWeek(phases, tactics, week, sp).forEach((t) => {
+    const freq = t.freq || 'weekly'
+    if (freq === 'daily') {
+      out.push({ tactic: t, done: Boolean(checks[checkKey(t, dayIdx)]) })
+    } else if (freq === 'custom') {
+      if (!effectiveCustomDays(t, sp, week).includes(dayIdx)) return
+      const orig = originalDayFor(t, sp, week, dayIdx)
+      if (orig == null) return
+      out.push({ tactic: t, done: Boolean(checks[checkKey(t, orig)]) })
+    }
+  })
+  return out
+}
+
+/** Below this many elapsed commitment-days, a percentage is noise —
+    "2 of 3" is honest, "67%" pretends to a precision it doesn't have. */
+export const MIN_RATE_SAMPLE = 5
+
+/**
+ * Commitment rate: of the day-specific commitments whose day has FULLY
+ * elapsed, how many were met. Today is deliberately excluded — the day
+ * isn't over, so counting it can only make you look worse than you are
+ * (this is what produced "0 of 3 done today" as a red 0% at 12:01am).
+ *
+ * `pct` is null until MIN_RATE_SAMPLE, so callers render the raw
+ * fraction instead of a percentage that a single checkbox could swing
+ * by 30 points.
+ */
+export function commitmentRate(phases, tactics, sp) {
+  const today = dateKey()
+  let done = 0, total = 0
+  for (const iso of elapsedCycleDates(sp)) {
+    if (iso >= today) continue
+    for (const c of dayCommitments(phases, tactics, sp, iso)) {
+      total++; if (c.done) done++
+    }
+  }
+  return { done, total, pct: total >= MIN_RATE_SAMPLE ? Math.round((done / total) * 100) : null }
+}
+
+/** Same idea, per tactic — "Pull ups 8/10, 10k steps 4/12" names the one
+    commitment dragging the rate, which a single number never can. */
+export function tacticCommitmentRates(phases, tactics, sp) {
+  const today = dateKey()
+  const by = new Map()
+  for (const iso of elapsedCycleDates(sp)) {
+    if (iso >= today) continue
+    for (const c of dayCommitments(phases, tactics, sp, iso)) {
+      const id = tacticKeyId(c.tactic)
+      const row = by.get(id) || { tactic: c.tactic, done: 0, total: 0 }
+      row.total++; if (c.done) row.done++
+      by.set(id, row)
+    }
+  }
+  return [...by.values()]
+}
+
+/** Flexible targets (weekly / xperweek / onetime), resolved per COMPLETED
+    full week — a week still in progress isn't late yet, and a week
+    truncated by the cycle's own start/end never had a fair shot at a
+    7-day target. Reported separately from the day rate on purpose. */
+export function flexibleTargets(phases, tactics, sp) {
+  const cw = sprintCurrentWeek(sp)
+  let met = 0, total = 0
+  for (let w = 1; w < cw; w++) {
+    if (weekIsPartial(sp, w)) continue
+    const checks = (sp.week_checks || {})[w] || {}
+    tacticsForWeek(phases, tactics, w, sp).forEach((t) => {
+      const freq = t.freq || 'weekly'
+      if (freq === 'xperweek') {
+        total++; if (xpwDoneCount(t, checks) >= xpwTarget(t)) met++
+      } else if (freq === 'weekly' || freq === 'onetime') {
+        total++; if (checks[tacticKeyId(t)]) met++
+      }
+    })
+  }
+  return { met, total }
+}
+
+/** Consistency: how many of the last `days` days had at least one
+    completed action, across every cycle. A rolling window rather than a
+    cycle-scoped one so it still reads sensibly for a 1-week cycle, and
+    so it never resets to zero the moment a cycle rolls over. */
+export function consistency(sprints, days = 14) {
+  const dates = completedCheckDates(sprints)
+  let hit = 0
+  const d = new Date()
+  for (let i = 0; i < days; i++) {
+    if (dates.has(dateKey(d))) hit++
+    d.setDate(d.getDate() - 1)
+  }
+  return { hit, days }
+}
+
+/** Cycles run Monday-Sunday, so a start date snaps back to the Monday of
+    whatever week was picked. Backward rather than forward because "start
+    the week of the 12th" is predictable, while forward-snapping can push
+    a cycle you wanted to start now up to six days out. This also makes
+    start_date and the Monday grid anchor identical for every new cycle,
+    which is what retires the whole truncated-week problem going forward. */
+export function snapToMonday(iso) {
+  if (!iso) return iso
+  return dateKey(startOfWeek(new Date(iso + 'T12:00:00'), { weekStartsOn: 1 }))
 }
 
 /**
@@ -363,37 +534,18 @@ export function tacticWeekRows(phases, tactics, sp, week) {
   })
 }
 
-export function execScore(phases, tactics, sp, week) {
-  const rows = tacticWeekRows(phases, tactics, sp, week)
-  if (!rows.length) return null
-  // A week truncated by the cycle's own start/end date never had a fair
-  // full 7 days. Once it's OVER, scoring it from whatever fragment of
-  // flexible targets happened to exist can read as a deceptively clean
-  // "100%" built from just 1-2 real data points, while every day-specific
-  // tactic that never got a chance to count sits silently excluded — a
-  // real effort/score mismatch, not a fair reflection of the week. While
-  // it's still the live current week, a partial live number is still
-  // useful real-time feedback, so only a PAST partial week gets
-  // suppressed to null (the same empty read as "nothing was countable").
-  const isCurrentWeek = week === sprintCurrentWeek(sp) && isSprintActive(sp)
-  if (!isCurrentWeek && weekIsPartial(sp, week)) return null
-  let possible = 0, done = 0
-  rows.forEach((r) => { possible += r.possible; done += r.done })
-  return possible ? Math.round((done / possible) * 100) : null
-}
+/* execScore / avgExecScore removed with Scoring v2.
 
-export function avgExecScore(phases, tactics, sp) {
-  const cw = sprintCurrentWeek(sp)
-  let sum = 0, cnt = 0
-  for (let w = 1; w <= cw; w++) {
-    const s = execScore(phases, tactics, sp, w)
-    if (s === null) continue
-    const isPast = w < cw
-    const hasSomeChecks = Object.keys((sp.week_checks || {})[w] || {}).length > 0
-    if (isPast || hasSomeChecks) { sum += s; cnt++ }
-  }
-  return cnt ? Math.round(sum / cnt) : null
-}
+   They produced ONE number from eight interacting rules (dayIsCountable,
+   weekIsPartial, isCurrentWeek, isSprintActive, a lenient flag, two
+   separate flexible-target branches, and a past-partial-week
+   suppression), and still couldn't be trusted: the denominator meant
+   something different every week, so the bars in the old chart weren't
+   comparable to each other, and avgExecScore averaged those percentages
+   — weighting a week where 1 checkpoint counted the same as a week
+   where 10 did.
+
+   commitmentRate() replaces both. See the Scoring v2 note above. */
 
 /** Obligations due TODAY across a cycle's active-week tactics. */
 export function todayDoneTotals(phases, tactics, sp) {
