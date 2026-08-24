@@ -11,6 +11,11 @@
   five goal cards in the same area signs/fetches that photo once, not
   five times — same "fetch at most once" rule imageCache.js already
   enforces for legacy images, extended to cover the new Storage path too.
+
+  useGoalPhoto layers a per-goal override on top: a goal can pin one
+  specific photo (goals.featured_photo_kind/_ref, set via the picker in
+  the goal editor) instead of getting whatever the area default happens
+  to be. Same memoization strategy, keyed by kind+ref instead of area.
 */
 import { useEffect, useState } from 'react'
 import { useAsync } from '../hooks/useAsync'
@@ -49,4 +54,35 @@ export function useAreaPhoto(area) {
   }, [area, items.data, legacy.data])
 
   return src
+}
+
+const resolvedGoalPhoto = new Map() // "kind:ref" -> Promise<string|null>
+
+function resolveGoalPhoto(kind, ref) {
+  const key = `${kind}:${ref}`
+  if (resolvedGoalPhoto.has(key)) return resolvedGoalPhoto.get(key)
+  const p = (kind === 'legacy' ? getVisionImage(ref) : signVisionUrl(ref)).catch(() => null)
+  resolvedGoalPhoto.set(key, p)
+  return p
+}
+
+/** A goal's own pinned photo (goal.featured_photo_kind/_ref, set from the
+    picker in the goal editor) when it has one, otherwise the same area
+    default useAreaPhoto returns — callers never need to know which one
+    they got. Always calls useAreaPhoto regardless (hooks can't be
+    conditional), so the fallback is ready the moment it's needed with no
+    extra render delay. */
+export function useGoalPhoto(goal) {
+  const areaPhoto = useAreaPhoto(goal?.area)
+  const [pinnedSrc, setPinnedSrc] = useState(null)
+  const kind = goal?.featured_photo_kind, ref = goal?.featured_photo_ref
+
+  useEffect(() => {
+    if (!kind || !ref) { setPinnedSrc(null); return }
+    let alive = true
+    resolveGoalPhoto(kind, ref).then((s) => { if (alive) setPinnedSrc(s) })
+    return () => { alive = false }
+  }, [kind, ref])
+
+  return kind && ref ? pinnedSrc : areaPhoto
 }

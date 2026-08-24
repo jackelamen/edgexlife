@@ -25,8 +25,9 @@ import {
   execScore, avgExecScore, todayDoneTotals, scoreColor, scoreBadgeTone,
   autoEndDate, DEFAULT_PHASES, goalStreak, streakMilestone, scoreMomentumLine, effectiveCustomDays, withDaySwap,
 } from '../lib/goals'
-import { useAreaPhoto } from '../lib/areaPhoto'
+import { useGoalPhoto } from '../lib/areaPhoto'
 import VisionBoard from '../components/goals/VisionBoard'
+import GoalPhotoPicker from '../components/goals/GoalPhotoPicker'
 import StreakChart from '../components/goals/StreakChart'
 import DonutChart from '../components/goals/DonutChart'
 import { MODULES } from '../lib/design'
@@ -148,7 +149,7 @@ function TodayView({ goals, rollup, cycleData, onStartCycle }) {
   // see lib/areaPhoto.js. Falls back to the plain module-colour hero
   // (unchanged) when that area has no vision photos yet, so this is
   // additive, never a broken/empty state.
-  const heroPhoto = useAreaPhoto(featured?.goal?.area)
+  const heroPhoto = useGoalPhoto(featured?.goal)
 
   return (
     <>
@@ -578,7 +579,7 @@ function GoalCard({ goal, roll, hasCycle, onStartCycle, open, onToggle, onEdit, 
   // the photo treatment; GoalDetail below (metrics/tasks/habits editing)
   // stays on the normal white surface when expanded, since that content
   // was never designed to sit on top of an image.
-  const photo = useAreaPhoto(goal.area)
+  const photo = useGoalPhoto(goal)
   return (
     <div className={`goal-card ${goal.area}`} style={{ borderLeftColor: areaColor(goal.area) }} onClick={onToggle}>
       <div className="goal-grid-body" style={{ position: 'relative' }}>
@@ -843,6 +844,9 @@ function GoalEditor({ goal, onClose, onSaved }) {
   const [g, setG] = useState(null)
   const cur = g ?? (goal?.id ? goal : { title: '', area: 'personal', why: '', status: 'active' })
   const [saving, setSaving] = useState(false)
+  const [pickingPhoto, setPickingPhoto] = useState(false)
+  const previewSrc = useGoalPhoto(cur)
+  const hasPinnedPhoto = Boolean(cur.featured_photo_kind && cur.featured_photo_ref)
 
   return (
     <Modal open={open} onClose={() => { setG(null); onClose() }} title={goal?.id ? 'Edit goal' : 'New goal'} width={520}
@@ -899,7 +903,42 @@ function GoalEditor({ goal, onClose, onSaved }) {
             Feature this goal on Today
           </label>
         </Field>
+        {/* The photo behind this goal's card and, when it's the featured
+            goal, Today's hero — see useGoalPhoto in lib/areaPhoto.js. An
+            unpinned goal just gets whatever photo its area defaults to
+            (same as before this existed); this is only for overriding
+            that with one specific photo. */}
+        <Field label="Featured photo">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{
+              width: 64, height: 64, borderRadius: 10, overflow: 'hidden', flexShrink: 0,
+              background: 'var(--white-soft)', border: '1px solid var(--border)',
+            }}>
+              {previewSrc && <img src={previewSrc} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <span style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 600 }}>
+                {hasPinnedPhoto ? 'Pinned to this goal' : `Using the ${areaLabel(cur.area)} area default`}
+              </span>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => setPickingPhoto(true)}>
+                  <Icon name="add_photo_alternate" size={13} /> Choose…
+                </button>
+                {hasPinnedPhoto && (
+                  <button type="button" className="btn btn-ghost btn-sm"
+                    onClick={() => setG({ ...cur, featured_photo_kind: null, featured_photo_ref: null })}>
+                    Clear
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </Field>
       </div>
+      <GoalPhotoPicker open={pickingPhoto} goalArea={cur.area}
+        current={hasPinnedPhoto ? { kind: cur.featured_photo_kind, ref: cur.featured_photo_ref } : null}
+        onClose={() => setPickingPhoto(false)}
+        onPick={(kind, ref) => setG({ ...cur, featured_photo_kind: kind, featured_photo_ref: ref })} />
     </Modal>
   )
 }
