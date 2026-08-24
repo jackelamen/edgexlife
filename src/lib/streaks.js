@@ -21,8 +21,8 @@ export const MILESTONES = [7, 14, 30, 60, 100, 365]
 
 /** Consecutive days ending today (or yesterday, if nothing's logged yet
     today — so a fresh morning doesn't read as a broken streak). `dates` is
-    any iterable of "YYYY-MM-DD" strings; duplicates are fine. Mirrors
-    lib/goals.js's goalStreak, same anchoring rule, different data source. */
+    any iterable of "YYYY-MM-DD" strings; duplicates are fine. Same
+    anchoring rule as lib/goals.js's cycleStreak, different data source. */
 export function currentStreak(dates) {
   const set = new Set(dates)
   const todayKey = dateKey()

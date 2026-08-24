@@ -669,25 +669,35 @@ export function completedCheckDates(sprints) {
   return dates
 }
 
-/** Consecutive days, ending today (or yesterday if nothing's checked off
-    yet today so a fresh morning doesn't read as a broken streak), with at
-    least one completed tactic across every cycle. */
-export function goalStreak(sprints) {
-  const dates = completedCheckDates(sprints)
-  const t = dateKey()
+/** Consecutive CLEAN days for one specific cycle, ending yesterday — not
+    "did something happen," but "was every commitment actually due that
+    day met." A rest day (nothing scheduled — a Sat/Sun with no tactics,
+    say) is NEUTRAL: it neither extends nor breaks the streak, it's just
+    skipped over, so a Mon-Fri habit's streak survives the weekend intact
+    instead of reading as two misses. A day where something WAS due and
+    wasn't fully done breaks it. Today is never evaluated at all — the
+    day isn't over, so whatever's still unchecked isn't a miss yet; it
+    only gets judged retroactively once tomorrow arrives. This replaced
+    a global cross-goal version (goalStreak) that broke on any rest day
+    and pooled every cycle together, which read as either wrong or
+    misleading depending on which goal's hero it was shown under. */
+export function cycleStreak(phases, tactics, sp) {
+  if (!sp?.start_date) return 0
   let n = 0
-  const d = new Date()
-  for (;;) {
+  const d = new Date(); d.setDate(d.getDate() - 1) // start at yesterday — today is never judged
+  for (let guard = 0; guard < 1000; guard++) {
     const iso = dateKey(d)
-    if (dates.has(iso)) { n++; d.setDate(d.getDate() - 1) }
-    else if (n === 0 && iso === t) d.setDate(d.getDate() - 1)
-    else break
+    if (iso < sp.start_date) break
+    const cs = dayCommitments(phases, tactics, sp, iso)
+    if (!cs.length) { d.setDate(d.getDate() - 1); continue } // rest day — neutral, skip
+    if (cs.every((c) => c.done)) { n++; d.setDate(d.getDate() - 1); continue }
+    break // something was due and wasn't fully met
   }
   return n
 }
 
 /* ── Streak milestones ──────────────────────────────────────
-   goalStreak() recomputes from scratch every render, so a milestone
+   cycleStreak() recomputes from scratch every render, so a milestone
    only matches on the single day the count actually lands on it — the
    day after, the streak has moved to n+1 and the banner clears itself
    with no extra bookkeeping. */

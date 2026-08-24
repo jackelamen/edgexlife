@@ -24,7 +24,7 @@ import {
   xpwTarget, xpwDoneCount, xpwDidToday, tacticCheckpointCount, checkKey,
   tacticWeekRows, commitmentRate, consistency, snapToMonday, MIN_RATE_SAMPLE,
   todayDoneTotals, scoreColor, scoreBadgeTone,
-  autoEndDate, DEFAULT_PHASES, goalStreak, streakMilestone, scoreMomentumLine, effectiveCustomDays, withDaySwap,
+  autoEndDate, DEFAULT_PHASES, cycleStreak, streakMilestone, scoreMomentumLine, effectiveCustomDays, withDaySwap,
 } from '../lib/goals'
 import { useGoalPhoto } from '../lib/areaPhoto'
 import VisionBoard from '../components/goals/VisionBoard'
@@ -138,7 +138,12 @@ function TodayView({ goals, rollup, cycleData, onStartCycle }) {
   const featured = manualFeatured || sorted[0]
   const rest = sorted.filter((c) => c !== featured)
 
-  const streak = useMemo(() => goalStreak(cycleData.sprints.data || []), [cycleData.sprints.data])
+  // Scoped to the featured cycle specifically, not pooled across every
+  // goal — a global streak sitting directly under one goal's hero read
+  // as either wrong (breaks on a rest day with nothing scheduled) or
+  // misleading (about a different goal than the one on screen). See
+  // cycleStreak in lib/goals.js for the "clean day" rules.
+  const streak = featured ? cycleStreak(featured.phases, featured.tactics, featured.sp) : 0
   const streakPct = Math.min(100, Math.round((streak / 7) * 100))
   const milestone = useMemo(() => streakMilestone(streak), [streak])
   const consist = useMemo(() => consistency(cycleData.sprints.data || []), [cycleData.sprints.data])
@@ -204,7 +209,11 @@ function TodayView({ goals, rollup, cycleData, onStartCycle }) {
         <div className="streak-milestone">
           <Icon name="local_fire_department" size={22} />
           <div>
-            <div className="streak-milestone-title">{milestone.days}-day streak</div>
+            {/* Names the goal explicitly — this streak is scoped to the
+                featured cycle above, and sitting right under its hero
+                without saying so is exactly what read as ambiguous
+                before. */}
+            <div className="streak-milestone-title">{milestone.days}-day streak on {featured?.goal?.title || featured?.sp?.name}</div>
             <div className="streak-milestone-sub">{milestone.message}</div>
           </div>
         </div>
@@ -222,7 +231,7 @@ function TodayView({ goals, rollup, cycleData, onStartCycle }) {
             fraction already says everything true about right now. */}
         <StatCard label="Today" value={todayTotals.total ? `${todayTotals.done}/${todayTotals.total}` : '—'}
           sub="due today" icon="today" color={MODULES.goals.color} tint={MODULES.goals.tint} />
-        <StatCard label="Streak" value={streak} sub={streak === 1 ? 'day' : 'days'} icon="local_fire_department"
+        <StatCard label="Streak" value={streak} sub={`clean ${streak === 1 ? 'day' : 'days'} on this goal`} icon="local_fire_department"
           pct={streak > 0 ? streakPct : null} color={MODULES.goals.color} tint={MODULES.goals.tint} />
         {/* Consistency (rolling 14 days) rather than a live-cycle count:
             the question this view exists to answer is "am I showing up,"
