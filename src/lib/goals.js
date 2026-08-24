@@ -366,6 +366,17 @@ export function tacticWeekRows(phases, tactics, sp, week) {
 export function execScore(phases, tactics, sp, week) {
   const rows = tacticWeekRows(phases, tactics, sp, week)
   if (!rows.length) return null
+  // A week truncated by the cycle's own start/end date never had a fair
+  // full 7 days. Once it's OVER, scoring it from whatever fragment of
+  // flexible targets happened to exist can read as a deceptively clean
+  // "100%" built from just 1-2 real data points, while every day-specific
+  // tactic that never got a chance to count sits silently excluded — a
+  // real effort/score mismatch, not a fair reflection of the week. While
+  // it's still the live current week, a partial live number is still
+  // useful real-time feedback, so only a PAST partial week gets
+  // suppressed to null (the same empty read as "nothing was countable").
+  const isCurrentWeek = week === sprintCurrentWeek(sp) && isSprintActive(sp)
+  if (!isCurrentWeek && weekIsPartial(sp, week)) return null
   let possible = 0, done = 0
   rows.forEach((r) => { possible += r.possible; done += r.done })
   return possible ? Math.round((done / possible) * 100) : null
