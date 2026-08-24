@@ -126,8 +126,14 @@ function TodayView({ goals, rollup, cycleData, onStartCycle }) {
     const owedA = a.totals.total - a.totals.done, owedB = b.totals.total - b.totals.done
     return owedB - owedA
   })
-  const featured = sorted[0]
-  const rest = sorted.slice(1)
+  // A goal marked `featured` in its editor (see GoalEditor) always wins
+  // over the "most owed" pick — that's the whole point of a manual
+  // override. Only takes effect while that goal actually has a live
+  // cycle today; a featured goal with nothing live just falls through to
+  // the usual most-owed ordering, same as before this existed.
+  const manualFeatured = sorted.find((c) => c.goal?.featured)
+  const featured = manualFeatured || sorted[0]
+  const rest = sorted.filter((c) => c !== featured)
 
   const streak = useMemo(() => goalStreak(cycleData.sprints.data || []), [cycleData.sprints.data])
   const streakPct = Math.min(100, Math.round((streak / 7) * 100))
@@ -575,6 +581,12 @@ function GoalCard({ goal, roll, hasCycle, onStartCycle, open, onToggle, onEdit, 
               made the area-colour system look decorative rather than real. */}
           <span className="badge" style={{ background: areaColor(goal.area), color: '#fff' }}>{areaLabel(goal.area)}</span>
           {goal.status !== 'active' && <Badge tone="muted">{goal.status}</Badge>}
+          {goal.featured && (
+            <span className="badge" title="Pinned to the top of Today"
+              style={{ background: photo ? 'rgba(255,255,255,.22)' : 'var(--white-soft)', color: photo ? '#fff' : 'var(--text-2)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              <Icon name="push_pin" size={11} fill /> Featured
+            </span>
+          )}
           {/* Identity thread tag — see lib/identity.js. One shared hue
               (MODULES.identity) for every thread; the icon is what tells
               them apart, same reasoning as the design-system comment on
@@ -859,6 +871,18 @@ function GoalEditor({ goal, onClose, onSaved }) {
             <option value="">— none —</option>
             {IDENTITY_THREADS.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
           </select>
+        </Field>
+        {/* Overrides TodayView's own "most owed today" pick (lib/goals.js
+            doesn't decide this — GoalsPage's TodayView does, by checking
+            this flag first). Only one goal can be featured at a time —
+            saveGoal() clears the previous one automatically, and the DB
+            has a matching unique index as a backstop. */}
+        <Field hint="Pins this goal's cycle to the top of Today, instead of whichever cycle owes the most today. Only one goal can be featured — picking this one un-features whatever was featured before.">
+          <label className="flex items-center gap-2 text-[13px]">
+            <input type="checkbox" checked={Boolean(cur.featured)}
+              onChange={(e) => setG({ ...cur, featured: e.target.checked })} />
+            Feature this goal on Today
+          </label>
         </Field>
       </div>
     </Modal>
