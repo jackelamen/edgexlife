@@ -48,7 +48,12 @@ function PromptState({ date, onSaved }) {
   const [pickingTasks, setPickingTasks] = useState(false)
   const [taskIds, setTaskIds] = useState([])
   const [saving, setSaving] = useState(false)
-  const candidates = useAsync((f) => fetchTodayCandidateTasks({ force: f }), [], { enabled: pickingTasks })
+  // [pickingTasks] as the dep, not [] — useAsync only (re)fetches when its
+  // deps array changes, not whenever `enabled` flips. With [], the fetch
+  // ran once at mount while the picker was still closed (enabled: false)
+  // and never ran again once it actually opened — the exact same bug
+  // GoalPhotoPicker had (see that fix's commit for the full explanation).
+  const candidates = useAsync((f) => fetchTodayCandidateTasks({ force: f }), [pickingTasks], { enabled: pickingTasks })
 
   async function save() {
     setSaving(true)

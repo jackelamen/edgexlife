@@ -57,7 +57,12 @@ export default function ReviewPage() {
      rest are app-wide caches already warm from other pages. Nothing here
      opens a new unbounded query. */
   const reviews = useAsync((f) => fetchWeeklyReviews(prevWeekId(prevWeekId(weekId)), nextWeekId(weekId), { force: f }), [weekId])
-  const allReviews = useAsync((f) => fetchWeeklyReviews('2000-01-01', weekIdFor(), { force: f }), [], { enabled: tab === 'history' })
+  // [tab] as the dep, not [] — useAsync only (re)fetches when its deps
+  // array changes, not whenever `enabled` flips on its own. With [], this
+  // fetched once at mount (tab starts as 'week', so enabled: false) and
+  // never again once the History tab was actually opened — same bug as
+  // GoalPhotoPicker/IntentionCard's task picker (see those commits).
+  const allReviews = useAsync((f) => fetchWeeklyReviews('2000-01-01', weekIdFor(), { force: f }), [tab], { enabled: tab === 'history' })
 
   const settings = useAsync((f) => fetchHealthSettings({ force: f }))
   const healthLogs = useAsync((f) => fetchHealthLogs(from, to, { force: f }), [from, to])
