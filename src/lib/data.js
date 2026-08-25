@@ -253,6 +253,17 @@ export async function deleteTactic(id) {
 export const fetchGoalRollup = (o) => cachedQuery('goal-rollup',
   () => rpc('life_goal_rollup'), { ttlMs: TTL.pulse, ...o })
 
+/* ── Momentum ────────────────────────────────────────
+   Work-side rollup, same standing as Review/Identity: a surface that
+   sits above Pulse/xPM/xFocus rather than beside them, scoped strictly to
+   goal-linked work. Task/habit counts per goal already exist via
+   fetchGoalRollup above (xPM is bridged into Pulse's tasks, so that one
+   rollup already covers both) — this adds the trailing-7-day focus
+   signal. See migration add_life_momentum_functions. */
+
+export const fetchMomentumFocus = (o) => cachedQuery('momentum-focus',
+  () => rpc('life_momentum_focus'), { ttlMs: TTL.pulse, ...o })
+
 /** Read-only: savings goals are created from the Finance app, just shown here. */
 export const fetchSavingsGoals = (o) => cachedQuery('savings-goals', async () =>
   unwrap(await supabase.from('finance_savings_goals')

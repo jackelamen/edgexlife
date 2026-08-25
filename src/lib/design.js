@@ -62,6 +62,11 @@ export const MODULES = {
      hue already in this file (nothing else here reads as gold) so it
      never gets mistaken for STATUS.short's much brighter amber. */
   identity: { label: 'Identity', color: '#6b5b1f', tint: '#efe9d0' },
+  /* Momentum is the same "sits above, not beside" move as Review and
+     Identity, but for work (Pulse/xPM/xFocus) instead of the reflective
+     three. A deep slate-blue, picked far enough from Review's navy and
+     Goals' rust that a glance at the accent alone tells them apart. */
+  momentum: { label: 'Momentum', color: '#1f4d5b', tint: '#dbe9ec' },
 }
 
 /* ── 5. Identity threads (Goal tags, not a new hue system) ────────

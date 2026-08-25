@@ -10,6 +10,7 @@ import HealthPage from './pages/HealthPage'
 import WellnessPage from './pages/WellnessPage'
 import ReviewPage from './pages/ReviewPage'
 import IdentityPage from './pages/IdentityPage'
+import MomentumPage from './pages/MomentumPage'
 import SettingsPage from './pages/SettingsPage'
 
 // Keyed on pathname so navigating to a different page — including away
@@ -53,6 +54,7 @@ export default function App() {
           <Route path="/wellness" element={<Page><WellnessPage /></Page>} />
           <Route path="/review" element={<Page><ReviewPage /></Page>} />
           <Route path="/identity" element={<Page><IdentityPage /></Page>} />
+          <Route path="/momentum" element={<Page><MomentumPage /></Page>} />
           <Route path="/settings" element={<Page><SettingsPage /></Page>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

@@ -19,6 +19,7 @@ const NAV = [
   { section: 'Rhythm' },
   { to: '/review', label: 'Review', icon: 'event_note', module: 'review' },
   { to: '/identity', label: 'Identity', icon: 'star', module: 'identity' },
+  { to: '/momentum', label: 'Momentum', icon: 'bolt', module: 'momentum' },
   { section: 'System' },
   { to: '/settings', label: 'Settings', icon: 'settings', module: 'settings' },
 ]
@@ -27,13 +28,13 @@ const LINKS = NAV.filter((n) => n.to)
 
 /* Phone bottom bar: the four daily modules only. Today leads because it's
    the home surface; Settings stays in the drawer with sign-out rather than
-   spending a quarter of the bar on something opened once a month. Review
-   and Identity are excluded on the same logic — both are rollups you
-   check into on your own rhythm (weekly for Review, whenever for
-   Identity), not something with a daily due-list, and Today's own
-   .north-star line already keeps the statement present on the surface
-   that IS on the bar. */
-const BOTTOM_NAV = LINKS.filter((n) => n.module !== 'settings' && n.module !== 'review' && n.module !== 'identity')
+   spending a quarter of the bar on something opened once a month. Review,
+   Identity and Momentum are excluded on the same logic — all three are
+   rollups you check into on your own rhythm (weekly for Review, whenever
+   for Identity and Momentum), not something with a daily due-list, and
+   Today's own .north-star line and IntentionCard already keep the
+   day-to-day signal present on the surface that IS on the bar. */
+const BOTTOM_NAV = LINKS.filter((n) => n.module !== 'settings' && n.module !== 'review' && n.module !== 'identity' && n.module !== 'momentum')
 
 function useModuleTheme(pathname) {
   const mod = LINKS.find((n) => (n.end ? pathname === n.to : pathname.startsWith(n.to)))?.module || 'today'

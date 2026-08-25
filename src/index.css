@@ -123,6 +123,15 @@ html[data-module="identity"] {
   --accent-rgb: 107, 91, 31;
   --accent-grad-2: #8a7629;
 }
+/* Momentum — MODULES.momentum in lib/design.js. */
+html[data-module="momentum"] {
+  --accent: #1f4d5b;
+  --accent-dark: #143540;
+  --accent-dim: rgba(31, 77, 91, 0.10);
+  --accent-light: #dbe9ec;
+  --accent-rgb: 31, 77, 91;
+  --accent-grad-2: #2c6a7c;
+}
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html { -webkit-font-smoothing: antialiased; }
