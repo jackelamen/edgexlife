@@ -409,12 +409,6 @@ export default function TodayPage() {
         <span>{IDENTITY_STATEMENT}</span>
       </div>
 
-      {/* Turns the statement above into today, specifically — see
-          components/today/IntentionCard.jsx. Above the hero rather than
-          inside it: the ring row is already a tuned 3-system layout with
-          no free slot, so this is additive instead of crowding it. */}
-      <IntentionCard />
-
       {/* Every other page has this; Today was the one page without it,
           which meant a network failure here rendered indistinguishable
           from "you have never logged anything" — an empty state with the
@@ -460,6 +454,14 @@ export default function TodayPage() {
           </div>
         </div>
       </div>
+
+      {/* Turns the statement up top into today, specifically — see
+          components/today/IntentionCard.jsx. Below the hero, not above
+          it: "Mission control" opening the page is the whole point of
+          this being the first thing on screen every morning, and this
+          card demoted it when it sat above. Secondary follow-up, not a
+          replacement for it. */}
+      <IntentionCard />
 
       {reviewDue && (
         <Link to="/review" className="rv-due">
