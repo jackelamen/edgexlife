@@ -125,7 +125,7 @@ export default function IdentityPage() {
             </p>
             <p className="hero-copy">
               {taggedCount} of {IDENTITY_THREADS.length} threads have an active goal behind them right now.
-              {taggedCount < IDENTITY_THREADS.length && ' The uncovered ones are below, named — not hidden.'}
+              {taggedCount < IDENTITY_THREADS.length && ' The uncovered ones are below, named, not hidden.'}
             </p>
           </div>
           <Ring score={coveragePct} sub={`${taggedCount} of ${IDENTITY_THREADS.length}`} />

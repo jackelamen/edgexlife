@@ -104,8 +104,8 @@ export default function ExecutionHeatmap({ sprint, phases, tactics }) {
                   <g key={wi}>
                     <title>
                       {cell.iso ? pretty(cell.iso) : ''}
-                      {cell.total ? ` — ${cell.done} of ${cell.total} done` :
-                        cell.state === 'future' ? ' — upcoming' : ' — nothing due'}
+                      {cell.total ? `: ${cell.done} of ${cell.total} done` :
+                        cell.state === 'future' ? ': upcoming' : ': nothing due'}
                     </title>
                     <rect x={x} y={y} width={CELL} height={CELL} rx={4}
                       fill={fill || 'var(--white-soft)'}

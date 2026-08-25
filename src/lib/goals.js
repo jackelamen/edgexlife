@@ -704,10 +704,10 @@ export function cycleStreak(phases, tactics, sp) {
 export const STREAK_MILESTONES = [3, 7, 14, 21, 30, 45, 60, 90, 100, 150, 200, 365]
 
 const STREAK_MILESTONE_COPY = {
-  3: 'Three days in a row — the habit is starting to stick.',
+  3: 'Three days in a row. The habit is starting to stick.',
   7: 'A full week, no misses.',
   14: 'Two weeks straight.',
-  21: 'Three weeks — this is a habit now.',
+  21: 'Three weeks. This is a habit now.',
   30: 'A month of showing up every day.',
   45: 'Six and a half weeks. Still going.',
   60: 'Two months, no gaps.',

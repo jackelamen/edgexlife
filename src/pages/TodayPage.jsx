@@ -373,7 +373,7 @@ export default function TodayPage() {
      cross-module pattern if one exists, otherwise the component actually
      dragging the score, otherwise an honest "nothing to say yet". */
   const insight = patterns[0]?.text
-    || (weakest ? `${weakest.label} is the piece holding your score back — ${weakest.detail}.` : null)
+    || (weakest ? `${weakest.label} is the piece holding your score back: ${weakest.detail}.` : null)
     || 'Log Health and Wellness on the same days and cross-system patterns start surfacing here.'
 
   const healthStreak = currentStreak(healthIdx.data || [])
@@ -530,7 +530,7 @@ export default function TodayPage() {
         <Card>
           <CardHead
             title="Due today"
-            sub="Cycle actions from every live goal — tick them here."
+            sub="Cycle actions from every live goal, tick them here."
             right={dueActions.length
               ? <Badge tone={dueDone === dueActions.length ? 'green' : 'orange'}>{dueDone}/{dueActions.length}</Badge>
               : null}
@@ -611,7 +611,7 @@ export default function TodayPage() {
           <Empty icon="hub" title={matchedDays < 3 ? 'Not enough overlapping days yet' : 'No strong pattern yet'}>
             {matchedDays < 3
               ? 'Log both Health and Wellness on the same days a few more times and a pattern can surface here.'
-              : `Checked ${matchedDays} days with both a health log and a check-in — nothing crossed the bar to report yet.`}
+              : `Checked ${matchedDays} days with both a health log and a check-in; nothing crossed the bar to report yet.`}
           </Empty>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>

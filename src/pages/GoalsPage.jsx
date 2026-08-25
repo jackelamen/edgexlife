@@ -36,7 +36,7 @@ import { IDENTITY_THREADS, identityThreadByKey } from '../lib/identity'
 const VIEWS = [
   { value: 'today', label: 'Today', sub: "What's due today, and how the week is going." },
   { value: 'goals', label: 'Goals', sub: 'Every active goal, by life area, with what feeds it.' },
-  { value: 'cycles', label: 'Cycles', sub: 'Focus cycles, 1 to 12 weeks — phases, actions, execution.' },
+  { value: 'cycles', label: 'Cycles', sub: 'Focus cycles, 1 to 12 weeks · phases, actions, execution.' },
   { value: 'roadmap', label: 'Roadmap', sub: 'Every cycle plotted against the calendar.' },
   { value: 'visions', label: 'Visions', sub: 'The future state you’re building toward, by area.' },
   { value: 'retros', label: 'Retros', sub: 'What a finished cycle taught you.' },
@@ -166,7 +166,7 @@ function TodayView({ goals, rollup, cycleData, onStartCycle }) {
           <div className="hero-title">
             {!live.length ? 'Nothing in motion yet.' :
               todayTotals.total === 0 ? 'Nothing due today. Rest counts.' :
-              todayTotals.done === todayTotals.total ? 'Clean day — everything checked off.' :
+              todayTotals.done === todayTotals.total ? 'Clean day. Everything checked off.' :
               `${todayTotals.done} of ${todayTotals.total} actions done today.`}
           </div>
           {/* The checklist above says WHAT's due; this says WHY it's worth
@@ -249,7 +249,7 @@ function TodayView({ goals, rollup, cycleData, onStartCycle }) {
         <Card>
           <Empty icon="rocket_launch" title="Nothing in motion yet"
             action={<button className="btn btn-primary btn-sm" onClick={onStartCycle}>Start a Cycle</button>}>
-            Start a Focus Cycle — a week, a month, or the full 12 — and your daily actions will show up here.
+            Start a Focus Cycle (a week, a month, or the full 12) and your daily actions will show up here.
           </Empty>
         </Card>
       ) : (
@@ -339,7 +339,7 @@ function CycleCard({ sprint, phases, tactics, goal, compact, onChanged, onDelete
             the reserved status ramp (red/amber/green) rather than the
             module accent. */}
         <div className="cycle-ring-section"
-          title={`Commitment rate — ${rate.done} of ${rate.total} commitments met on days that have fully elapsed`}>
+          title={`Commitment rate: ${rate.done} of ${rate.total} commitments met on days that have fully elapsed`}>
           {rate.pct != null ? (
             <Ring score={rate.pct} size={72} stroke={7} sub="rate" onAccent={false} />
           ) : (
@@ -625,7 +625,7 @@ function GoalRoom({ goals, rollup, cycleData, onEdit, onStartCycle, onOpenCycles
 
       {SHOW_SAVINGS && (
         <Card>
-          <CardHead title="Savings Targets" sub="From your Finance app — shown here, edited there." />
+          <CardHead title="Savings Targets" sub="From your Finance app, shown here, edited there." />
           {savings.loading ? <Loading /> : !(savings.data || []).length ? (
             <Empty icon="savings" title="No savings goals yet" />
           ) : (
@@ -721,7 +721,7 @@ function GoalCard({ goal, roll, hasCycle, cycle, onOpenCycle, onStartCycle, open
         {!hasCycle && goal.status === 'active' && (
           <button className="btn btn-secondary btn-sm" style={{ width: '100%', justifyContent: 'center', marginBottom: 12 }}
             onClick={(e) => { e.stopPropagation(); onStartCycle() }}>
-            <Icon name="add_circle" size={14} /> No cycle yet — start one
+            <Icon name="add_circle" size={14} /> No cycle yet, start one
           </button>
         )}
         {/* The one thing this card was missing entirely: how the live
@@ -967,7 +967,7 @@ function GoalEditor({ goal, onClose, onSaved }) {
             try {
               const justCompleted = goal?.id && goal.status !== 'completed' && cur.status === 'completed'
               await saveGoal({ ...cur, id: goal?.id })
-              if (justCompleted) toast.success(`🎉 "${cur.title}" — goal completed!`, { duration: 4500 })
+              if (justCompleted) toast.success(`🎉 Goal completed: "${cur.title}"`, { duration: 4500 })
               else toast.success(goal?.id ? 'Goal updated' : 'Goal created')
               setG(null); onSaved(); onClose()
             } catch (e) { toast.error(e.message) } finally { setSaving(false) }
@@ -996,7 +996,7 @@ function GoalEditor({ goal, onClose, onSaved }) {
         <Field label="Identity thread (optional)"
           hint="Which part of your identity statement is this goal actually for? See it rolled up on the Identity page.">
           <select value={cur.identity_thread || ''} onChange={(e) => setG({ ...cur, identity_thread: e.target.value || null })}>
-            <option value="">— none —</option>
+            <option value="">None</option>
             {IDENTITY_THREADS.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
           </select>
         </Field>
@@ -1005,7 +1005,7 @@ function GoalEditor({ goal, onClose, onSaved }) {
             this flag first). Only one goal can be featured at a time —
             saveGoal() clears the previous one automatically, and the DB
             has a matching unique index as a backstop. */}
-        <Field hint="Pins this goal's cycle to the top of Today, instead of whichever cycle owes the most today. Only one goal can be featured — picking this one un-features whatever was featured before.">
+        <Field hint="Pins this goal's cycle to the top of Today, instead of whichever cycle owes the most today. Only one goal can be featured; picking this one un-features whatever was featured before.">
           <label className="flex items-center gap-2 text-[13px]">
             <input type="checkbox" checked={Boolean(cur.featured)}
               onChange={(e) => setG({ ...cur, featured: e.target.checked })} />
@@ -1255,7 +1255,7 @@ function CycleEditor({ sprint, cloneFrom, goals, seedGoalId, onClose, onSaved })
       let payload = cur
       if (isQuick && !cur.name?.trim()) {
         const goalTitle = goals.find((g) => g.id === cur.goal_id)?.title || 'Cycle'
-        payload = { ...cur, name: `${goalTitle} — ${quickTactic.text.trim()}`.slice(0, 80) }
+        payload = { ...cur, name: `${goalTitle} · ${quickTactic.text.trim()}`.slice(0, 80) }
       }
       const sprintId = await saveSprint({ ...payload, id: sprint?.id })
       const id = sprint?.id || sprintId
@@ -1356,7 +1356,7 @@ function CycleEditor({ sprint, cloneFrom, goals, seedGoalId, onClose, onSaved })
               to that week's Monday (snapToMonday). A mid-week start meant
               week 1 was really a 2-day week that no score could represent
               fairly — see the Scoring v2 note in lib/goals.js. */}
-          <Field label="Start Date" hint="Snaps to Monday — cycles run Mon–Sun.">
+          <Field label="Start Date" hint="Snaps to Monday. Cycles run Mon–Sun.">
             <input type="date" value={cur.start_date || ''}
               onChange={(e) => {
                 const start = snapToMonday(e.target.value)
@@ -1394,7 +1394,7 @@ function CycleEditor({ sprint, cloneFrom, goals, seedGoalId, onClose, onSaved })
               </div>
             </Field>
             <p style={{ fontSize: 11.5, color: 'var(--text-3)', fontWeight: 600, marginTop: -8 }}>
-              You can add more actions or split this into phases anytime — edit the cycle and switch to Full setup.
+              You can add more actions or split this into phases anytime: edit the cycle and switch to Full setup.
             </p>
           </>
         ) : (
