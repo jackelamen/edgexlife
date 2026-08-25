@@ -26,6 +26,7 @@ import { today, daysAgo, pretty, shiftDate } from '../lib/dates'
 import { fetchReviewIndex } from '../lib/data'
 import { isReviewWindow, reviewTargetWeekId, prettyWeek } from '../lib/review'
 import { IDENTITY_STATEMENT, identityThreadByKey } from '../lib/identity'
+import IntentionCard from '../components/today/IntentionCard'
 
 /*
   Mission control.
@@ -407,6 +408,12 @@ export default function TodayPage() {
         <Icon name="star" size={13} />
         <span>{IDENTITY_STATEMENT}</span>
       </div>
+
+      {/* Turns the statement above into today, specifically — see
+          components/today/IntentionCard.jsx. Above the hero rather than
+          inside it: the ring row is already a tuned 3-system layout with
+          no free slot, so this is additive instead of crowding it. */}
+      <IntentionCard />
 
       {/* Every other page has this; Today was the one page without it,
           which meant a network failure here rendered indistinguishable

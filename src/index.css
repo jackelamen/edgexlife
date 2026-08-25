@@ -1246,6 +1246,95 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
 .streak-milestone-title { font-size: 14px; font-weight: 800; color: #c2410c; }
 .streak-milestone-sub { font-size: 12.5px; font-weight: 600; color: #ea580c; opacity: .85; margin-top: 1px; }
 
+/* ── Daily Intention card (Today, above the hero) ────────────────
+   Deliberately its own accent (--id-accent/--id-tint, MODULES.identity's
+   hex from lib/design.js) rather than var(--accent) — that resolves to
+   Today's own graphite here, but this card is tied to the identity
+   statement specifically, same gold every other identity-thread badge
+   in the app already uses (GoalCard, Identity page). */
+.intention-card {
+  --id-accent: #6b5b1f; --id-tint: #efe9d0;
+  background: var(--white); border: 1px solid var(--border); border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm); overflow: hidden; margin-bottom: 20px;
+}
+.intention-top { padding: 18px 20px 16px; display: flex; flex-direction: column; gap: 12px; }
+.intention-eyebrow { display: flex; align-items: center; gap: 8px; }
+.intention-eyebrow .icon { color: var(--id-accent); font-size: 15px; }
+.intention-eyebrow span { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); }
+
+.thread-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.thread-chip {
+  display: inline-flex; align-items: center; gap: 5px; padding: 6px 12px; border-radius: 99px;
+  border: 1.5px solid var(--border-med); background: var(--white); color: var(--text-2);
+  font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer; transition: all .15s;
+}
+.thread-chip:hover { border-color: var(--id-accent); color: var(--id-accent); }
+.thread-chip.active { background: var(--id-tint); border-color: var(--id-accent); color: var(--id-accent); }
+
+.intention-prompt { font-size: 13.5px; font-weight: 600; color: var(--text-2); margin: 2px 0 0; }
+.intention-input {
+  width: 100%; border: 1.5px solid var(--border-med); border-radius: var(--radius-sm); background: var(--white-soft);
+  padding: 11px 13px; font-family: inherit; font-size: 14px; font-weight: 600; color: var(--text); resize: none;
+}
+.intention-input::placeholder { color: var(--text-3); font-weight: 500; }
+.intention-input:focus { outline: none; border-color: var(--id-accent); background: var(--white); }
+
+.task-attach { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.task-attach-label { font-size: 12px; font-weight: 700; color: var(--text-3); }
+
+.task-pick-row {
+  display: flex; align-items: center; gap: 10px; padding: 9px 11px; border-radius: 10px;
+  border: 1px solid var(--border); background: var(--white-soft); font-size: 12.5px; font-weight: 600; cursor: pointer;
+}
+.task-pick-row input { accent-color: var(--id-accent); width: 15px; height: 15px; }
+.task-pick-due { margin-left: auto; font-size: 10.5px; font-weight: 700; color: var(--text-3); }
+
+.intention-footer { border-top: 1px solid var(--border); padding: 12px 20px; display: flex; justify-content: flex-end; }
+
+.set-header { display: flex; align-items: center; gap: 10px; padding: 16px 20px 0; }
+.thread-badge {
+  display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 99px;
+  background: var(--id-tint); color: var(--id-accent); font-size: 11px; font-weight: 700;
+}
+.set-quote { font-size: 15px; font-style: italic; font-weight: 700; line-height: 1.42; margin: 10px 20px 4px; color: var(--text); }
+.set-sub { font-size: 11.5px; font-weight: 700; color: var(--text-3); text-transform: uppercase; letter-spacing: .04em; margin: 0 20px 14px; }
+
+.task-list { display: flex; flex-direction: column; gap: 6px; padding: 0 20px 16px; }
+.task-row { display: flex; align-items: center; gap: 10px; padding: 9px 11px; border-radius: 10px; background: var(--white-soft); }
+.task-check {
+  width: 19px; height: 19px; border-radius: 6px; border: 1.5px solid var(--border-med); background: var(--white);
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0; padding: 0; cursor: pointer;
+}
+.task-check.done { background: var(--s-good); border-color: var(--s-good); color: #fff; }
+.task-row span { font-size: 13px; font-weight: 600; color: var(--text); flex: 1; }
+.task-row.done span { color: var(--text-3); text-decoration: line-through; }
+.task-remove {
+  background: transparent; border: none; color: var(--text-3); cursor: pointer; padding: 2px;
+  display: flex; opacity: .6; flex-shrink: 0;
+}
+.task-remove:hover { opacity: 1; color: var(--s-risk); }
+
+.reflect-divider { border-top: 1px solid var(--border); padding: 16px 20px; }
+.reflect-title { font-size: 12px; font-weight: 700; color: var(--text-3); margin-bottom: 10px; }
+.outcome-row { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+.outcome-btn {
+  flex: 1; min-width: 90px; font-family: inherit; padding: 9px 8px; border-radius: 10px; border: 1.5px solid var(--border-med);
+  background: var(--white); color: var(--text-2); font-size: 12px; font-weight: 700; cursor: pointer; transition: all .15s;
+}
+.outcome-btn:hover { border-color: var(--text-2); }
+.outcome-btn.sel-good { background: var(--s-good-bg); border-color: var(--s-good); color: var(--s-good); }
+.outcome-btn.sel-short { background: var(--s-short-bg); border-color: var(--s-short); color: var(--s-short); }
+.outcome-btn.sel-risk { background: var(--s-risk-bg); border-color: var(--s-risk); color: var(--s-risk); }
+
+.closed-summary { padding: 16px 20px; display: flex; align-items: flex-start; gap: 12px; }
+.closed-badge { width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0; display: grid; place-items: center; background: var(--id-tint); color: var(--id-accent); }
+.closed-badge.tone-good { background: var(--s-good-bg); color: var(--s-good); }
+.closed-badge.tone-short { background: var(--s-short-bg); color: var(--s-short); }
+.closed-badge.tone-risk { background: var(--s-risk-bg); color: var(--s-risk); }
+.closed-text .quote { font-size: 14px; font-style: italic; font-weight: 700; color: var(--text); margin: 0 0 4px; }
+.closed-text .note { font-size: 12.5px; color: var(--text-2); margin: 0 0 6px; line-height: 1.5; }
+.closed-text .meta { font-size: 11px; font-weight: 700; color: var(--text-3); text-transform: uppercase; letter-spacing: .03em; }
+
 /* Used as a <button> on Today so cycle actions and habits are tickable
    without leaving mission control. */
 .check-row {

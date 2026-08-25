@@ -635,6 +635,78 @@ export async function linkHabitToGoal(habitId, goalId) {
   invalidate('habits'); invalidate('goal-rollup')
 }
 
+/* ═══════════════════════ DAILY INTENTIONS ═══════════════════════
+   One row per calendar day (daily_intentions, unique on user_id+date):
+   a short intention tied to an identity thread, closed out that evening
+   with an outcome + reflection. Pulse tasks "committed to today" live in
+   a separate join table (daily_intention_tasks) rather than a column on
+   `tasks` — tasks is shared with Pulse/xFocus (same Supabase project,
+   same user id), and a task being committed today is independent of it
+   being goal-linked (tasks.goal_id, used elsewhere in this file). */
+
+export const fetchDailyIntention = (dateISO, o) => cachedQuery(`daily-intention:${dateISO}`, async () =>
+  unwrap(await supabase.from('daily_intentions')
+    .select('id,date,identity_thread,intention,outcome,reflection,closed_at')
+    .eq('date', dateISO).maybeSingle()), { ttlMs: TTL.pulse, ...o })
+
+export async function saveDailyIntention(intention) {
+  const payload = {
+    date: intention.date, user_id: await uid(),
+    identity_thread: intention.identity_thread || null,
+    intention: intention.intention || '',
+    outcome: intention.outcome || null,
+    reflection: intention.reflection || null,
+    closed_at: intention.closed_at || null,
+    updated_at: new Date().toISOString(),
+  }
+  const { error } = await supabase.from('daily_intentions')
+    .upsert(payload, { onConflict: 'user_id,date' })
+  if (error) throw error
+  invalidate(`daily-intention:${intention.date}`)
+}
+
+/** Open Pulse tasks eligible to attach to today's intention — every open
+    task, not just unlinked ones (fetchUnlinkedTasks below is scoped to
+    goal-linking specifically): "must get done today" is independent of
+    whether a task already belongs to a goal. */
+export const fetchTodayCandidateTasks = (o) => cachedQuery('today-candidate-tasks', async () =>
+  unwrap(await supabase.from('tasks')
+    .select('id,title,due_at,priority,goal_id,completed_at')
+    .is('deleted_at', null).is('archived_at', null).is('parent_task_id', null)
+    .not('status', 'in', '(done,cancelled)')
+    .order('due_at', { ascending: true, nullsFirst: false }).limit(60)), { ttlMs: TTL.pulse, ...o })
+
+/** Caller is responsible for only invoking this once intentionId is real
+    (see useAsync's `enabled` option) — there's no intention row yet on a
+    brand-new day, and querying with an undefined id would just error. */
+export const fetchIntentionTasks = (intentionId, o) => cachedQuery(`intention-tasks:${intentionId}`, async () =>
+  unwrap(await supabase.from('daily_intention_tasks')
+    .select('id,task_id,tasks(id,title,completed_at)')
+    .eq('intention_id', intentionId)), { ttlMs: TTL.pulse, ...o })
+
+export async function attachIntentionTask(intentionId, taskId) {
+  const { error } = await supabase.from('daily_intention_tasks')
+    .insert({ intention_id: intentionId, task_id: taskId, user_id: await uid() })
+  if (error) throw error
+  invalidate(`intention-tasks:${intentionId}`)
+}
+
+export async function detachIntentionTask(rowId, intentionId) {
+  const { error } = await supabase.from('daily_intention_tasks').delete().eq('id', rowId)
+  if (error) throw error
+  invalidate(`intention-tasks:${intentionId}`)
+}
+
+/** Reuses the same `tasks.completed_at` column Pulse itself reads —
+    checking a committed task off here is the same action as completing
+    it in Pulse, not a shadow "done in xLife only" state. */
+export async function toggleTaskDone(taskId, done) {
+  const { error } = await supabase.from('tasks')
+    .update({ completed_at: done ? new Date().toISOString() : null }).eq('id', taskId)
+  if (error) throw error
+  invalidate('today-candidate-tasks'); invalidate('intention-tasks'); invalidate('goal-tasks'); invalidate('unlinked-tasks')
+}
+
 /**
  * Tick a habit for a day. Deliberately select-then-write rather than
  * `.upsert()`: the uniqueness guard is a PARTIAL index
