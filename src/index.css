@@ -1297,6 +1297,10 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
 }
 .task-pick-row input { accent-color: var(--id-accent); width: 15px; height: 15px; }
 .task-pick-due { margin-left: auto; font-size: 10.5px; font-weight: 700; color: var(--text-3); }
+.picker-section-label {
+  font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text-3);
+  margin-bottom: 6px;
+}
 
 .intention-footer { border-top: 1px solid var(--border); padding: 12px 20px; display: flex; justify-content: flex-end; }
 

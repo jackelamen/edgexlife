@@ -649,11 +649,12 @@ export async function linkHabitToGoal(habitId, goalId) {
 /* ═══════════════════════ DAILY INTENTIONS ═══════════════════════
    One row per calendar day (daily_intentions, unique on user_id+date):
    a short intention tied to one or more identity threads, closed out that evening
-   with an outcome + reflection. Pulse tasks "committed to today" live in
-   a separate join table (daily_intention_tasks) rather than a column on
-   `tasks` — tasks is shared with Pulse/xFocus (same Supabase project,
-   same user id), and a task being committed today is independent of it
-   being goal-linked (tasks.goal_id, used elsewhere in this file). */
+   with an outcome + reflection. Pulse tasks and habits "committed to
+   today" live in separate join tables (daily_intention_tasks,
+   daily_intention_habits) rather than columns on `tasks`/`habits` —
+   both are shared with Pulse/xFocus (same Supabase project, same user
+   id), and being committed today is independent of a task's own
+   goal-linking (tasks.goal_id, used elsewhere in this file). */
 
 export const fetchDailyIntention = (dateISO, o) => cachedQuery(`daily-intention:${dateISO}`, async () =>
   unwrap(await supabase.from('daily_intentions')
@@ -723,6 +724,31 @@ export async function toggleTaskDone(taskId, done) {
     .update({ completed_at: done ? new Date().toISOString() : null }).eq('id', taskId)
   if (error) throw error
   invalidate('today-candidate-tasks'); invalidate('intention-tasks'); invalidate('goal-tasks'); invalidate('unlinked-tasks')
+}
+
+/** Same shape as fetchIntentionTasks/attachIntentionTask/
+    detachIntentionTask above, for Pulse habits instead of tasks — see
+    daily_intention_habits' own comment for why this is a separate join
+    table rather than reusing daily_intention_tasks or a column on
+    habits. Candidates come straight from the existing fetchHabits (no
+    separate "today-candidate-habits" query needed) filtered client-side
+    by isHabitDueToday, same as TodayPage's own habit list. */
+export const fetchIntentionHabits = (intentionId, o) => cachedQuery(`intention-habits:${intentionId}`, async () =>
+  unwrap(await supabase.from('daily_intention_habits')
+    .select('id,habit_id,habits(id,name,icon,color)')
+    .eq('intention_id', intentionId)), { ttlMs: TTL.pulse, ...o })
+
+export async function attachIntentionHabit(intentionId, habitId) {
+  const { error } = await supabase.from('daily_intention_habits')
+    .insert({ intention_id: intentionId, habit_id: habitId, user_id: await uid() })
+  if (error) throw error
+  invalidate(`intention-habits:${intentionId}`)
+}
+
+export async function detachIntentionHabit(rowId, intentionId) {
+  const { error } = await supabase.from('daily_intention_habits').delete().eq('id', rowId)
+  if (error) throw error
+  invalidate(`intention-habits:${intentionId}`)
 }
 
 /**

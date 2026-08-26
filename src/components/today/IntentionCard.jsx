@@ -4,6 +4,8 @@ import { useAsync } from '../../hooks/useAsync'
 import {
   fetchDailyIntention, saveDailyIntention, fetchTodayCandidateTasks, fetchIntentionTasks,
   attachIntentionTask, detachIntentionTask, toggleTaskDone,
+  fetchHabits, fetchHabitLogs, logHabit, unlogHabit,
+  fetchIntentionHabits, attachIntentionHabit, detachIntentionHabit,
 } from '../../lib/data'
 import { today, pretty } from '../../lib/dates'
 import { IDENTITY_THREADS, identityThreadByKey } from '../../lib/identity'
@@ -15,17 +17,18 @@ import Icon from '../ui/Icon'
   statement rather than a bare to-do: you pick which thread(s) (lib/
   identity.js IDENTITY_THREADS) today is in service of — more than one at
   once is fine, a day can genuinely be in service of Success AND Health —
-  say what that looks like, optionally commit Pulse tasks to it, then
-  close the loop that evening with the same yes/mostly/partial/no
-  vocabulary Goals' cycle retros already use — one outcome scale across
-  the app, not a second one invented here.
+  say what that looks like, optionally commit Pulse tasks AND habits to
+  it, then close the loop that evening with the same yes/mostly/partial/
+  no vocabulary Goals' cycle retros already use — one outcome scale
+  across the app, not a second one invented here.
 
   Three states, driven entirely by daily_intentions' own columns for
   today's date (see saveDailyIntention in lib/data.js):
     no row yet       -> morning prompt
-    row, not closed   -> set (quote + tasks), with the reflect form
-                         available to open whenever
-    row, closed_at set -> compact closed summary
+    row, not closed   -> set (quote + committed tasks/habits), with the
+                         reflect form and the edit form both available
+                         to open whenever
+    row, closed_at set -> compact closed summary, still editable
 */
 
 const OUTCOMES = [['yes', 'Yes, fully'], ['mostly', 'Mostly'], ['partial', 'Partially'], ['no', 'Not really']]
@@ -40,6 +43,17 @@ function threadPhrase(keys) {
   return `${labels.slice(0, -1).join(', ')}, and ${labels[labels.length - 1]}`
 }
 
+/** Pulse's own due-today algorithm isn't available to copy verbatim from
+    this repo, so this is the same best-effort mirror TodayPage.jsx
+    already uses for its own habit list — kept in sync by hand, not
+    imported, since TodayPage's copy is local to that file too. */
+function isHabitDueToday(h) {
+  if (h.cadence === 'daily') return true
+  const days = h.cadence_config?.days
+  if (Array.isArray(days) && days.length) return days.includes(new Date().getDay())
+  return true
+}
+
 export default function IntentionCard() {
   const date = today()
   const row = useAsync((f) => fetchDailyIntention(date, { force: f }), [date])
@@ -51,6 +65,62 @@ export default function IntentionCard() {
   return <SetState intention={intention} onChanged={() => row.reload()} />
 }
 
+/* ── Shared: the "commit Pulse tasks/habits" picker ────────────────
+   Fully controlled — PromptState uses it in deferred mode (nothing's
+   written until the intention itself is saved, since there's no
+   intention_id yet to attach against); SetState/EditForm use it in
+   immediate mode (each checkbox click attaches/detaches right away,
+   same as the existing per-row remove buttons already do). */
+function TaskHabitPicker({ open, onClose, selectedTaskIds, onToggleTask, selectedHabitIds, onToggleHabit }) {
+  // [open] as the dep, not [] — see the useAsync fix commit from earlier
+  // this session (GoalPhotoPicker/IntentionCard/Review all had the same
+  // bug: enabled flipping true doesn't refetch unless it's also a dep).
+  const tasks = useAsync((f) => fetchTodayCandidateTasks({ force: f }), [open], { enabled: open })
+  const habits = useAsync((f) => fetchHabits({ force: f }), [open], { enabled: open })
+  const habitCandidates = (habits.data || []).filter(isHabitDueToday)
+  const loading = tasks.loading || habits.loading
+  const totalSelected = selectedTaskIds.length + selectedHabitIds.length
+
+  return (
+    <Modal open={open} onClose={onClose} title="Commit Pulse tasks & habits to today" width={480}
+      footer={<button className="btn btn-primary" onClick={onClose}>Done ({totalSelected} selected)</button>}>
+      {loading ? <Loading /> : !(tasks.data || []).length && !habitCandidates.length ? (
+        <Empty icon="task_alt" title="Nothing open in Pulse" />
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxHeight: 400, overflowY: 'auto' }}>
+          {(tasks.data || []).length > 0 && (
+            <div>
+              <div className="picker-section-label">Tasks</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {tasks.data.map((t) => (
+                  <label key={t.id} className="task-pick-row">
+                    <input type="checkbox" checked={selectedTaskIds.includes(t.id)} onChange={() => onToggleTask(t.id)} />
+                    <span>{t.title}</span>
+                    {t.due_at && <span className="task-pick-due">{pretty(t.due_at.slice(0, 10))}</span>}
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+          {habitCandidates.length > 0 && (
+            <div>
+              <div className="picker-section-label">Habits</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {habitCandidates.map((h) => (
+                  <label key={h.id} className="task-pick-row">
+                    <input type="checkbox" checked={selectedHabitIds.includes(h.id)} onChange={() => onToggleHabit(h.id)} />
+                    <span>{h.name}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </Modal>
+  )
+}
+
 /* ── Morning: no intention yet ────────────────────────────────── */
 
 function PromptState({ date, onSaved }) {
@@ -58,17 +128,14 @@ function PromptState({ date, onSaved }) {
   const [text, setText] = useState('')
   const [pickingTasks, setPickingTasks] = useState(false)
   const [taskIds, setTaskIds] = useState([])
+  const [habitIds, setHabitIds] = useState([])
   const [saving, setSaving] = useState(false)
-  // [pickingTasks] as the dep, not [] — useAsync only (re)fetches when its
-  // deps array changes, not whenever `enabled` flips. With [], the fetch
-  // ran once at mount while the picker was still closed (enabled: false)
-  // and never ran again once it actually opened — the exact same bug
-  // GoalPhotoPicker had (see that fix's commit for the full explanation).
-  const candidates = useAsync((f) => fetchTodayCandidateTasks({ force: f }), [pickingTasks], { enabled: pickingTasks })
 
   function toggleThread(key) {
     setThreads((cur) => cur.includes(key) ? cur.filter((k) => k !== key) : [...cur, key])
   }
+  const toggleTaskId = (id) => setTaskIds((cur) => cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id])
+  const toggleHabitId = (id) => setHabitIds((cur) => cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id])
 
   async function save() {
     setSaving(true)
@@ -76,12 +143,14 @@ function PromptState({ date, onSaved }) {
       await saveDailyIntention({ date, identity_threads: threads, intention: text.trim() })
       const row = await fetchDailyIntention(date, { force: true })
       for (const taskId of taskIds) await attachIntentionTask(row.id, taskId)
+      for (const habitId of habitIds) await attachIntentionHabit(row.id, habitId)
       toast.success("Today's intention set")
       onSaved()
     } catch (e) { toast.error(e.message) } finally { setSaving(false) }
   }
 
   const phrase = threadPhrase(threads)
+  const attachedCount = taskIds.length + habitIds.length
 
   return (
     <div className="intention-card">
@@ -104,7 +173,7 @@ function PromptState({ date, onSaved }) {
             <div className="task-attach">
               <span className="task-attach-label">Anything from Pulse you must get done?</span>
               <button type="button" className="btn btn-ghost" onClick={() => setPickingTasks(true)}>
-                <Icon name="add_task" size={15} /> {taskIds.length ? `${taskIds.length} attached` : 'Attach tasks'}
+                <Icon name="add_task" size={15} /> {attachedCount ? `${attachedCount} attached` : 'Attach tasks & habits'}
               </button>
             </div>
           </>
@@ -118,23 +187,9 @@ function PromptState({ date, onSaved }) {
         </div>
       )}
 
-      <Modal open={pickingTasks} onClose={() => setPickingTasks(false)} title="Commit Pulse tasks to today" width={480}
-        footer={<button className="btn btn-primary" onClick={() => setPickingTasks(false)}>Done ({taskIds.length} attached)</button>}>
-        {candidates.loading ? <Loading /> : !(candidates.data || []).length ? (
-          <Empty icon="task_alt" title="Nothing open in Pulse" />
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 360, overflowY: 'auto' }}>
-            {candidates.data.map((t) => (
-              <label key={t.id} className="task-pick-row">
-                <input type="checkbox" checked={taskIds.includes(t.id)}
-                  onChange={(e) => setTaskIds(e.target.checked ? [...taskIds, t.id] : taskIds.filter((id) => id !== t.id))} />
-                <span>{t.title}</span>
-                {t.due_at && <span className="task-pick-due">{pretty(t.due_at.slice(0, 10))}</span>}
-              </label>
-            ))}
-          </div>
-        )}
-      </Modal>
+      <TaskHabitPicker open={pickingTasks} onClose={() => setPickingTasks(false)}
+        selectedTaskIds={taskIds} onToggleTask={toggleTaskId}
+        selectedHabitIds={habitIds} onToggleHabit={toggleHabitId} />
     </div>
   )
 }
@@ -145,9 +200,14 @@ function SetState({ intention, onChanged }) {
   const [reflecting, setReflecting] = useState(false)
   const [editing, setEditing] = useState(false)
   const tasks = useAsync((f) => fetchIntentionTasks(intention.id, { force: f }), [intention.id])
+  const habits = useAsync((f) => fetchIntentionHabits(intention.id, { force: f }), [intention.id])
+  const habitLogs = useAsync((f) => fetchHabitLogs(intention.date, intention.date, { force: f }), [intention.date])
   const threads = (intention.identity_threads || []).map((k) => identityThreadByKey[k]).filter(Boolean)
-  const list = tasks.data || []
-  const doneCount = list.filter((r) => r.tasks?.completed_at).length
+  const taskList = tasks.data || []
+  const habitList = habits.data || []
+  const doneHabitIds = new Set((habitLogs.data || []).filter((l) => l.count > 0).map((l) => l.habit_id))
+  const doneCount = taskList.filter((r) => r.tasks?.completed_at).length + habitList.filter((r) => doneHabitIds.has(r.habit_id)).length
+  const totalCommitted = taskList.length + habitList.length
 
   async function toggleTask(row) {
     try {
@@ -156,7 +216,17 @@ function SetState({ intention, onChanged }) {
     } catch (e) { toast.error(e.message) }
   }
 
-  if (editing) return <EditForm intention={intention} onDone={() => { setEditing(false); onChanged() }} onCancel={() => setEditing(false)} />
+  async function toggleHabit(row) {
+    try {
+      if (doneHabitIds.has(row.habit_id)) await unlogHabit(row.habit_id, intention.date)
+      else await logHabit(row.habit_id, intention.date, 1)
+      habitLogs.reload()
+    } catch (e) { toast.error(e.message) }
+  }
+
+  if (editing) {
+    return <EditForm intention={intention} onDone={() => { setEditing(false); onChanged(); tasks.reload(); habits.reload() }} onCancel={() => setEditing(false)} />
+  }
 
   return (
     <div className="intention-card">
@@ -167,11 +237,11 @@ function SetState({ intention, onChanged }) {
         </button>
       </div>
       {intention.intention && <p className="set-quote">"{intention.intention}"</p>}
-      <div className="set-sub">{list.length ? `${doneCount} of ${list.length} tasks done` : "Today's intention"}</div>
+      <div className="set-sub">{totalCommitted ? `${doneCount} of ${totalCommitted} committed done` : "Today's intention"}</div>
 
-      {list.length > 0 && (
+      {totalCommitted > 0 && (
         <div className="task-list">
-          {list.map((row) => {
+          {taskList.map((row) => {
             const done = Boolean(row.tasks?.completed_at)
             return (
               <div key={row.id} className={`task-row${done ? ' done' : ''}`}>
@@ -181,6 +251,21 @@ function SetState({ intention, onChanged }) {
                 <span>{row.tasks?.title}</span>
                 <button type="button" className="task-remove" title="Un-commit this task"
                   onClick={async () => { await detachIntentionTask(row.id, intention.id); tasks.reload() }}>
+                  <Icon name="close" size={13} />
+                </button>
+              </div>
+            )
+          })}
+          {habitList.map((row) => {
+            const done = doneHabitIds.has(row.habit_id)
+            return (
+              <div key={row.id} className={`task-row${done ? ' done' : ''}`}>
+                <button type="button" className={`task-check${done ? ' done' : ''}`} onClick={() => toggleHabit(row)}>
+                  {done && <Icon name="check" size={13} />}
+                </button>
+                <span>{row.habits?.name}</span>
+                <button type="button" className="task-remove" title="Un-commit this habit"
+                  onClick={async () => { await detachIntentionHabit(row.id, intention.id); habits.reload() }}>
                   <Icon name="close" size={13} />
                 </button>
               </div>
@@ -245,9 +330,9 @@ function ClosedState({ intention, onChanged }) {
   const threads = (intention.identity_threads || []).map((k) => identityThreadByKey[k]).filter(Boolean)
   const tone = intention.outcome === 'yes' ? 'good' : intention.outcome === 'no' ? 'risk' : 'short'
 
-  // Editing after closing only touches threads/intention text — see
-  // EditForm — so outcome/reflection/closed_at all pass through
-  // saveDailyIntention unchanged and the loop stays closed.
+  // Editing after closing only touches threads/intention text/committed
+  // tasks & habits — see EditForm — so outcome/reflection/closed_at all
+  // pass through saveDailyIntention unchanged and the loop stays closed.
   if (editing) return <EditForm intention={intention} onDone={() => { setEditing(false); onChanged() }} onCancel={() => setEditing(false)} />
 
   return (
@@ -271,15 +356,37 @@ function ClosedState({ intention, onChanged }) {
   )
 }
 
-/* ── Edit: revise threads/intention text after the fact ───────── */
+/* ── Edit: revise threads/intention text/committed tasks & habits ─ */
 
 function EditForm({ intention, onDone, onCancel }) {
   const [threads, setThreads] = useState(intention.identity_threads || [])
   const [text, setText] = useState(intention.intention || '')
   const [saving, setSaving] = useState(false)
+  const [pickingTasks, setPickingTasks] = useState(false)
+  const tasks = useAsync((f) => fetchIntentionTasks(intention.id, { force: f }), [intention.id])
+  const habits = useAsync((f) => fetchIntentionHabits(intention.id, { force: f }), [intention.id])
+  const taskIds = (tasks.data || []).map((r) => r.task_id)
+  const habitIds = (habits.data || []).map((r) => r.habit_id)
 
   function toggleThread(key) {
     setThreads((cur) => cur.includes(key) ? cur.filter((k) => k !== key) : [...cur, key])
+  }
+
+  // Task/habit changes here are immediate (attach/detach on click), same
+  // as the remove buttons already are in SetState — only threads/text
+  // wait for "Save changes" below, since those are free-text edits that
+  // need an explicit commit point.
+  async function toggleTaskId(taskId) {
+    const existing = (tasks.data || []).find((r) => r.task_id === taskId)
+    if (existing) await detachIntentionTask(existing.id, intention.id)
+    else await attachIntentionTask(intention.id, taskId)
+    tasks.reload()
+  }
+  async function toggleHabitId(habitId) {
+    const existing = (habits.data || []).find((r) => r.habit_id === habitId)
+    if (existing) await detachIntentionHabit(existing.id, intention.id)
+    else await attachIntentionHabit(intention.id, habitId)
+    habits.reload()
   }
 
   async function save() {
@@ -295,6 +402,7 @@ function EditForm({ intention, onDone, onCancel }) {
   }
 
   const phrase = threadPhrase(threads)
+  const attachedCount = taskIds.length + habitIds.length
 
   return (
     <div className="intention-card">
@@ -310,6 +418,12 @@ function EditForm({ intention, onDone, onCancel }) {
         </div>
         <textarea className="intention-input" rows={2} value={text} onChange={(e) => setText(e.target.value)}
           placeholder={phrase ? `e.g. one concrete thing that's actually ${phrase} today` : 'What does today look like?'} />
+        <div className="task-attach">
+          <span className="task-attach-label">Pulse tasks &amp; habits committed today</span>
+          <button type="button" className="btn btn-ghost" onClick={() => setPickingTasks(true)}>
+            <Icon name="add_task" size={15} /> {attachedCount ? `${attachedCount} attached` : 'Choose tasks & habits'}
+          </button>
+        </div>
       </div>
       <div className="intention-footer" style={{ justifyContent: 'space-between' }}>
         <button type="button" className="btn btn-ghost" onClick={onCancel}>Cancel</button>
@@ -317,6 +431,10 @@ function EditForm({ intention, onDone, onCancel }) {
           <Icon name="check" size={16} /> {saving ? 'Saving…' : 'Save changes'}
         </button>
       </div>
+
+      <TaskHabitPicker open={pickingTasks} onClose={() => setPickingTasks(false)}
+        selectedTaskIds={taskIds} onToggleTask={toggleTaskId}
+        selectedHabitIds={habitIds} onToggleHabit={toggleHabitId} />
     </div>
   )
 }
