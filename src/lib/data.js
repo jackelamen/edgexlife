@@ -648,7 +648,7 @@ export async function linkHabitToGoal(habitId, goalId) {
 
 /* ═══════════════════════ DAILY INTENTIONS ═══════════════════════
    One row per calendar day (daily_intentions, unique on user_id+date):
-   a short intention tied to an identity thread, closed out that evening
+   a short intention tied to one or more identity threads, closed out that evening
    with an outcome + reflection. Pulse tasks "committed to today" live in
    a separate join table (daily_intention_tasks) rather than a column on
    `tasks` — tasks is shared with Pulse/xFocus (same Supabase project,
@@ -657,13 +657,13 @@ export async function linkHabitToGoal(habitId, goalId) {
 
 export const fetchDailyIntention = (dateISO, o) => cachedQuery(`daily-intention:${dateISO}`, async () =>
   unwrap(await supabase.from('daily_intentions')
-    .select('id,date,identity_thread,intention,outcome,reflection,closed_at')
+    .select('id,date,identity_threads,intention,outcome,reflection,closed_at')
     .eq('date', dateISO).maybeSingle()), { ttlMs: TTL.pulse, ...o })
 
 export async function saveDailyIntention(intention) {
   const payload = {
     date: intention.date, user_id: await uid(),
-    identity_thread: intention.identity_thread || null,
+    identity_threads: intention.identity_threads || [],
     intention: intention.intention || '',
     outcome: intention.outcome || null,
     reflection: intention.reflection || null,
@@ -682,7 +682,14 @@ export async function saveDailyIntention(intention) {
     whether a task already belongs to a goal. */
 export const fetchTodayCandidateTasks = (o) => cachedQuery('today-candidate-tasks', async () =>
   unwrap(await supabase.from('tasks')
-    .select('id,title,due_at,priority,goal_id,completed_at')
+    .select('id,title,due_at,priority,goal_id')
+    // completed_at is/status not-in are BOTH needed, same as
+    // fetchUnlinkedTasks/fetchGoalTasks elsewhere in this file — Pulse's
+    // status field can lag completed_at, so a task can carry a real
+    // completion timestamp while status still reads as open. Missing
+    // this filter is exactly how a task already done yesterday still
+    // showed up as attachable today.
+    .is('completed_at', null)
     .is('deleted_at', null).is('archived_at', null).is('parent_task_id', null)
     .not('status', 'in', '(done,cancelled)')
     .order('due_at', { ascending: true, nullsFirst: false }).limit(60)), { ttlMs: TTL.pulse, ...o })

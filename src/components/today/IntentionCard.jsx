@@ -11,13 +11,14 @@ import { Modal, Empty, Loading } from '../ui/Kit'
 import Icon from '../ui/Icon'
 
 /*
-  Sits above Today's hero — see the approved mockup. Tied to the identity
-  statement rather than a bare to-do: you pick which of the six threads
-  (lib/identity.js IDENTITY_THREADS) today is in service of, say what
-  that looks like, optionally commit Pulse tasks to it, then close the
-  loop that evening with the same yes/mostly/partial/no vocabulary
-  Goals' cycle retros already use — one outcome scale across the app,
-  not a second one invented here.
+  Sits below Today's hero — see the approved mockup. Tied to the identity
+  statement rather than a bare to-do: you pick which thread(s) (lib/
+  identity.js IDENTITY_THREADS) today is in service of — more than one at
+  once is fine, a day can genuinely be in service of Success AND Health —
+  say what that looks like, optionally commit Pulse tasks to it, then
+  close the loop that evening with the same yes/mostly/partial/no
+  vocabulary Goals' cycle retros already use — one outcome scale across
+  the app, not a second one invented here.
 
   Three states, driven entirely by daily_intentions' own columns for
   today's date (see saveDailyIntention in lib/data.js):
@@ -28,6 +29,16 @@ import Icon from '../ui/Icon'
 */
 
 const OUTCOMES = [['yes', 'Yes, fully'], ['mostly', 'Mostly'], ['partial', 'Partially'], ['no', 'Not really']]
+
+/** "success", "success and health", or "success, health, and family" —
+    used in the adaptive prompt/placeholder text once more than one
+    thread is picked. */
+function threadPhrase(keys) {
+  const labels = keys.map((k) => identityThreadByKey[k]?.label.toLowerCase()).filter(Boolean)
+  if (labels.length <= 1) return labels[0] || ''
+  if (labels.length === 2) return `${labels[0]} and ${labels[1]}`
+  return `${labels.slice(0, -1).join(', ')}, and ${labels[labels.length - 1]}`
+}
 
 export default function IntentionCard() {
   const date = today()
@@ -43,7 +54,7 @@ export default function IntentionCard() {
 /* ── Morning: no intention yet ────────────────────────────────── */
 
 function PromptState({ date, onSaved }) {
-  const [thread, setThread] = useState(null)
+  const [threads, setThreads] = useState([])
   const [text, setText] = useState('')
   const [pickingTasks, setPickingTasks] = useState(false)
   const [taskIds, setTaskIds] = useState([])
@@ -55,10 +66,14 @@ function PromptState({ date, onSaved }) {
   // GoalPhotoPicker had (see that fix's commit for the full explanation).
   const candidates = useAsync((f) => fetchTodayCandidateTasks({ force: f }), [pickingTasks], { enabled: pickingTasks })
 
+  function toggleThread(key) {
+    setThreads((cur) => cur.includes(key) ? cur.filter((k) => k !== key) : [...cur, key])
+  }
+
   async function save() {
     setSaving(true)
     try {
-      await saveDailyIntention({ date, identity_thread: thread, intention: text.trim() })
+      await saveDailyIntention({ date, identity_threads: threads, intention: text.trim() })
       const row = await fetchDailyIntention(date, { force: true })
       for (const taskId of taskIds) await attachIntentionTask(row.id, taskId)
       toast.success("Today's intention set")
@@ -66,26 +81,26 @@ function PromptState({ date, onSaved }) {
     } catch (e) { toast.error(e.message) } finally { setSaving(false) }
   }
 
-  const threadLabel = thread ? identityThreadByKey[thread]?.short.toLowerCase() : null
+  const phrase = threadPhrase(threads)
 
   return (
     <div className="intention-card">
       <div className="intention-top">
         <div className="intention-eyebrow"><Icon name="star" fill size={15} /><span>Today's intention</span></div>
-        <p className="intention-prompt">Which part of who you're building shows up today?</p>
+        <p className="intention-prompt">Which part of who you're building shows up today? Pick as many as fit.</p>
         <div className="thread-row">
           {IDENTITY_THREADS.map((t) => (
-            <button key={t.key} type="button" className={`thread-chip${thread === t.key ? ' active' : ''}`}
-              onClick={() => setThread(t.key === thread ? null : t.key)}>
-              <Icon name={t.icon} size={14} fill={thread === t.key} />{t.short}
+            <button key={t.key} type="button" className={`thread-chip${threads.includes(t.key) ? ' active' : ''}`}
+              onClick={() => toggleThread(t.key)}>
+              <Icon name={t.icon} size={14} fill={threads.includes(t.key)} />{t.short}
             </button>
           ))}
         </div>
-        {thread && (
+        {threads.length > 0 && (
           <>
-            <p className="intention-prompt">What does "{identityThreadByKey[thread]?.label.toLowerCase()}" look like today?</p>
+            <p className="intention-prompt">What does "{phrase}" look like today?</p>
             <textarea className="intention-input" rows={2} value={text} onChange={(e) => setText(e.target.value)}
-              placeholder={`e.g. one concrete thing that's actually ${threadLabel} today`} />
+              placeholder={`e.g. one concrete thing that's actually ${phrase} today`} />
             <div className="task-attach">
               <span className="task-attach-label">Anything from Pulse you must get done?</span>
               <button type="button" className="btn btn-ghost" onClick={() => setPickingTasks(true)}>
@@ -95,7 +110,7 @@ function PromptState({ date, onSaved }) {
           </>
         )}
       </div>
-      {thread && (
+      {threads.length > 0 && (
         <div className="intention-footer">
           <button type="button" className="btn btn-primary" disabled={saving || !text.trim()} onClick={save}>
             <Icon name="check" size={16} /> {saving ? 'Setting…' : "Set today's intention"}
@@ -129,7 +144,7 @@ function PromptState({ date, onSaved }) {
 function SetState({ intention, onChanged }) {
   const [reflecting, setReflecting] = useState(false)
   const tasks = useAsync((f) => fetchIntentionTasks(intention.id, { force: f }), [intention.id])
-  const thread = identityThreadByKey[intention.identity_thread]
+  const threads = (intention.identity_threads || []).map((k) => identityThreadByKey[k]).filter(Boolean)
   const list = tasks.data || []
   const doneCount = list.filter((r) => r.tasks?.completed_at).length
 
@@ -143,7 +158,7 @@ function SetState({ intention, onChanged }) {
   return (
     <div className="intention-card">
       <div className="set-header">
-        {thread && <span className="thread-badge"><Icon name={thread.icon} size={14} fill />{thread.short}</span>}
+        {threads.map((t) => <span key={t.key} className="thread-badge"><Icon name={t.icon} size={14} fill />{t.short}</span>)}
       </div>
       {intention.intention && <p className="set-quote">"{intention.intention}"</p>}
       <div className="set-sub">{list.length ? `${doneCount} of ${list.length} tasks done` : "Today's intention"}</div>
@@ -220,18 +235,20 @@ function ReflectForm({ intention, onDone }) {
 /* ── Closed: loop already shut for today ──────────────────────── */
 
 function ClosedState({ intention }) {
-  const thread = identityThreadByKey[intention.identity_thread]
+  const threads = (intention.identity_threads || []).map((k) => identityThreadByKey[k]).filter(Boolean)
   const tone = intention.outcome === 'yes' ? 'good' : intention.outcome === 'no' ? 'risk' : 'short'
   return (
     <div className="intention-card">
       <div className="closed-summary">
-        <span className={`closed-badge tone-${tone}`}>
-          <Icon name={thread?.icon || 'star'} size={19} fill />
-        </span>
         <div className="closed-text">
+          {threads.length > 0 && (
+            <div className="thread-row" style={{ marginBottom: 6 }}>
+              {threads.map((t) => <span key={t.key} className="thread-badge"><Icon name={t.icon} size={12} fill />{t.short}</span>)}
+            </div>
+          )}
           {intention.intention && <p className="quote">"{intention.intention}"</p>}
           {intention.reflection && <p className="note">{intention.reflection}</p>}
-          <div className="meta">{OUTCOMES.find(([v]) => v === intention.outcome)?.[1] || 'Reflected'}</div>
+          <div className="meta"><span className={`meta-dot tone-${tone}`} />{OUTCOMES.find(([v]) => v === intention.outcome)?.[1] || 'Reflected'}</div>
         </div>
       </div>
     </div>

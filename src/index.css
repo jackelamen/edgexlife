@@ -1300,7 +1300,7 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
 
 .intention-footer { border-top: 1px solid var(--border); padding: 12px 20px; display: flex; justify-content: flex-end; }
 
-.set-header { display: flex; align-items: center; gap: 10px; padding: 16px 20px 0; }
+.set-header { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 16px 20px 0; }
 .thread-badge {
   display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 99px;
   background: var(--id-tint); color: var(--id-accent); font-size: 11px; font-weight: 700;
@@ -1336,13 +1336,21 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
 .outcome-btn.sel-risk { background: var(--s-risk-bg); border-color: var(--s-risk); color: var(--s-risk); }
 
 .closed-summary { padding: 16px 20px; display: flex; align-items: flex-start; gap: 12px; }
-.closed-badge { width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0; display: grid; place-items: center; background: var(--id-tint); color: var(--id-accent); }
-.closed-badge.tone-good { background: var(--s-good-bg); color: var(--s-good); }
-.closed-badge.tone-short { background: var(--s-short-bg); color: var(--s-short); }
-.closed-badge.tone-risk { background: var(--s-risk-bg); color: var(--s-risk); }
 .closed-text .quote { font-size: 14px; font-style: italic; font-weight: 700; color: var(--text); margin: 0 0 4px; }
 .closed-text .note { font-size: 12.5px; color: var(--text-2); margin: 0 0 6px; line-height: 1.5; }
-.closed-text .meta { font-size: 11px; font-weight: 700; color: var(--text-3); text-transform: uppercase; letter-spacing: .03em; }
+.closed-text .meta {
+  display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; color: var(--text-3);
+  text-transform: uppercase; letter-spacing: .03em;
+}
+/* Outcome tone, as a plain dot rather than a per-thread icon badge —
+   with 1-N threads possible now, one badge per outcome no longer maps
+   cleanly onto "one badge = the outcome," so identity (thread badges,
+   above) and performance (this dot, reserved status ramp per design.js
+   rule 3) are kept visually separate instead of conflated into one. */
+.meta-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.meta-dot.tone-good { background: var(--s-good); }
+.meta-dot.tone-short { background: var(--s-short); }
+.meta-dot.tone-risk { background: var(--s-risk); }
 
 /* Used as a <button> on Today so cycle actions and habits are tickable
    without leaving mission control. */
