@@ -47,7 +47,7 @@ export default function IntentionCard() {
 
   if (row.loading) return null // avoid a flash of the empty-state prompt while the first fetch resolves
   if (!intention) return <PromptState date={date} onSaved={() => row.reload()} />
-  if (intention.closed_at) return <ClosedState intention={intention} onReopen={() => row.reload()} />
+  if (intention.closed_at) return <ClosedState intention={intention} onChanged={() => row.reload()} />
   return <SetState intention={intention} onChanged={() => row.reload()} />
 }
 
@@ -143,6 +143,7 @@ function PromptState({ date, onSaved }) {
 
 function SetState({ intention, onChanged }) {
   const [reflecting, setReflecting] = useState(false)
+  const [editing, setEditing] = useState(false)
   const tasks = useAsync((f) => fetchIntentionTasks(intention.id, { force: f }), [intention.id])
   const threads = (intention.identity_threads || []).map((k) => identityThreadByKey[k]).filter(Boolean)
   const list = tasks.data || []
@@ -155,10 +156,15 @@ function SetState({ intention, onChanged }) {
     } catch (e) { toast.error(e.message) }
   }
 
+  if (editing) return <EditForm intention={intention} onDone={() => { setEditing(false); onChanged() }} onCancel={() => setEditing(false)} />
+
   return (
     <div className="intention-card">
       <div className="set-header">
         {threads.map((t) => <span key={t.key} className="thread-badge"><Icon name={t.icon} size={14} fill />{t.short}</span>)}
+        <button type="button" className="intention-edit-btn" title="Edit today's intention" onClick={() => setEditing(true)}>
+          <Icon name="edit" size={14} />
+        </button>
       </div>
       {intention.intention && <p className="set-quote">"{intention.intention}"</p>}
       <div className="set-sub">{list.length ? `${doneCount} of ${list.length} tasks done` : "Today's intention"}</div>
@@ -234,13 +240,20 @@ function ReflectForm({ intention, onDone }) {
 
 /* ── Closed: loop already shut for today ──────────────────────── */
 
-function ClosedState({ intention }) {
+function ClosedState({ intention, onChanged }) {
+  const [editing, setEditing] = useState(false)
   const threads = (intention.identity_threads || []).map((k) => identityThreadByKey[k]).filter(Boolean)
   const tone = intention.outcome === 'yes' ? 'good' : intention.outcome === 'no' ? 'risk' : 'short'
+
+  // Editing after closing only touches threads/intention text — see
+  // EditForm — so outcome/reflection/closed_at all pass through
+  // saveDailyIntention unchanged and the loop stays closed.
+  if (editing) return <EditForm intention={intention} onDone={() => { setEditing(false); onChanged() }} onCancel={() => setEditing(false)} />
+
   return (
     <div className="intention-card">
       <div className="closed-summary">
-        <div className="closed-text">
+        <div className="closed-text" style={{ flex: 1 }}>
           {threads.length > 0 && (
             <div className="thread-row" style={{ marginBottom: 6 }}>
               {threads.map((t) => <span key={t.key} className="thread-badge"><Icon name={t.icon} size={12} fill />{t.short}</span>)}
@@ -250,6 +263,59 @@ function ClosedState({ intention }) {
           {intention.reflection && <p className="note">{intention.reflection}</p>}
           <div className="meta"><span className={`meta-dot tone-${tone}`} />{OUTCOMES.find(([v]) => v === intention.outcome)?.[1] || 'Reflected'}</div>
         </div>
+        <button type="button" className="intention-edit-btn" title="Edit today's intention" onClick={() => setEditing(true)}>
+          <Icon name="edit" size={14} />
+        </button>
+      </div>
+    </div>
+  )
+}
+
+/* ── Edit: revise threads/intention text after the fact ───────── */
+
+function EditForm({ intention, onDone, onCancel }) {
+  const [threads, setThreads] = useState(intention.identity_threads || [])
+  const [text, setText] = useState(intention.intention || '')
+  const [saving, setSaving] = useState(false)
+
+  function toggleThread(key) {
+    setThreads((cur) => cur.includes(key) ? cur.filter((k) => k !== key) : [...cur, key])
+  }
+
+  async function save() {
+    setSaving(true)
+    try {
+      // Spreads the existing row first so outcome/reflection/closed_at
+      // (irrelevant to this form) pass through untouched — editing the
+      // intention after closing the loop doesn't reopen it.
+      await saveDailyIntention({ ...intention, identity_threads: threads, intention: text.trim() })
+      toast.success('Intention updated')
+      onDone()
+    } catch (e) { toast.error(e.message) } finally { setSaving(false) }
+  }
+
+  const phrase = threadPhrase(threads)
+
+  return (
+    <div className="intention-card">
+      <div className="intention-top">
+        <div className="intention-eyebrow"><Icon name="edit" size={15} /><span>Edit today's intention</span></div>
+        <div className="thread-row">
+          {IDENTITY_THREADS.map((t) => (
+            <button key={t.key} type="button" className={`thread-chip${threads.includes(t.key) ? ' active' : ''}`}
+              onClick={() => toggleThread(t.key)}>
+              <Icon name={t.icon} size={14} fill={threads.includes(t.key)} />{t.short}
+            </button>
+          ))}
+        </div>
+        <textarea className="intention-input" rows={2} value={text} onChange={(e) => setText(e.target.value)}
+          placeholder={phrase ? `e.g. one concrete thing that's actually ${phrase} today` : 'What does today look like?'} />
+      </div>
+      <div className="intention-footer" style={{ justifyContent: 'space-between' }}>
+        <button type="button" className="btn btn-ghost" onClick={onCancel}>Cancel</button>
+        <button type="button" className="btn btn-primary" disabled={saving || !threads.length || !text.trim()} onClick={save}>
+          <Icon name="check" size={16} /> {saving ? 'Saving…' : 'Save changes'}
+        </button>
       </div>
     </div>
   )

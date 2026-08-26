@@ -1301,6 +1301,11 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
 .intention-footer { border-top: 1px solid var(--border); padding: 12px 20px; display: flex; justify-content: flex-end; }
 
 .set-header { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 16px 20px 0; }
+.intention-edit-btn {
+  margin-left: auto; background: transparent; border: none; color: var(--text-3); cursor: pointer;
+  padding: 4px; display: flex; border-radius: 6px; flex-shrink: 0; transition: color .15s, background .15s;
+}
+.intention-edit-btn:hover { color: var(--id-accent); background: var(--id-tint); }
 .thread-badge {
   display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 99px;
   background: var(--id-tint); color: var(--id-accent); font-size: 11px; font-weight: 700;
