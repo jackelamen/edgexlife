@@ -8,6 +8,7 @@ import {
   fetchIntentionHabits, attachIntentionHabit, detachIntentionHabit,
 } from '../../lib/data'
 import { today, pretty } from '../../lib/dates'
+import { isHabitDueToday } from '../../lib/habits'
 import { IDENTITY_THREADS, identityThreadByKey } from '../../lib/identity'
 import { Modal, Empty, Loading } from '../ui/Kit'
 import Icon from '../ui/Icon'
@@ -41,17 +42,6 @@ function threadPhrase(keys) {
   if (labels.length <= 1) return labels[0] || ''
   if (labels.length === 2) return `${labels[0]} and ${labels[1]}`
   return `${labels.slice(0, -1).join(', ')}, and ${labels[labels.length - 1]}`
-}
-
-/** Pulse's own due-today algorithm isn't available to copy verbatim from
-    this repo, so this is the same best-effort mirror TodayPage.jsx
-    already uses for its own habit list — kept in sync by hand, not
-    imported, since TodayPage's copy is local to that file too. */
-function isHabitDueToday(h) {
-  if (h.cadence === 'daily') return true
-  const days = h.cadence_config?.days
-  if (Array.isArray(days) && days.length) return days.includes(new Date().getDay())
-  return true
 }
 
 export default function IntentionCard() {

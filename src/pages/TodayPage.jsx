@@ -27,6 +27,7 @@ import { fetchReviewIndex } from '../lib/data'
 import { isReviewWindow, reviewTargetWeekId, prettyWeek } from '../lib/review'
 import { IDENTITY_STATEMENT, identityThreadByKey } from '../lib/identity'
 import IntentionCard from '../components/today/IntentionCard'
+import { isHabitDueToday } from '../lib/habits'
 
 /*
   Mission control.
@@ -130,22 +131,8 @@ export default function TodayPage() {
   const liveCycles = (sprints.data || []).filter((s) => isSprintActive(s) && !s.archived)
   // fetchHabits() pulls every non-archived habit — the same query Pulse
   // itself uses before Pulse applies its own "due today" filter, which
-  // this bridge was never doing. `cadence` + `cadence_config.days` are
-  // Pulse's own scheduling fields (already selected in fetchHabits, just
-  // never read here): 'daily' habits are due every day; 'custom'/'weekly'
-  // habits carry an explicit days array (JS Date.getDay() indices,
-  // Sun=0..Sat=6 — confirmed against Jack's real data: a Mon/Wed/Fri habit
-  // stores days:[1,3,5]) and are only due when today matches one of them.
-  // Any cadence shape this doesn't recognize defaults to "due" rather than
-  // silently hiding a habit — Pulse's own due-today algorithm isn't
-  // available to copy verbatim from this repo, so this is a best-effort
-  // mirror of it, not a guaranteed 1:1 match.
-  const isHabitDueToday = (h) => {
-    if (h.cadence === 'daily') return true
-    const days = h.cadence_config?.days
-    if (Array.isArray(days) && days.length) return days.includes(new Date().getDay())
-    return true
-  }
+  // this bridge was never doing. See lib/habits.js for the due-today rule
+  // (also used by IntentionCard's habit picker, so the two can't disagree).
   const habitList = (habits.data || []).filter(isHabitDueToday)
 
   /* ── Today's due cycle actions, flattened across every live cycle ── */
