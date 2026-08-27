@@ -1112,7 +1112,7 @@ function CyclesView({ goals, cycleData, cycleIntent }) {
           action={filter === 'active' && <button className="btn btn-primary btn-sm" onClick={() => setEditing({})}>Start one</button>}>
           {filter === 'archived'
             ? 'Cycles you tuck away show up here, still around if you want to duplicate or revisit one.'
-            : 'A cycle gives one goal a deadline, phases, and a set of repeatable tactics.'}
+            : 'A cycle gives one goal a deadline — whether that’s repeatable tactics or a one-off task you just need to get done.'}
         </Empty></Card>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -1245,8 +1245,16 @@ function CycleEditor({ sprint, cloneFrom, goals, seedGoalId, onClose, onSaved })
     setSaving(true)
     try {
       const isQuick = quickMode && !sprint?.id
+      // A one-time action isn't a repeating habit split evenly across
+      // Foundation/Build/Peak — it needs exactly one checkbox, live for the
+      // cycle's full length, not three (one per phase's week slice) that
+      // would each need doing separately and two of which vanish once
+      // their phase's weeks pass. A single phase spanning every week
+      // (phaseCount 1 → phaseWeekRange covers 1..totalWeeks) gives it that.
       const drafts = isQuick
-        ? DEFAULT_PHASES.map((p) => ({ ...p, tactics: quickTactic.text.trim() ? [{ ...quickTactic }] : [] }))
+        ? quickTactic.freq === 'onetime'
+          ? [{ name: 'Cycle', description: '', tactics: quickTactic.text.trim() ? [{ ...quickTactic }] : [] }]
+          : DEFAULT_PHASES.map((p) => ({ ...p, tactics: quickTactic.text.trim() ? [{ ...quickTactic }] : [] }))
         : phaseDrafts
       // A name is bookkeeping, not a decision — quick mode never made the
       // user type one, so derive one from the goal + the single action
@@ -1377,15 +1385,17 @@ function CycleEditor({ sprint, cloneFrom, goals, seedGoalId, onClose, onSaved })
 
         {quickMode && !sprint?.id ? (
           <>
-            <Field label="What will you do, and how often?">
+            <Field label={quickTactic.freq === 'onetime' ? 'What needs to get done?' : 'What will you do, and how often?'}>
               <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-                <input style={{ flex: '1 1 200px' }} value={quickTactic.text} placeholder="e.g. Go for a run"
+                <input style={{ flex: '1 1 200px' }} value={quickTactic.text}
+                  placeholder={quickTactic.freq === 'onetime' ? 'e.g. Book the dentist appointment' : 'e.g. Go for a run'}
                   onChange={(e) => setQuickTactic({ ...quickTactic, text: e.target.value })} />
                 <select style={{ width: 110 }} value={quickTactic.freq}
                   onChange={(e) => setQuickTactic({ ...quickTactic, freq: e.target.value })}>
                   <option value="daily">Daily</option>
                   <option value="xperweek">×/week</option>
                   <option value="weekly">Weekly</option>
+                  <option value="onetime">One-time</option>
                 </select>
                 {quickTactic.freq === 'xperweek' && (
                   <input type="number" min={1} max={7} style={{ width: 56 }} value={quickTactic.times_per_week || 3}
@@ -1394,7 +1404,9 @@ function CycleEditor({ sprint, cloneFrom, goals, seedGoalId, onClose, onSaved })
               </div>
             </Field>
             <p style={{ fontSize: 11.5, color: 'var(--text-3)', fontWeight: 600, marginTop: -8 }}>
-              You can add more actions or split this into phases anytime: edit the cycle and switch to Full setup.
+              {quickTactic.freq === 'onetime'
+                ? 'A one-off task, not a repeating habit — check it off once, any time before the cycle ends.'
+                : 'You can add more actions or split this into phases anytime: edit the cycle and switch to Full setup.'}
             </p>
           </>
         ) : (
