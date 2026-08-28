@@ -381,10 +381,14 @@ export function dayCommitments(phases, tactics, sp, iso) {
 export const MIN_RATE_SAMPLE = 5
 
 /**
- * Commitment rate: of the day-specific commitments whose day has FULLY
- * elapsed, how many were met. Today is deliberately excluded — the day
- * isn't over, so counting it can only make you look worse than you are
- * (this is what produced "0 of 3 done today" as a red 0% at 12:01am).
+ * Commitment rate: of EVERY commitment that's fully resolvable by now —
+ * day-specific tactics whose day has elapsed, plus weekly/xperweek/
+ * onetime targets whose week is over (see flexibleTargets) — how many
+ * were met. Today is deliberately excluded from the day-specific half —
+ * the day isn't over, so counting it can only make you look worse than
+ * you are (this is what produced "0 of 3 done today" as a red 0% at
+ * 12:01am). A tactic with no specific day still counts here; it just
+ * resolves at week-end instead of day-end.
  *
  * `pct` is null until MIN_RATE_SAMPLE, so callers render the raw
  * fraction instead of a percentage that a single checkbox could swing
@@ -399,6 +403,16 @@ export function commitmentRate(phases, tactics, sp) {
       total++; if (c.done) done++
     }
   }
+  // dayCommitments only ever covers daily/custom-day tactics — a weekly,
+  // xperweek, or onetime target (nothing "attached to a day") never
+  // showed up here at all, only in the separate "Weekly targets" line
+  // (flexibleTargets). Folding its raw met/total into this SAME ratio —
+  // not averaging two percentages, pooling two raw counts, the same
+  // principle avgExecution already uses in GoalRoom — is what makes the
+  // headline rate account for a cycle's full set of commitments instead
+  // of silently dropping every tactic that isn't day-specific.
+  const flex = flexibleTargets(phases, tactics, sp)
+  done += flex.met; total += flex.total
   return { done, total, pct: total >= MIN_RATE_SAMPLE ? Math.round((done / total) * 100) : null }
 }
 
