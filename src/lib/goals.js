@@ -433,23 +433,33 @@ export function tacticCommitmentRates(phases, tactics, sp) {
   return [...by.values()]
 }
 
-/** Flexible targets (weekly / xperweek / onetime), resolved per COMPLETED
-    full week — a week still in progress isn't late yet, and a week
-    truncated by the cycle's own start/end never had a fair shot at a
-    7-day target. Reported separately from the day rate on purpose. */
+/** Flexible targets (weekly / xperweek / onetime). Past, COMPLETED weeks
+    are resolved fully (met or missed) unless that week was truncated by
+    the cycle's own start/end — it never had a fair shot at a 7-day
+    target, so it's skipped rather than counted as a miss. The CURRENT
+    week gets the same asymmetric credit tacticWeekRows already gives
+    day-specific tactics mid-week: if a target is ALREADY met this week,
+    that's real, immediate credit (checking off "60,000 steps" today
+    should count today, not wait until the week ends) — but an unmet one
+    isn't a miss yet, so it contributes to neither side of the ratio
+    until the week is actually over. Reported alongside the day rate,
+    not blended into one ratio (see commitmentRate), since a "week met"
+    and a "day met" aren't the same unit. */
 export function flexibleTargets(phases, tactics, sp) {
   const cw = sprintCurrentWeek(sp)
   let met = 0, total = 0
-  for (let w = 1; w < cw; w++) {
-    if (weekIsPartial(sp, w)) continue
+  for (let w = 1; w <= cw; w++) {
+    const isCurrent = w === cw
+    if (!isCurrent && weekIsPartial(sp, w)) continue
     const checks = (sp.week_checks || {})[w] || {}
     tacticsForWeek(phases, tactics, w, sp).forEach((t) => {
       const freq = t.freq || 'weekly'
-      if (freq === 'xperweek') {
-        total++; if (xpwDoneCount(t, checks) >= xpwTarget(t)) met++
-      } else if (freq === 'weekly' || freq === 'onetime') {
-        total++; if (checks[tacticKeyId(t)]) met++
-      }
+      let hit
+      if (freq === 'xperweek') hit = xpwDoneCount(t, checks) >= xpwTarget(t)
+      else if (freq === 'weekly' || freq === 'onetime') hit = Boolean(checks[tacticKeyId(t)])
+      else return
+      if (isCurrent) { if (hit) { total++; met++ } } // credit only, never penalise a week still in progress
+      else { total++; if (hit) met++ }
     })
   }
   return { met, total }
