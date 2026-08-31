@@ -338,7 +338,7 @@ function CycleCard({ sprint, phases, tactics, goal, compact, onChanged, onDelete
             genuine performance read, so off-accent correctly falls back to
             the reserved status ramp (red/amber/green) rather than the
             module accent. */}
-        <div className="cycle-ring-section"
+        <div className="cycle-ring-section" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}
           title={`Commitment rate: ${rate.done} of ${rate.total} commitments met on days that have fully elapsed`}>
           {rate.pct != null ? (
             <Ring score={rate.pct} size={72} stroke={7} sub="rate" onAccent={false} />
@@ -351,6 +351,13 @@ function CycleCard({ sprint, phases, tactics, goal, compact, onChanged, onDelete
               <small>so far</small>
             </div>
           )}
+          {/* This ring is cumulative across the whole cycle to date, not
+              this week — a perfect current week (the "Week X of Y...
+              done so far" line below) can still sit next to a rate under
+              100 if something was missed earlier in the cycle. Without
+              this, the two numbers looked like they were contradicting
+              each other instead of measuring different things. */}
+          {sprint.start_date && <span className="cycle-rate-since">since {prettyShort(sprint.start_date)}</span>}
         </div>
         <div className="cycle-info">
           <div className="cycle-meta">

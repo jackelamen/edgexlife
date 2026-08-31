@@ -384,11 +384,15 @@ export const MIN_RATE_SAMPLE = 5
  * Commitment rate: of EVERY commitment that's fully resolvable by now —
  * day-specific tactics whose day has elapsed, plus weekly/xperweek/
  * onetime targets whose week is over (see flexibleTargets) — how many
- * were met. Today is deliberately excluded from the day-specific half —
- * the day isn't over, so counting it can only make you look worse than
- * you are (this is what produced "0 of 3 done today" as a red 0% at
- * 12:01am). A tactic with no specific day still counts here; it just
- * resolves at week-end instead of day-end.
+ * were met.
+ *
+ * TODAY is asymmetric, the same way flexibleTargets treats the current
+ * week: something you've ALREADY done today counts immediately, but
+ * something still outstanding isn't a miss yet and contributes to
+ * neither side. Excluding today outright (the previous behaviour) fixed
+ * the "0 of 3 done today = red 0% at 12:01am" problem, but broke the
+ * other half of it — checking an action off gave no feedback at all
+ * until tomorrow, which reads as the score being stuck.
  *
  * `pct` is null until MIN_RATE_SAMPLE, so callers render the raw
  * fraction instead of a percentage that a single checkbox could swing
@@ -398,9 +402,11 @@ export function commitmentRate(phases, tactics, sp) {
   const today = dateKey()
   let done = 0, total = 0
   for (const iso of elapsedCycleDates(sp)) {
-    if (iso >= today) continue
+    if (iso > today) continue
+    const isToday = iso === today
     for (const c of dayCommitments(phases, tactics, sp, iso)) {
-      total++; if (c.done) done++
+      if (isToday) { if (c.done) { total++; done++ } } // credit only, never penalise a day still in progress
+      else { total++; if (c.done) done++ }
     }
   }
   // dayCommitments only ever covers daily/custom-day tactics — a weekly,
@@ -422,8 +428,13 @@ export function tacticCommitmentRates(phases, tactics, sp) {
   const today = dateKey()
   const by = new Map()
   for (const iso of elapsedCycleDates(sp)) {
-    if (iso >= today) continue
+    if (iso > today) continue
+    const isToday = iso === today
     for (const c of dayCommitments(phases, tactics, sp, iso)) {
+      // Same today-is-asymmetric rule as commitmentRate above — these two
+      // MUST agree, since this breakdown is what someone reads to find
+      // out why the headline rate is what it is.
+      if (isToday && !c.done) continue
       const id = tacticKeyId(c.tactic)
       const row = by.get(id) || { tactic: c.tactic, done: 0, total: 0 }
       row.total++; if (c.done) row.done++

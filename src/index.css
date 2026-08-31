@@ -1482,6 +1482,7 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
 .cycle-rate-fraction small {
   font-size: 9px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text-3);
 }
+.cycle-rate-since { font-size: 9.5px; font-weight: 700; color: var(--text-3); white-space: nowrap; }
 
 .goal-cycle-strip-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 .goal-cycle-strip-text strong { font-size: 12.5px; font-weight: 800; color: var(--text); }
