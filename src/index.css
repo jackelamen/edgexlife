@@ -672,6 +672,10 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
    a slightly bigger tap target on the button gives it real separation
    instead of relying on precision. */
 .ex-card-hdr .btn-icon.btn-sm { width: 36px; height: 36px; margin-right: 4px; }
+/* Reorder arrows are a low-stakes, repeatable action, so they get a
+   tighter footprint than the destructive remove button next to them. */
+.ex-card-hdr .btn-icon.btn-sm.ex-move { width: 30px; height: 30px; margin-right: 0; color: var(--text-3); }
+.ex-card-hdr .btn-icon.btn-sm.ex-move:disabled { opacity: .3; }
 .ex-card-hdr .icon-chevron { font-size: 18px; color: var(--text-3); transition: transform .15s; margin-left: 6px; }
 .ex-card.open .icon-chevron { transform: rotate(180deg); }
 .ex-sets { border-top: 1px solid var(--border); padding: 10px 14px 14px; }

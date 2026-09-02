@@ -698,6 +698,21 @@ function SessionTab({ session, setSession, db, goals, plan, pastSessions, exerci
   const updateEx = (i, patch) =>
     set({ exercises: session.exercises.map((e, j) => (j === i ? { ...e, ...patch } : e)) })
 
+  /* Reorder exercises with the header arrows. Keeps whichever card was
+     expanded expanded by following it to its new index, and disarms the
+     per-card confirm buttons so a swap can't leave one primed on the
+     wrong row. */
+  function moveEx(i, dir) {
+    const j = i + dir
+    if (j < 0 || j >= session.exercises.length) return
+    const next = session.exercises.slice()
+    ;[next[i], next[j]] = [next[j], next[i]]
+    set({ exercises: next })
+    setOpenEx((o) => (o === i ? j : o === j ? i : o))
+    setArmedRepeat(-1)
+    setArmedRemove(-1)
+  }
+
   function toggleTimer() {
     if (running) { base.current = secs; setRunning(false) } else setRunning(true)
   }
@@ -818,6 +833,16 @@ function SessionTab({ session, setSession, db, goals, plan, pastSessions, exerci
                   style={{ border: 'none', background: 'transparent', padding: 0, fontWeight: 800, fontSize: 14 }}
                 />
                 <span className="ex-summary">{done}/{ex.sets?.length || 0}</span>
+                <button className="btn btn-icon btn-sm ex-move" disabled={i === 0}
+                  onClick={(e) => { e.stopPropagation(); moveEx(i, -1) }}
+                  aria-label="Move exercise up" title="Move up">
+                  <Icon name="arrow_upward" size={15} />
+                </button>
+                <button className="btn btn-icon btn-sm ex-move" disabled={i === session.exercises.length - 1}
+                  onClick={(e) => { e.stopPropagation(); moveEx(i, 1) }}
+                  aria-label="Move exercise down" title="Move down">
+                  <Icon name="arrow_downward" size={15} />
+                </button>
                 {/* Arm-then-confirm, same shape as Repeat's armedRepeat and
                     History's useConfirm() elsewhere in this file — a tap
                     here used to delete instantly, and this button sits
@@ -1283,8 +1308,23 @@ function exerciseHistory(sessions, name, bodyweightKg = 70) {
 function lastExerciseSession(sessions, name, excludeId) {
   const n = (name || '').trim()
   if (!n) return null
-  const rows = exerciseHistory((sessions || []).filter((s) => s.id !== excludeId), n)
-  return rows.length ? rows[rows.length - 1] : null
+  const rows = (sessions || [])
+    .filter((s) => s.id !== excludeId && (s.exercises || []).some((e) => e.name === n))
+    .slice()
+    .sort((a, b) => a.date.localeCompare(b.date))
+  if (!rows.length) return null
+  const s = rows[rows.length - 1]
+  const ex = s.exercises.find((e) => e.name === n)
+  const all = ex.sets || []
+  /* Only the sets actually checked off are "what I did last time" — a
+     typed-but-unchecked row is a plan or a scratch note, not a performed
+     set, and echoing it back into Repeat / the ghost placeholders
+     overstates the last session. Fall back to every row when nothing was
+     checked, for the user who logs by typing and never taps the check. */
+  const doneOnly = all.filter((x) => x.done)
+  const chosen = doneOnly.length ? doneOnly : all
+  const sets = chosen.map((x) => ({ reps: parseFloat(x.reps) || 0, weight: parseFloat(x.weight) || 0 }))
+  return { date: s.date, sessionId: s.id, sets }
 }
 
 /* "3x5 @ 100kg · 2x5 @ 90kg" — consecutive identical sets collapse into a
