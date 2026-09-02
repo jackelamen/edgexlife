@@ -133,7 +133,7 @@ export default function WorkoutModule() {
           <button className="btn btn-secondary btn-sm" onClick={() => setWeekOffset((w) => w + 1)}>
             <Icon name="chevron_right" size={16} />
           </button>
-          <button className="btn btn-primary btn-sm" onClick={() => goToSessionOrStart(null, true)}>
+          <button className="btn btn-primary btn-sm" onClick={() => goToSessionOrStart(null)}>
             <Icon name="play_arrow" size={16} /> {session ? 'Resume Session' : 'Log Session'}
           </button>
         </div>
@@ -167,7 +167,7 @@ export default function WorkoutModule() {
           fixed-position button was sitting on top of the sets grid's own
           inputs on tall session cards. */}
       {tab !== 'log' && (
-      <button className="mob-fab" onClick={() => goToSessionOrStart(null, true)}
+      <button className="mob-fab" onClick={() => goToSessionOrStart(null)}
         aria-label={session ? 'Resume session' : 'Log session'}>
         <Icon name="play_arrow" size={26} fill />
       </button>
