@@ -193,7 +193,7 @@ function Dashboard({ latest, notes, todayCheckins, index, onCheckIn, onNav, onOp
         <span className="practice-ic"><Icon name="self_improvement" size={17} fill /></span>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="practice-lbl">Practice today</div>
-          <div className="practice-sub">Not part of the score — a thing you did, not a rating.</div>
+          <div className="practice-sub">Not part of the score, a thing you did, not a rating.</div>
         </div>
         <span className="practice-val">{practiceMins}m</span>
       </div>
@@ -698,7 +698,7 @@ function ResetRunner({ tool, onClose, onLogged }) {
       {last && (
         <div style={{ marginTop: 16 }}>
           <textarea rows={3} value={note} onChange={(e) => setNote(e.target.value)}
-            placeholder="Write it here if it helps — optional." />
+            placeholder="Write it here if it helps. Optional." />
           {note.trim() && (
             <button className="btn btn-ghost btn-sm" style={{ marginTop: 6 }}
               onClick={() => { navigator.clipboard?.writeText(note.trim()); toast.success('Copied') }}>

@@ -38,7 +38,7 @@ export default class ErrorBoundary extends Component {
         <div style={{ fontSize: 32, marginBottom: 8 }}>⚠️</div>
         <h2 style={{ fontSize: 17, fontWeight: 800, marginBottom: 6 }}>This page hit an error</h2>
         <p style={{ fontSize: 13, color: 'var(--text-3, #888)', marginBottom: 16 }}>
-          Nothing you had was lost — this page just couldn't render. Try reloading it.
+          Nothing you had was lost. This page just couldn't render. Try reloading it.
         </p>
         <button className="btn btn-primary" onClick={() => window.location.reload()}>
           Reload

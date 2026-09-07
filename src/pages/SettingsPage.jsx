@@ -59,7 +59,7 @@ export default function SettingsPage() {
             <Panel title="Caches">
               <div className="flex flex-col gap-2">
                 <button className="btn" onClick={() => {
-                  refreshAll(); toast.success('Cleared — next load refetches')
+                  refreshAll(); toast.success('Cleared. Next load refetches')
                 }}>Clear data cache</button>
                 <button className="btn" onClick={async () => {
                   await clearVisionCache(); toast.success('Vision images cleared')
@@ -73,7 +73,7 @@ export default function SettingsPage() {
             <Panel title="Account">
               <p className="text-[13px] mb-3" style={{ color: 'var(--ink-2)' }}>{user?.email}</p>
               <p className="text-[12px] mb-3" style={{ color: 'var(--ink-4)' }}>
-                Shared with Pulse and xFocus — same Supabase project, same user id.
+                Shared with Pulse and xFocus, same Supabase project, same user id.
               </p>
               <button className="btn" onClick={signOut}>Sign out</button>
             </Panel>
@@ -152,7 +152,7 @@ function ReminderPanel() {
         </div>
       ) : permission === 'denied' ? (
         <p className="text-[13px] mb-3" style={{ color: 'var(--ink-3)' }}>
-          Notifications are blocked for this site — enable them in your browser's site settings, then reload.
+          Notifications are blocked for this site. Enable them in your browser's site settings, then reload.
         </p>
       ) : (
         <button className="btn btn-primary" style={{ marginBottom: 16 }} onClick={enable} disabled={subBusy}>
@@ -165,7 +165,7 @@ function ReminderPanel() {
           <label className="flex items-center gap-2 text-[13px]" style={{ flex: 1 }}>
             <input type="checkbox" checked={p.health_enabled}
               onChange={(e) => setForm({ ...p, health_enabled: e.target.checked })} />
-            Health — log your day
+            Health · log your day
           </label>
           <input type="time" value={p.health_time} style={{ width: 110 }}
             onChange={(e) => setForm({ ...p, health_time: e.target.value })} />
@@ -174,14 +174,14 @@ function ReminderPanel() {
           <label className="flex items-center gap-2 text-[13px]" style={{ flex: 1 }}>
             <input type="checkbox" checked={p.wellness_enabled}
               onChange={(e) => setForm({ ...p, wellness_enabled: e.target.checked })} />
-            Wellness — check in
+            Wellness · check in
           </label>
           <input type="time" value={p.wellness_time} style={{ width: 110 }}
             onChange={(e) => setForm({ ...p, wellness_time: e.target.value })} />
         </div>
       </div>
       <p className="text-[11.5px] mt-2" style={{ color: 'var(--ink-4)' }}>
-        Only fires if that module hasn't been logged yet that day — once you log, it stays quiet.
+        Only fires if that module hasn't been logged yet that day. Once you log, it stays quiet.
       </p>
       <button className="btn btn-primary" style={{ marginTop: 14 }} disabled={!form || saving} onClick={save}>
         {saving ? 'Saving…' : 'Save reminder times'}

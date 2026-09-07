@@ -64,7 +64,7 @@ export default function FastingModule() {
     try {
       await saveFastingSession(ended)
       sessions.reload()
-      toast.success(`Fast logged — ${formatDuration(elapsedMs(ended))}`)
+      toast.success(`Fast logged · ${formatDuration(elapsedMs(ended))}`)
     } catch (err) { toast.error(err.message || 'Could not end fast') }
   }
 
@@ -165,7 +165,7 @@ function EditFastModal({ session, requireEnd = true, onClose, onSave }) {
       title={isNew ? 'Log a past fast' : requireEnd ? 'Edit fast' : 'Fix start time'}
       sub={isNew ? 'Both start and end, since this one already happened.'
         : requireEnd ? 'Correct the start, end, method or notes for this session.'
-          : "Leave Ended blank to keep the fast running — this only corrects when it began."}
+          : 'Leave Ended blank to keep the fast running. This only corrects when it began.'}
       footer={<>
         <button className="btn btn-secondary" onClick={onClose}>Cancel</button>
         <button className="btn btn-primary" disabled={invalid}
@@ -177,7 +177,7 @@ function EditFastModal({ session, requireEnd = true, onClose, onSave }) {
         <Field label="Started">
           <input type="datetime-local" value={start} onChange={(e) => setStart(e.target.value)} />
         </Field>
-        <Field label="Ended" hint={requireEnd ? undefined : 'Optional — blank keeps it running'}>
+        <Field label="Ended" hint={requireEnd ? undefined : 'Optional, blank keeps it running'}>
           <input type="datetime-local" value={end} onChange={(e) => setEnd(e.target.value)} />
         </Field>
       </div>
@@ -246,7 +246,7 @@ export function FastingStatusCard({ onNav }) {
           {lastDone ? `Last fast ${formatDuration(elapsedMs(lastDone))} · ${methodLabel(lastDone.method)}` : 'No fasts logged yet'}
         </div>
         <div style={{ fontSize: 11.5, color: 'var(--text-3)', fontWeight: 600 }}>
-          {wkCount >= 1 ? `${wkCount} this week · ${streak}-week streak` : 'None yet this week — tap to start one'}
+          {wkCount >= 1 ? `${wkCount} this week · ${streak}-week streak` : 'None yet this week · tap to start one'}
         </div>
       </div>
       <Badge tone={wkCount >= 1 ? 'green' : 'muted'}>{wkCount >= 1 ? 'On track' : 'Start one'}</Badge>
@@ -280,7 +280,7 @@ function ActiveFastCard({ session, onEnd, onEditStart }) {
           <div className="hero-h">{formatDuration(ms)}</div>
           <p className="hero-copy">
             {overTarget
-              ? `Past your ${target}h target — end whenever feels right.`
+              ? `Past your ${target}h target. End whenever feels right.`
               : target
                 ? `Started ${new Date(session.startedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}. Aiming for ${target}h.`
                 : `Started ${new Date(session.startedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}.`}
@@ -321,7 +321,7 @@ function StartFastCard({ onStart }) {
   const [method, setMethod] = useState('16:8')
   return (
     <Card style={{ marginBottom: 14 }}>
-      <CardHead title="Start a fast" sub="Pick a target — the timer tracks real elapsed time either way." />
+      <CardHead title="Start a fast" sub="Pick a target. The timer tracks real elapsed time either way." />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(84px, 1fr))', gap: 8, marginBottom: 16 }}>
         {FAST_METHODS.map((m) => (
           <button key={m.id} className={`btn ${method === m.id ? 'btn-primary' : 'btn-secondary'} btn-sm`}
@@ -350,7 +350,7 @@ function WeeklyStats({ sessions }) {
       <div className="row" style={rowStyle}>
         <span className="k" style={kStyle}>This week</span>
         <span className="v" style={vStyle}>{wkCount}</span>
-        <span style={subStyle}>{wkCount >= 1 ? 'goal met — at least 1' : 'goal is at least 1'}</span>
+        <span style={subStyle}>{wkCount >= 1 ? 'goal met, at least 1' : 'goal is at least 1'}</span>
       </div>
       <div className="row" style={rowStyle}>
         <span className="k" style={kStyle}>Week streak</span>

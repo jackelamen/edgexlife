@@ -1119,7 +1119,7 @@ function CyclesView({ goals, cycleData, cycleIntent }) {
           action={filter === 'active' && <button className="btn btn-primary btn-sm" onClick={() => setEditing({})}>Start one</button>}>
           {filter === 'archived'
             ? 'Cycles you tuck away show up here, still around if you want to duplicate or revisit one.'
-            : 'A cycle gives one goal a deadline — whether that’s repeatable tactics or a one-off task you just need to get done.'}
+            : 'A cycle gives one goal a deadline, whether that’s repeatable tactics or a one-off task you just need to get done.'}
         </Empty></Card>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -1412,7 +1412,7 @@ function CycleEditor({ sprint, cloneFrom, goals, seedGoalId, onClose, onSaved })
             </Field>
             <p style={{ fontSize: 11.5, color: 'var(--text-3)', fontWeight: 600, marginTop: -8 }}>
               {quickTactic.freq === 'onetime'
-                ? 'A one-off task, not a repeating habit — check it off once, any time before the cycle ends.'
+                ? 'A one-off task, not a repeating habit. Check it off once, any time before the cycle ends.'
                 : 'You can add more actions or split this into phases anytime: edit the cycle and switch to Full setup.'}
             </p>
           </>

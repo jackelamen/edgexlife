@@ -76,7 +76,7 @@ export default function MomentumPage() {
       <PageHeader
         kicker="Pulse, xPM and xFocus, one lens"
         title="Momentum"
-        sub={`Is there real work behind each ${areaLabel('work')} goal right now — not a score, just what's actually moving.`}
+        sub={`Is there real work behind each ${areaLabel('work')} goal right now, not a score, just what's actually moving.`}
       />
 
       <div className="hero-card hero-momentum" style={{ marginBottom: 14 }}>
@@ -101,7 +101,7 @@ export default function MomentumPage() {
       {loading ? <Loading /> : !rows.length ? (
         <Empty icon="bolt" title="No active career goals"
           action={<Link to="/goals" className="btn btn-secondary btn-sm">Open Goals</Link>}>
-          Momentum only tracks {areaLabel('work')}-area goals — start one to see it here.
+          Momentum only tracks {areaLabel('work')}-area goals. Start one to see it here.
         </Empty>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5">

@@ -58,9 +58,9 @@ function wimHofRound(round, holdSeconds, isLast) {
     phases.push({ key: 'in', label: 'Breathe In', seconds: 1.5, from: 0.12, to: 1.14, rep: i + 1, reps: 30, round })
     phases.push({ key: 'out', label: 'Let Go', seconds: 1.5, from: 1.14, to: 0.3, rep: i + 1, reps: 30, round })
   }
-  phases.push({ key: 'hold', label: 'Hold — Lungs Empty', seconds: holdSeconds, from: 0.12, to: 0.12, cue: 'Hold', round })
+  phases.push({ key: 'hold', label: 'Hold, Lungs Empty', seconds: holdSeconds, from: 0.12, to: 0.12, cue: 'Hold', round })
   phases.push({ key: 'in', label: 'Recovery Breath', seconds: 2, from: 0.12, to: 1.3, cue: 'Breathe In', round })
-  phases.push({ key: 'hold', label: 'Hold — Lungs Full', seconds: 15, from: 1.3, to: 1.3, round })
+  phases.push({ key: 'hold', label: 'Hold, Lungs Full', seconds: 15, from: 1.3, to: 1.3, round })
   phases.push({ key: 'out', label: isLast ? 'Session Complete' : 'Release', seconds: isLast ? 5 : 2, from: 1.3, to: 0.12, round })
   return phases
 }

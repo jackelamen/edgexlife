@@ -273,7 +273,7 @@ export default function ReviewPage() {
             <CardHead title="Identity check"
               sub="Where this week actually served it, and where it didn't." />
             <p className="rv-hint">
-              Be specific — "led with compassion" or "cut a corner on integrity" is
+              Be specific: "led with compassion" or "cut a corner on integrity" is
               something you can act on next week; "did okay" isn't.
             </p>
             <textarea value={draft.module_notes || ''} rows={4}

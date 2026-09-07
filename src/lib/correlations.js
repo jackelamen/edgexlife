@@ -116,8 +116,8 @@ export function findPatterns(matched, settings) {
     patterns.push({
       key: 'sleep-clarity', icon: 'bedtime', metricKey: 'sleepHours', up: sleepDiff > 0,
       text: sleepDiff > 0
-        ? `Clarity runs ${sleepDiff} points higher on days you hit your sleep target — ${Math.round(sleepSplit.yesAvg)} vs ${Math.round(sleepSplit.noAvg)}, over ${sleepSplit.yesN} vs ${sleepSplit.noN} days.`
-        : `Clarity runs ${Math.abs(sleepDiff)} points lower on days you hit your sleep target (${Math.round(sleepSplit.yesAvg)} vs ${Math.round(sleepSplit.noAvg)}) — worth a second look, that's the opposite of what you'd expect.`,
+        ? `Clarity runs ${sleepDiff} points higher on days you hit your sleep target: ${Math.round(sleepSplit.yesAvg)} vs ${Math.round(sleepSplit.noAvg)}, over ${sleepSplit.yesN} vs ${sleepSplit.noN} days.`
+        : `Clarity runs ${Math.abs(sleepDiff)} points lower on days you hit your sleep target (${Math.round(sleepSplit.yesAvg)} vs ${Math.round(sleepSplit.noAvg)}). Worth a second look, that's the opposite of what you'd expect.`,
     })
   }
 
@@ -130,8 +130,8 @@ export function findPatterns(matched, settings) {
     patterns.push({
       key: 'exercise-mood', icon: 'fitness_center', metricKey: 'exercise', up: exDiff > 0,
       text: exDiff > 0
-        ? `Mood averages ${exDiff.toFixed(1)} points higher (of 5) on days with any exercise logged — ${exSplit.yesN} vs ${exSplit.noN} days.`
-        : `Mood averages ${Math.abs(exDiff).toFixed(1)} points lower on exercise days — could be timing or soreness, not necessarily exercise itself.`,
+        ? `Mood averages ${exDiff.toFixed(1)} points higher (of 5) on days with any exercise logged: ${exSplit.yesN} vs ${exSplit.noN} days.`
+        : `Mood averages ${Math.abs(exDiff).toFixed(1)} points lower on exercise days. Could be timing or soreness, not necessarily exercise itself.`,
     })
   }
 

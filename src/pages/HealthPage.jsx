@@ -186,7 +186,7 @@ function TodayView({ settings, index, onEdit, onNavFasting }) {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5">
         <Card>
-          <CardHead title="What's driving your score" sub="Same hue as the tile above — biggest point impact first." />
+          <CardHead title="What's driving your score" sub="Same hue as the tile above, biggest point impact first." />
           {details ? (
             [...details.components]
               .sort((a, b) => (b.maxPoints ?? b.weight * 100) - (a.maxPoints ?? a.weight * 100))
@@ -532,11 +532,11 @@ function LogEditor({ date, settings, onClose, onSaved, onBodyweightSynced }) {
                 onChange={(e) => set('exercisedToday', e.target.checked)} />
               <span style={{ fontWeight: 700, flex: 1 }}>Exercised today</span>
               <span style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 600 }}>
-                +{MOVEMENT_BONUS_POINTS} bonus — never subtracted if unchecked
+                +{MOVEMENT_BONUS_POINTS} bonus, never subtracted if unchecked
               </span>
             </label>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14 }}>
-              <Field label="Exercise (min)" hint="Optional — not scored">
+              <Field label="Exercise (min)" hint="Optional, not scored">
                 <input type="number" step="5" value={f.exerciseMins ?? ''}
                   onChange={(e) => set('exerciseMins', e.target.value === '' ? null : Number(e.target.value))} />
               </Field>
@@ -572,7 +572,7 @@ function LogEditor({ date, settings, onClose, onSaved, onBodyweightSynced }) {
                 onChange={(e) => set('isFastingDay', e.target.checked)} />
               <span style={{ fontWeight: 700, flex: 1 }}>Fasting day</span>
               <span style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 600 }}>
-                Context only — not scored
+                Context only, not scored
               </span>
             </label>
           </div>
@@ -825,7 +825,7 @@ function SettingsView({ settings }) {
     </Card>
 
     <Card>
-      <CardHead title="Bodyweight" sub="Doesn't feed the Health Score — used by Workout and, optionally, a weight goal." />
+      <CardHead title="Bodyweight" sub="Doesn't feed the Health Score. Used by Workout and, optionally, a weight goal." />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14 }}>
         <Field label="Current bodyweight (kg)">
           <input type="number" step="0.5" value={s.bodyweightKg}
@@ -839,7 +839,7 @@ function SettingsView({ settings }) {
       <p style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 12 }}>
         Current bodyweight is what Workout uses to count added weight on bodyweight moves
         (pull-ups, dips, push-ups) as bodyweight plus what you entered, not just what you
-        entered — it's kept in sync with whatever you log on the Bodyweight field in Daily
+        entered. It's kept in sync with whatever you log on the Bodyweight field in Daily
         Log, so the two never drift apart. Target weight is just a goal you're tracking
         toward; nothing else reads it yet.
       </p>

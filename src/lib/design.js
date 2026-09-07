@@ -133,7 +133,7 @@ export const AREA_COLORS = {
 export const DESIGN_RULES = [
   {
     title: 'Hue is identity',
-    body: 'Every metric owns one colour permanently — sleep is always indigo, water always blue, energy always magenta. The same hue marks its tile, its score bar, its chart line and its chips, in every view. You can read the dashboard by colour alone.',
+    body: 'Every metric owns one colour permanently: sleep is always indigo, water always blue, energy always magenta. The same hue marks its tile, its score bar, its chart line and its chips, in every view. You can read the dashboard by colour alone.',
   },
   {
     title: 'Fill is quantity',
@@ -141,7 +141,7 @@ export const DESIGN_RULES = [
   },
   {
     title: 'Green, amber and red are reserved',
-    body: 'Those three never identify anything — they only report performance, on the percent pills, the day dots and the score ring. So a colour change always means your numbers moved. It is also why movement is violet and pain is brown rather than the obvious green and red.',
+    body: 'Those three never identify anything; they only report performance, on the percent pills, the day dots and the score ring. So a colour change always means your numbers moved. It is also why movement is violet and pain is brown rather than the obvious green and red.',
   },
   {
     title: 'Module hue is location',

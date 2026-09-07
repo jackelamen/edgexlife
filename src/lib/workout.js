@@ -176,7 +176,7 @@ export function parseWorkoutCSV(text) {
 
     const date = (row[iDate] || '').trim()
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-      errors.push(`Row ${r + 1}: "${date || '(blank)'}" isn't a valid date (want YYYY-MM-DD) — skipped.`)
+      errors.push(`Row ${r + 1}: "${date || '(blank)'}" isn't a valid date (want YYYY-MM-DD), skipped.`)
       continue
     }
 
@@ -201,7 +201,7 @@ export function parseWorkoutCSV(text) {
         weight: iWeight !== -1 ? (row[iWeight] || '').trim() : '',
       })
     } else if (!exerciseName && !isRest) {
-      errors.push(`Row ${r + 1}: no exercise and not marked rest — skipped.`)
+      errors.push(`Row ${r + 1}: no exercise and not marked rest, skipped.`)
     }
   }
 

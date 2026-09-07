@@ -237,7 +237,7 @@ function PlanTab({ plan, weekOffset, db, goals, sessions, onStart, bodyweightKg 
     reader.onload = () => {
       const { days, errors } = parseWorkoutCSV(String(reader.result || ''))
       if (!Object.keys(days).length) {
-        toast.error(errors[0] || 'Nothing to import — check the CSV format.')
+        toast.error(errors[0] || 'Nothing to import. Check the CSV format.')
         return
       }
       setImportPreview({ days, errors })
@@ -268,7 +268,7 @@ function PlanTab({ plan, weekOffset, db, goals, sessions, onStart, bodyweightKg 
       plan.reload()
       setImportPreview(null)
     } catch (e) {
-      toast.error(e.message || 'Import failed partway through — check what saved and retry the rest.')
+      toast.error(e.message || 'Import failed partway through. Check what saved and retry the rest.')
     } finally {
       setImporting(false)
     }
@@ -561,10 +561,10 @@ function DayModal({ date, plan, effectiveByDate, db, allDates, sessions = [], on
         <SectionLabel>Copy from another day</SectionLabel>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <select value={copyFrom} onChange={(e) => setCopyFrom(e.target.value)} style={{ flex: 1, fontSize: 13 }}>
-            <option value="">— pick a day to copy —</option>
+            <option value="">Pick a day to copy</option>
             {copySources.map(({ date: d, day }) => (
               <option key={d} value={d}>
-                {prettyShort(d)} — {day.rest ? 'Rest' : `${day.type}${day.exercises?.length ? ` · ${day.exercises.length} ex` : ''}`}
+                {prettyShort(d)}: {day.rest ? 'Rest' : `${day.type}${day.exercises?.length ? ` · ${day.exercises.length} ex` : ''}`}
               </option>
             ))}
           </select>
@@ -1160,7 +1160,7 @@ function HistoryTab({ sessions, onEdit, onTab, bodyweightKg = 70, activeSessionI
       <Card style={{ marginBottom: 18 }}>
         <CardHead
           title="Training Heatmap"
-          sub="13-week activity — darker = more volume."
+          sub="13-week activity · darker means more volume."
           right={
             <div style={{ display: 'flex', gap: 4, alignItems: 'center', fontSize: 10, fontWeight: 700, color: 'var(--text-3)' }}>
               <span>Less</span>
@@ -1535,7 +1535,7 @@ function ProgressTab({ sessions, exGoals, db, bodyweightKg = 70 }) {
       const next = [25, 50, 75].find((m) => pct >= m && !hit.has(m))
       if (!next || milestoneInFlight.current.has(goal.id)) continue
       milestoneInFlight.current.add(goal.id)
-      toast.success(`${goal.exercise} — ${next}% of the way there 💪`)
+      toast.success(`${goal.exercise}: ${next}% of the way there 💪`)
       saveExerciseGoal({ ...goal, milestonesHit: [...hit, next] })
         .then(() => exGoals.reload())
         .catch(() => {})
@@ -1589,7 +1589,7 @@ function ProgressTab({ sessions, exGoals, db, bodyweightKg = 70 }) {
                   </div>
                   <div className="hero-h">{Math.round(best)}{goalUnit(goal.mode)}</div>
                   <p className="hero-copy">
-                    Hit on {pretty(achievedDate)} — started {pretty(goal.startedAt)} at {Math.round(goal.startingValue || 0)}{goalUnit(goal.mode)}.
+                    Hit on {pretty(achievedDate)}. Started {pretty(goal.startedAt)} at {Math.round(goal.startingValue || 0)}{goalUnit(goal.mode)}.
                   </p>
                   <div className="hero-actions">
                     <button className="btn btn-primary" onClick={() => celebrate(goal)}>
@@ -1622,7 +1622,7 @@ function ProgressTab({ sessions, exGoals, db, bodyweightKg = 70 }) {
               <Icon name="add" size={16} /> Set your first goal
             </button>
           }>
-            Pick an exercise you care about and a number to hit — a 1-rep max, a rep count, or reps at a specific weight.
+            Pick an exercise you care about and a number to hit: a 1-rep max, a rep count, or reps at a specific weight.
           </Empty>
         </Card>
       ) : (
@@ -1665,7 +1665,7 @@ function ProgressTab({ sessions, exGoals, db, bodyweightKg = 70 }) {
                       {GOAL_MODES.find((m) => m.value === goal.mode)?.label} &middot; since {pretty(goal.startedAt)} &middot; day {daysIn}
                     </div>
                     <div style={{ fontSize: 11.5, fontWeight: 700, marginTop: 3, color: daysSincePR != null && daysSincePR >= 14 ? 'var(--orange)' : 'var(--text-2)' }}>
-                      {daysSincePR == null ? `No PR yet — day ${daysIn} on this goal` : daysSincePR === 0 ? 'New PR today 🔥' : `Last PR ${daysSincePR}d ago`}
+                      {daysSincePR == null ? `No PR yet · day ${daysIn} on this goal` : daysSincePR === 0 ? 'New PR today 🔥' : `Last PR ${daysSincePR}d ago`}
                     </div>
                   </div>
                 </div>
@@ -1713,7 +1713,7 @@ function ProgressTab({ sessions, exGoals, db, bodyweightKg = 70 }) {
                       {Math.round(pct)}% of the way from {Math.round(goal.startingValue || 0)}{unit} to {Math.round(goal.target)}{unit}
                     </div>
                     <div style={{ fontSize: 11, color: daysSincePR != null && daysSincePR >= 14 ? 'var(--orange)' : 'var(--text-3)', fontWeight: 700, marginTop: 3 }}>
-                      {daysSincePR == null ? `No PR yet — day ${daysIn} on this goal` : daysSincePR === 0 ? 'New PR today 🔥' : `Last PR ${daysSincePR}d ago`}
+                      {daysSincePR == null ? `No PR yet · day ${daysIn} on this goal` : daysSincePR === 0 ? 'New PR today 🔥' : `Last PR ${daysSincePR}d ago`}
                     </div>
                   </Card>
                 )
@@ -1749,7 +1749,7 @@ function ProgressTab({ sessions, exGoals, db, bodyweightKg = 70 }) {
       <div style={{ borderTop: '1px solid var(--border)', paddingTop: 20, marginTop: 8 }}>
         <h3 style={{ fontSize: 14, fontWeight: 800, color: 'var(--text-2)', marginBottom: 3 }}>Explore any exercise</h3>
         <p style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 14 }}>
-          A secondary view — every exercise you've logged, with a chart, whether or not it has a goal.
+          A secondary view: every exercise you've logged, with a chart, whether or not it has a goal.
         </p>
         <ExerciseExplorer sessions={sessions} bodyweightKg={bodyweightKg} />
       </div>
@@ -1763,8 +1763,8 @@ function ProgressTab({ sessions, exGoals, db, bodyweightKg = 70 }) {
 
 const GOAL_MODE_HINTS = {
   oneRM: 'The heaviest weight for a true single rep. Only sets logged as exactly 1 rep count.',
-  reps: 'Your best single set, regardless of weight — pull-ups, push-ups, or any rep count you want to raise.',
-  repsAtWeight: 'The most reps you can do in one set at or above a fixed weight — e.g. "10 reps at 80kg".',
+  reps: 'Your best single set, regardless of weight: pull-ups, push-ups, or any rep count you want to raise.',
+  repsAtWeight: 'The most reps you can do in one set at or above a fixed weight, e.g. "10 reps at 80kg".',
 }
 
 function NewGoalModal({ open, prefill, sessions, db, onClose, onSaved }) {
@@ -1886,7 +1886,7 @@ function NewGoalModal({ open, prefill, sessions, db, onClose, onSaved }) {
 
       <SectionLabel>Notes</SectionLabel>
       <textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)}
-        placeholder="Optional — why this goal, what the plan is." style={{ marginBottom: 16 }} />
+        placeholder="Optional: why this goal, what the plan is." style={{ marginBottom: 16 }} />
 
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
         <button className="btn btn-primary" disabled={saving} onClick={save}>

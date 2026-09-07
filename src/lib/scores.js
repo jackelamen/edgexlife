@@ -137,15 +137,15 @@ export function healthDetails(log, settings) {
 
   const components = [
     { key: 'sleepHours', label: 'Sleep', value: sleep, weight: 0.24, maxPoints: 24,
-      detail: isMissing(log.sleepHours) ? `Not logged — assumed 60% of ${hmLabel(s.sleepTarget)}`
+      detail: isMissing(log.sleepHours) ? `Not logged, assumed 60% of ${hmLabel(s.sleepTarget)}`
         : `${hmLabel(n(log.sleepHours)) || '0h'} / ${hmLabel(s.sleepTarget)}`,
       advice: 'Add an earlier shutdown cue or protect tomorrow morning from late-night drift.' },
     { key: 'steps', label: 'Steps', value: steps, weight: 0.15, maxPoints: 15,
-      detail: isMissing(log.steps) ? `Not logged — assumed 60% of ${s.stepTarget.toLocaleString()}`
+      detail: isMissing(log.steps) ? `Not logged, assumed 60% of ${s.stepTarget.toLocaleString()}`
         : `${i(log.steps).toLocaleString()} / ${s.stepTarget.toLocaleString()}`,
       advice: 'Add a 10-minute walk to a transition you already have.' },
     { key: 'water', label: 'Water', value: water, weight: 0.11, maxPoints: 11,
-      detail: isMissing(log.water) ? `Not logged — assumed 60% of ${s.waterTarget}L`
+      detail: isMissing(log.water) ? `Not logged, assumed 60% of ${s.waterTarget}L`
         : `${n(log.water).toFixed(1)}L / ${s.waterTarget}L`,
       advice: 'Put water in reach and pair the next glass with food or a work start.' },
     { key: 'energy', label: 'Energy', value: energy, weight: 0.20, maxPoints: 20,
@@ -255,7 +255,7 @@ export const METRIC_ADVICE = {
   steps: 'Attach walking to something already happening: after food, before work, or between tasks.',
   water: 'Put water in reach and use meals as anchors. Do not rely on remembering later.',
   energy: 'Reduce the plan to the essentials and look for sleep, food, light, or overload as the lever.',
-  nutrition: 'Plan the next meal before you are actually hungry — most low-rated days start from a gap, not a bad choice.',
+  nutrition: 'Plan the next meal before you are actually hungry. Most low-rated days start from a gap, not a bad choice.',
 }
 
 /* ── Wellness ────────────────────────────────────────────── */
