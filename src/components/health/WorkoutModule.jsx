@@ -13,10 +13,10 @@ import {
 } from '../../lib/data'
 import {
   WK_TYPES, DEFAULT_EXERCISE_DB, WK_TEMPLATES, bodypartLabel,
-  DAY_SHORT, DAY_FULL, weekDates, sessionVolume, sessionSetCount, fmtDuration,
+  DAY_SHORT, weekDates, sessionVolume, sessionSetCount, fmtDuration,
   parseWorkoutCSV, WORKOUT_CSV_TEMPLATE, isBodyweightExercise, setLoadKg,
 } from '../../lib/workout'
-import { today, dateKey, pretty, prettyShort } from '../../lib/dates'
+import { today, dateKey, pretty, prettyShort, shiftDate } from '../../lib/dates'
 import TrendChart from './TrendChart'
 
 /* No standalone "Session Log" tab — it used to be a nav destination that,
@@ -369,6 +369,7 @@ function PlanTab({ plan, weekOffset, db, goals, sessions, onStart, bodyweightKg 
         effectiveByDate={effectiveByDate}
         db={db}
         allDates={dates}
+        sessions={sessions}
         onClose={() => setEditDate(null)}
         onStart={(d) => { setEditDate(null); onStart(d) }}
       />
@@ -418,7 +419,7 @@ function ImportPreviewModal({ preview, importing, onClose, onConfirm }) {
   )
 }
 
-function DayModal({ date, plan, effectiveByDate, db, allDates, onClose, onStart }) {
+function DayModal({ date, plan, effectiveByDate, db, allDates, sessions = [], onClose, onStart }) {
   const open = Boolean(date)
   // Prefill from the REAL plan if one exists, otherwise from whatever was
   // actually logged that day (effectiveByDate) — so opening a day that was
@@ -448,6 +449,30 @@ function DayModal({ date, plan, effectiveByDate, db, allDates, onClose, onStart 
 
   const list = db[bodypart] || []
   useEffect(() => { setPick(list[0] || '') }, [bodypart]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* Copy sources: any day in the last 7 days with a real plan or a
+     logged session, plus whatever else is on the current week grid.
+     Was previously limited to the on-screen week, so a session done
+     last Thursday disappeared from the list the moment you flipped to
+     next week. Most recent first, labelled with the actual date since
+     the list can now span weeks. */
+  const copySources = useMemo(() => {
+    if (!open) return []
+    const anchor = date || today()
+    const min = shiftDate(anchor, -7)
+    const inWindow = (d) => d >= min && d <= anchor
+    const cand = new Set((allDates || []).filter((d) => d !== date))
+    Object.keys(plan.data || {}).forEach((d) => { if (d !== date && inWindow(d)) cand.add(d) })
+    ;(sessions || []).forEach((s) => { if (s.date !== date && inWindow(s.date)) cand.add(s.date) })
+    return [...cand]
+      .map((d) => {
+        if (plan.data?.[d]) return { date: d, day: plan.data[d] }
+        const ds = (sessions || []).filter((s) => s.date === d)
+        return ds.length ? { date: d, day: sessionToPlanDay(ds[ds.length - 1]) } : null
+      })
+      .filter(Boolean)
+      .sort((a, b) => b.date.localeCompare(a.date))
+  }, [open, date, allDates, plan.data, sessions])
 
   function selectType(id) {
     setType(id)
@@ -537,13 +562,15 @@ function DayModal({ date, plan, effectiveByDate, db, allDates, onClose, onStart 
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <select value={copyFrom} onChange={(e) => setCopyFrom(e.target.value)} style={{ flex: 1, fontSize: 13 }}>
             <option value="">— pick a day to copy —</option>
-            {allDates.filter((d) => d !== date && effectiveByDate?.[d]).map((d, i) => (
-              <option key={d} value={d}>{DAY_FULL[allDates.indexOf(d)]} — {effectiveByDate[d].type}</option>
+            {copySources.map(({ date: d, day }) => (
+              <option key={d} value={d}>
+                {prettyShort(d)} — {day.rest ? 'Rest' : `${day.type}${day.exercises?.length ? ` · ${day.exercises.length} ex` : ''}`}
+              </option>
             ))}
           </select>
           <button className="btn btn-secondary btn-sm" disabled={!copyFrom}
             onClick={() => {
-              const src = effectiveByDate?.[copyFrom]
+              const src = copySources.find((s) => s.date === copyFrom)?.day
               if (!src) return
               setType(src.type); setExercises(src.exercises || [])
               setNotes(src.notes || ''); setRest(Boolean(src.rest))
