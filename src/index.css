@@ -1292,7 +1292,24 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
   background: var(--white); border: 1px solid var(--border); border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm); overflow: hidden; margin-bottom: 20px;
 }
+/* Unset state only: this is a thing you're meant to DO each morning, and a
+   plain white card between the hero and the alert stack read as filler.
+   Gold identity tint + a real headline give it the pull of a call to
+   action. Once set/closed it drops back to the quiet card above. */
+.intention-card--prompt {
+  background:
+    linear-gradient(180deg, rgba(107, 91, 31, 0.09), rgba(107, 91, 31, 0.02) 120px, var(--white));
+  border-color: rgba(107, 91, 31, 0.35);
+  box-shadow: 0 2px 10px rgba(107, 91, 31, .09);
+}
+.intention-headline {
+  font-size: 18px; font-weight: 800; letter-spacing: -.02em;
+  color: var(--text); margin: 0;
+}
 .intention-top { padding: 18px 20px 16px; display: flex; flex-direction: column; gap: 12px; }
+.intention-card--prompt .intention-top { gap: 8px; }
+.intention-card--prompt .intention-eyebrow span { color: var(--id-accent); }
+.intention-card--prompt .thread-row { margin-top: 6px; }
 .intention-eyebrow { display: flex; align-items: center; gap: 8px; }
 .intention-eyebrow .icon { color: var(--id-accent); font-size: 15px; }
 .intention-eyebrow span { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); }

@@ -12,6 +12,7 @@ import {
   fetchHealthIndex, fetchHealthLogs, fetchHealthSettings, saveHealthLog,
   fetchWellnessIndex, fetchWellnessCheckins, saveCheckin, logHabit, unlogHabit,
   fetchSprints, fetchSprintPhases, fetchSprintTactics, mergeSprintWeekChecks,
+  fetchDailyIntention,
 } from '../lib/data'
 import { healthDetails, clarityDetails, healthLabel, weakestComponent } from '../lib/scores'
 import { currentStreak, longestStreak } from '../lib/streaks'
@@ -55,6 +56,7 @@ export default function TodayPage() {
   /* Review index is week ids only — enough to know whether this week's
      review exists without pulling a line of its prose. */
   const reviewIdx = useAsync((f) => fetchReviewIndex({ force: f }))
+  const intentionRow = useAsync((f) => fetchDailyIntention(t, { force: f }), [t])
   const healthIdx = useAsync((f) => fetchHealthIndex({ force: f }))
   const wellnessIdx = useAsync((f) => fetchWellnessIndex({ force: f }))
   const lastHealthDate = healthIdx.data?.[0] || null
@@ -267,8 +269,14 @@ export default function TodayPage() {
     if (!liveCycles.length && activeGoals.length) {
       a.push({ sev: 'short', icon: 'loop', text: 'Active goals with no live cycle', to: '/goals', cta: 'Start one' })
     }
-    return a.sort((x, y) => (x.sev === 'risk' ? -1 : 1) - (y.sev === 'risk' ? -1 : 1))
-  }, [healthAge, checkinAge, dueActions.length, dueDone, weakest, liveCycles.length, activeGoals.length])
+    const sorted = a.sort((x, y) => (x.sev === 'risk' ? -1 : 1) - (y.sev === 'risk' ? -1 : 1))
+    // Intention nudge sits at the tail: it is a gentle "also do this",
+    // never louder than a missed health log or an open cycle action.
+    if (!intentionRow.loading && !intentionRow.data) {
+      sorted.push({ sev: 'short', icon: 'star', text: "Today's intention isn't set", kind: 'intention', scrollTo: 'today-intention' })
+    }
+    return sorted
+  }, [healthAge, checkinAge, dueActions.length, dueDone, weakest, liveCycles.length, activeGoals.length, intentionRow.loading, intentionRow.data])
 
   /* ── Trajectory ────────────────────────────────────────────────────
      The hero used to restate the alert count that is listed immediately
@@ -448,7 +456,10 @@ export default function TodayPage() {
           this being the first thing on screen every morning, and this
           card demoted it when it sat above. Secondary follow-up, not a
           replacement for it. */}
-      <IntentionCard />
+      <div id="today-intention" style={{ scrollMarginTop: 16 }}>
+        <IntentionCard intention={intentionRow.data} loading={intentionRow.loading}
+          onChanged={() => intentionRow.reload()} />
+      </div>
 
       {reviewDue && (
         <Link to="/review" className="rv-due">
@@ -482,9 +493,16 @@ export default function TodayPage() {
                       {open ? 'Cancel' : al.cta} <Icon name={open ? 'close' : 'bolt'} size={14} />
                     </button>
                   )}
-                  <Link to={al.to} className="btn btn-ghost btn-xs">
-                    Open <Icon name="arrow_forward" size={14} />
-                  </Link>
+                  {al.scrollTo ? (
+                    <button type="button" className="btn btn-ghost btn-xs"
+                      onClick={() => document.getElementById(al.scrollTo)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
+                      Set it <Icon name="arrow_upward" size={14} />
+                    </button>
+                  ) : (
+                    <Link to={al.to} className="btn btn-ghost btn-xs">
+                      Open <Icon name="arrow_forward" size={14} />
+                    </Link>
+                  )}
                 </div>
                 {open && al.kind === 'health' && (
                   <QuickHealthForm busy={quickBusy} onCancel={() => setQuickOpen(null)} onSave={quickSaveHealth} />

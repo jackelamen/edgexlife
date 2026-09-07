@@ -44,15 +44,14 @@ function threadPhrase(keys) {
   return `${labels.slice(0, -1).join(', ')}, and ${labels[labels.length - 1]}`
 }
 
-export default function IntentionCard() {
-  const date = today()
-  const row = useAsync((f) => fetchDailyIntention(date, { force: f }), [date])
-  const intention = row.data
-
-  if (row.loading) return null // avoid a flash of the empty-state prompt while the first fetch resolves
-  if (!intention) return <PromptState date={date} onSaved={() => row.reload()} />
-  if (intention.closed_at) return <ClosedState intention={intention} onChanged={() => row.reload()} />
-  return <SetState intention={intention} onChanged={() => row.reload()} />
+/* State is lifted to TodayPage so the attention queue and this card read
+   the same row — a "set today's intention" nudge in the queue that stayed
+   up for a few seconds after you'd just set it would be worse than none. */
+export default function IntentionCard({ intention, loading, onChanged }) {
+  if (loading) return null // avoid a flash of the empty-state prompt while the first fetch resolves
+  if (!intention) return <PromptState date={today()} onSaved={onChanged} />
+  if (intention.closed_at) return <ClosedState intention={intention} onChanged={onChanged} />
+  return <SetState intention={intention} onChanged={onChanged} />
 }
 
 /* ── Shared: the "commit Pulse tasks/habits" picker ────────────────
@@ -143,9 +142,10 @@ function PromptState({ date, onSaved }) {
   const attachedCount = taskIds.length + habitIds.length
 
   return (
-    <div className="intention-card">
+    <div className="intention-card intention-card--prompt">
       <div className="intention-top">
         <div className="intention-eyebrow"><Icon name="star" fill size={15} /><span>Today's intention</span></div>
+        <h3 className="intention-headline">Name what today is for</h3>
         <p className="intention-prompt">Which part of who you're building shows up today? Pick as many as fit.</p>
         <div className="thread-row">
           {IDENTITY_THREADS.map((t) => (
