@@ -791,14 +791,17 @@ const REMINDER_DEFAULTS = {
   timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Los_Angeles',
   health_enabled: true, health_time: '20:00',
   wellness_enabled: true, wellness_time: '20:00',
+  // Morning by default — the intention is meant to be set at the start of
+  // the day, not caught up on at night like a health log.
+  intention_enabled: true, intention_time: '08:00',
 }
 
 export const fetchReminderPrefs = (o) => cachedQuery('reminder-prefs', async () => {
   const row = unwrap(await supabase.from('life_reminder_prefs')
-    .select('timezone,health_enabled,health_time,wellness_enabled,wellness_time')
+    .select('timezone,health_enabled,health_time,wellness_enabled,wellness_time,intention_enabled,intention_time')
     .maybeSingle())
   return row ? { ...REMINDER_DEFAULTS, ...row, health_time: row.health_time?.slice(0, 5),
-    wellness_time: row.wellness_time?.slice(0, 5) } : REMINDER_DEFAULTS
+    wellness_time: row.wellness_time?.slice(0, 5), intention_time: row.intention_time?.slice(0, 5) } : REMINDER_DEFAULTS
 }, { ttlMs: HOUR, ...o })
 
 export async function saveReminderPrefs(prefs) {
@@ -811,6 +814,8 @@ export async function saveReminderPrefs(prefs) {
       health_time: prefs.health_time || '20:00',
       wellness_enabled: Boolean(prefs.wellness_enabled),
       wellness_time: prefs.wellness_time || '20:00',
+      intention_enabled: Boolean(prefs.intention_enabled),
+      intention_time: prefs.intention_time || '08:00',
       updated_at: new Date().toISOString(),
     }, { onConflict: 'user_id' })
   if (error) throw error

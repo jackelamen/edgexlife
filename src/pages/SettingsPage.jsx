@@ -179,9 +179,18 @@ function ReminderPanel() {
           <input type="time" value={p.wellness_time} style={{ width: 110 }}
             onChange={(e) => setForm({ ...p, wellness_time: e.target.value })} />
         </div>
+        <div className="row" style={{ alignItems: 'center' }}>
+          <label className="flex items-center gap-2 text-[13px]" style={{ flex: 1 }}>
+            <input type="checkbox" checked={p.intention_enabled}
+              onChange={(e) => setForm({ ...p, intention_enabled: e.target.checked })} />
+            Intention · name your day
+          </label>
+          <input type="time" value={p.intention_time} style={{ width: 110 }}
+            onChange={(e) => setForm({ ...p, intention_time: e.target.value })} />
+        </div>
       </div>
       <p className="text-[11.5px] mt-2" style={{ color: 'var(--ink-4)' }}>
-        Only fires if that module hasn't been logged yet that day. Once you log, it stays quiet.
+        Each one only fires if that day's entry isn't already done. Once you log or set it, it stays quiet.
       </p>
       <button className="btn btn-primary" style={{ marginTop: 14 }} disabled={!form || saving} onClick={save}>
         {saving ? 'Saving…' : 'Save reminder times'}
