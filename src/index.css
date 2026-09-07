@@ -766,16 +766,38 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
 }
 
 /* ── Trends ────────────────────────────────────────────────── */
-.trend-chart {
-  min-height: 230px; border: 1px solid var(--border); border-radius: 14px;
-  background: linear-gradient(180deg, var(--white-soft), var(--white)); padding: 14px;
-  display: flex; flex-direction: column; gap: 12px;
+/* The chart sits inside a <Card>, so it brings no border or fill of its
+   own — nested chrome was half the reason Trends looked boxed-in. */
+.trend-chart { width: 100%; }
+.trend-chart svg { overflow: visible; }
+
+.tc-grid { stroke: var(--border); stroke-width: 1; }
+.tc-line { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.tc-target { stroke: var(--orange); stroke-width: 1.25; stroke-dasharray: 4 4; }
+.tc-avg { stroke: rgba(var(--accent-rgb), 0.28); stroke-width: 1.25; stroke-dasharray: 2 4; }
+
+.tc-ytick { fill: var(--text-3); font-size: 10px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.tc-xtick { fill: var(--text-3); font-size: 10.5px; font-weight: 700; letter-spacing: .02em; }
+.tc-avg-lbl { fill: var(--text-3); font-size: 9.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
+.tc-target-lbl { fill: var(--orange); font-size: 9.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
+
+.tc-end-dot { fill: var(--white); stroke: var(--accent); stroke-width: 2; }
+.tc-focus { stroke: var(--accent); stroke-width: 1; stroke-dasharray: 3 3; opacity: .5; }
+.tc-focus-dot { fill: var(--accent); stroke: var(--white); stroke-width: 2.5; }
+
+.tc-tip {
+  position: absolute; z-index: 3; pointer-events: none;
+  display: flex; flex-direction: column; gap: 1px; align-items: flex-start;
+  padding: 6px 9px; border-radius: 9px; background: var(--text); color: var(--white);
+  box-shadow: var(--shadow-sm); white-space: nowrap;
 }
-.trend-chart .line { fill: none; stroke: var(--accent); stroke-width: 2.25; stroke-linecap: round; stroke-linejoin: round; }
-.trend-chart .target { stroke: var(--orange); stroke-width: 1.5; stroke-dasharray: 5 5; }
-.trend-chart .avg-line { stroke: rgba(var(--accent-rgb), 0.4); stroke-width: 1.5; stroke-dasharray: 4 4; }
-.trend-chart .grid-line { stroke: var(--border); stroke-width: 1; }
-.trend-chart .dot { fill: var(--white); stroke: var(--accent); stroke-width: 2; }
+.tc-tip::after {
+  content: ''; position: absolute; bottom: -4px; left: 12px;
+  width: 8px; height: 8px; background: inherit; transform: rotate(45deg);
+}
+.tc-tip.flip::after { left: auto; right: 12px; }
+.tc-tip-v { font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.tc-tip-d { font-size: 10.5px; font-weight: 600; color: rgba(255,255,255,.62); }
 .trend-day { display: grid; grid-template-columns: 82px 1fr auto; gap: 10px; align-items: center; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--white); }
 .trend-day-track { height: 6px; border-radius: 99px; background: var(--border-med); overflow: hidden; }
 .trend-day-track > span { display: block; height: 100%; border-radius: 99px; background: var(--accent); }
