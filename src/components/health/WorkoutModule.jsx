@@ -621,8 +621,6 @@ async function syncPlanFromSession(session, plan) {
 /* ═══════════════ Live session ═══════════════ */
 
 function SessionTab({ session, setSession, db, goals, plan, pastSessions, exerciseGoals, onStart, onFinished, bodyweightKg = 70 }) {
-  const [secs, setSecs] = useState(0)
-  const [running, setRunning] = useState(false)
   const [openEx, setOpenEx] = useState(0)
   // Which exercise's Repeat button is armed for a destructive replace.
   // -1 = none. See repeatLast().
@@ -635,8 +633,6 @@ function SessionTab({ session, setSession, db, goals, plan, pastSessions, exerci
   // delete a logged exercise instead. See the .ex-card-hdr comment in
   // index.css for the matching spacing fix.
   const [armedRemove, setArmedRemove] = useState(-1)
-  const startedAt = useRef(0)
-  const base = useRef(0)
   // The duration this session ALREADY carried when it was loaded into the
   // editor — 0 for a brand-new session, but a real value when re-opening a
   // finished one from History to fix a forgotten timer. `finish()` diffs
@@ -645,6 +641,15 @@ function SessionTab({ session, setSession, db, goals, plan, pastSessions, exerci
   // exerciseMins by the CHANGE, instead of adding the whole duration again
   // on top of what a previous finish already synced.
   const originalDurationSec = useRef(0)
+  // Elapsed time is derived from `session.timerStartedAt`/`durationSec` —
+  // persisted fields on the session object itself, autosaved to
+  // localStorage by WorkoutModule's own effect — rather than local
+  // component state. Local state used to hold the running clock, so
+  // switching to another Workout Planner tab (Plan/History/DB/Progress)
+  // or navigating away to another module entirely unmounted this
+  // component and silently reset the timer to 00:00. `now` just forces a
+  // re-render every tick; it isn't the source of truth.
+  const [now, setNow] = useState(() => Date.now())
 
   // Active goals grouped by exercise name — surfaced right on the exercise
   // card during logging, not just on a separate Progress tab you have to
@@ -694,21 +699,27 @@ function SessionTab({ session, setSession, db, goals, plan, pastSessions, exerci
     return map
   }, [exerciseGoals])
 
+  const running = Boolean(session?.timerStartedAt)
+  const secs = (session?.durationSec || 0)
+    + (running ? Math.max(0, Math.floor((now - session.timerStartedAt) / 1000)) : 0)
+
   useEffect(() => {
     if (!running) return
-    startedAt.current = Date.now()
-    const id = setInterval(() => setSecs(base.current + Math.floor((Date.now() - startedAt.current) / 1000)), 500)
+    setNow(Date.now())
+    const id = setInterval(() => setNow(Date.now()), 500)
     return () => clearInterval(id)
-  }, [running])
+  }, [running, session?.timerStartedAt])
 
   useEffect(() => {
     // Seed from the session's own durationSec rather than always 0 — a
     // finished workout re-opened from History (say, to add the duration
     // you forgot to time) used to show "00:00" no matter how much was
     // actually logged, which read as the session having lost its time.
-    const d = session?.durationSec || 0
-    setSecs(d); base.current = d; setRunning(false); setOpenEx(0)
-    originalDurationSec.current = d
+    // Only runs when a genuinely different session loads — the running
+    // clock itself lives on `session` now, so it doesn't need resetting
+    // here on every mount.
+    originalDurationSec.current = session?.durationSec || 0
+    setOpenEx(0)
   }, [session?.id])
 
   if (!session) {
@@ -741,11 +752,11 @@ function SessionTab({ session, setSession, db, goals, plan, pastSessions, exerci
   }
 
   function toggleTimer() {
-    if (running) { base.current = secs; setRunning(false) } else setRunning(true)
+    if (running) set({ durationSec: secs, timerStartedAt: null })
+    else { setNow(Date.now()); set({ timerStartedAt: Date.now() }) }
   }
 
   async function finish() {
-    if (running) { base.current = secs; setRunning(false) }
     // A nameless exercise with real set data used to be silently dropped
     // here — `filter((e) => e.name.trim())` — while the toast still said
     // "Session saved" with no hint anything was thrown away. Now only a
@@ -762,6 +773,7 @@ function SessionTab({ session, setSession, db, goals, plan, pastSessions, exerci
     const cleaned = {
       ...session,
       durationSec: secs,
+      timerStartedAt: null,
       exercises,
       completedAt: new Date().toISOString(),
     }
@@ -810,7 +822,7 @@ function SessionTab({ session, setSession, db, goals, plan, pastSessions, exerci
           <button className={`timer-btn ${running ? 'stop' : 'start'}`} onClick={toggleTimer}>
             {running ? 'Pause' : secs ? 'Resume' : 'Start'}
           </button>
-          <button className="timer-btn reset" onClick={() => { base.current = 0; setSecs(0); setRunning(false) }}>
+          <button className="timer-btn reset" onClick={() => set({ durationSec: 0, timerStartedAt: null })}>
             Reset
           </button>
         </div>
@@ -828,7 +840,7 @@ function SessionTab({ session, setSession, db, goals, plan, pastSessions, exerci
             placeholder={running ? '…' : '0'}
             onChange={(e) => {
               const mins = e.target.value === '' ? 0 : Math.max(0, Number(e.target.value))
-              base.current = mins * 60; setSecs(mins * 60)
+              set({ durationSec: mins * 60 })
             }} />
         </div>
       </div>
