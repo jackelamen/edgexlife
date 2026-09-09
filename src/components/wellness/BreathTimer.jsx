@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import Icon from '../ui/Icon'
-import { BREATH_PRESETS, cycleSeconds, phaseAt, cueAhead, LONG_PHASE_SECONDS, MEDITATION_FADE_SECONDS, MEDITATION_TRACKS } from '../../lib/practices'
+import { BREATH_PRESETS, cycleSeconds, phaseAt, cueAhead, breathsPerMinute, LONG_PHASE_SECONDS, MEDITATION_FADE_SECONDS, MEDITATION_TRACKS } from '../../lib/practices'
 import { metricColor } from '../../lib/design'
 
 // Breath phase colour = identity, not decoration (lib/design.js rule 1):
@@ -24,7 +24,7 @@ const BREATH_OUT = { hex: metricColor('grounded'), glow: '14,124,134' }
   accumulator, so a backgrounded tab doesn't drift the visual out of sync
   with the actual elapsed time.
 */
-export default function BreathTimer({ onComplete }) {
+export default function BreathTimer({ onComplete, suggestion }) {
   const [preset, setPreset] = useState(BREATH_PRESETS[0])
   const [duration, setDuration] = useState(preset.minutes * 60)
   const [remaining, setRemaining] = useState(preset.minutes * 60)
@@ -379,6 +379,39 @@ export default function BreathTimer({ onComplete }) {
     <div>
       {face(false)}
 
+      {/* Routed off the dominant state on today's latest check-in. Shown
+          even once you've picked something else, because the reason is
+          the useful part — it says what it's reasoning from, so you can
+          disagree with it rather than just obey a highlighted button. */}
+      {suggestion && (
+        <div className="breath-suggest">
+          <div className="breath-suggest-hd">
+            <Icon name="auto_awesome" size={15} />
+            <span>{suggestion.state ? `You logged “${suggestion.state}” today` : 'No check-in yet today'}</span>
+          </div>
+          <strong>Try {suggestion.preset.label}</strong>
+          <p>{suggestion.why}</p>
+          {/* A suggestion that carries a safety caution has to show it HERE,
+              not only in the panel below: that panel describes whichever
+              preset is selected, so recommending Wim Hof to a flat day would
+              otherwise put "never do this in water" one click away from the
+              person being told to try it. Suppressed only when the suggested
+              preset is already the selected one, where the panel below is
+              showing the same text a few centimetres down. */}
+          {suggestion.preset.caution && suggestion.preset.id !== preset.id && (
+            <p className="breath-caution">
+              <Icon name="warning" size={14} />
+              <span>{suggestion.preset.caution}</span>
+            </p>
+          )}
+          {suggestion.preset.id !== preset.id && (
+            <button className="btn btn-secondary btn-sm" onClick={() => selectPreset(suggestion.preset)}>
+              <Icon name="play_arrow" size={14} /> Load it
+            </button>
+          )}
+        </div>
+      )}
+
       <div className="breath-presets">
         {BREATH_PRESETS.map((p) => (
           <button key={p.id} type="button"
@@ -386,9 +419,12 @@ export default function BreathTimer({ onComplete }) {
             onClick={() => selectPreset(p)}>
             <strong>{p.label}</strong>
             <span>{p.pattern} · {p.minutes} min</span>
+            {suggestion?.preset.id === p.id && <em className="breath-preset-tag">Suggested</em>}
           </button>
         ))}
       </div>
+
+      <PresetInfo preset={preset} />
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 14 }}>
         <button className="btn btn-secondary btn-sm" onClick={() => setMinutesPreset(2)}>2m</button>
@@ -447,6 +483,55 @@ export default function BreathTimer({ onComplete }) {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+/*
+  What the selected pattern is for. Every field here is written and sourced
+  under the rules in lib/practices.js — in particular `evidence` says how
+  well-tested a pattern actually is, including when the answer is "this one
+  is popular rather than tested," which is the whole reason that line exists
+  rather than a row of confident benefit claims.
+
+  `caution` deliberately does NOT use red or amber. Rule 3 of the design
+  system reserves the status ramp for performance indicators, so a colour
+  shift always means a number moved; borrowing red for a safety note would
+  break that. It earns attention from the icon, the rule down its left edge
+  and its position instead.
+*/
+function PresetInfo({ preset }) {
+  const rate = breathsPerMinute(preset)
+  return (
+    <div className="breath-info">
+      <div className="breath-info-hd">
+        <strong>{preset.label}</strong>
+        <span>{preset.pattern}{rate ? ` · ${rate.toFixed(1).replace(/\.0$/, '')} breaths/min` : ''}</span>
+      </div>
+
+      <ul className="breath-use">
+        {preset.use.map((u) => <li key={u}>{u}</li>)}
+      </ul>
+
+      <p className="breath-how">{preset.how}</p>
+
+      <p className="breath-evidence">
+        <Icon name="science" size={13} />
+        <span>{preset.evidence}</span>
+      </p>
+
+      {preset.caution && (
+        <p className="breath-caution">
+          <Icon name="warning" size={14} />
+          <span>{preset.caution}</span>
+        </p>
+      )}
+
+      <p className="breath-disclaimer">
+        General wellness information, not medical advice. Breathing practice is
+        not a treatment for a medical or psychiatric condition — if something
+        feels wrong, stop and breathe normally.
+      </p>
     </div>
   )
 }

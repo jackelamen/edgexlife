@@ -16,7 +16,7 @@ import {
   clarityDetails, clarityLabel, MOOD_LABELS, STATES, SLEEP_IMPACTS, THOUGHT_TYPES,
 } from '../lib/scores'
 import { currentStreak, longestStreak, milestoneHit } from '../lib/streaks'
-import { RESET_TOOLS, suggestedReset, PRACTICE_TYPES, AFTER_STATES } from '../lib/practices'
+import { RESET_TOOLS, suggestedReset, suggestedBreath, PRACTICE_TYPES, AFTER_STATES } from '../lib/practices'
 import { today, daysAgo, shiftDate, pretty } from '../lib/dates'
 import { STATUS } from '../lib/design'
 import BreathTimer from '../components/wellness/BreathTimer'
@@ -91,7 +91,7 @@ export default function WellnessPage() {
         />
       )}
       {view === 'reset' && <ResetView latest={latest} onNav={setView} onLogged={reloadAll} />}
-      {view === 'meditate' && <MeditateView onLogged={reloadAll} />}
+      {view === 'meditate' && <MeditateView latest={latest} onLogged={reloadAll} />}
       {view === 'inbox' && <InboxView notes={notes} />}
       {view === 'journal' && <JournalView notes={notes} onEdit={openCheckin} />}
       {view === 'trends' && <TrendsView />}
@@ -724,16 +724,22 @@ function ResetRunner({ tool, onClose, onLogged }) {
 
 /* ══════════════════ Meditate ══════════════════ */
 
-function MeditateView({ onLogged }) {
+function MeditateView({ latest, onLogged }) {
   const [note, setNote] = useState('')
   const [after, setAfter] = useState('')
   const [practiceType, setPracticeType] = useState('Meditation')
   const [last, setLast] = useState(null)
 
+  // Routed off the dominant state on today's latest check-in, the same
+  // field the Reset tab already routes on — so the two tabs can't
+  // disagree about what you told the app you're feeling.
+  const suggestion = useMemo(() => suggestedBreath(latest?.state), [latest?.state])
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5">
       <Card>
-        <BreathTimer onComplete={(r) => { setLast(r); setPracticeType(r.preset.practiceType) }} />
+        <BreathTimer suggestion={suggestion}
+          onComplete={(r) => { setLast(r); setPracticeType(r.preset.practiceType) }} />
       </Card>
       <Card>
         <CardHead title="Session Note" sub="Save after a session to build your practice history." />

@@ -47,6 +47,7 @@
   --orange: var(--s-short); --orange-light: var(--s-short-bg);
   --red: var(--s-risk);     --red-light: var(--s-risk-bg);
   --purple: #6b3fa0;        --purple-light: #eae1f5;
+  --purple-rgb: 107, 63, 160;
 
   --shadow-sm: 0 2px 6px rgba(20,20,15,.05);
   --shadow: 0 8px 22px rgba(20,20,15,.08);
@@ -1149,6 +1150,36 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
 .breath-preset.active { border-color: rgba(var(--accent-rgb), .55); background: var(--accent-light); box-shadow: 0 0 0 3px var(--accent-dim); }
 .breath-preset strong { display: block; font-size: 13px; font-weight: 800; color: var(--text); }
 .breath-preset span { display: block; font-size: 11px; font-weight: 800; color: var(--text-3); margin-top: 3px; }
+.breath-preset-tag { display: inline-block; margin-top: 6px; font-size: 9px; font-style: normal; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; color: var(--purple); background: var(--purple-light); border-radius: 999px; padding: 2px 7px; }
+
+/* State-routed suggestion. Wellness purple, matching the module hue this
+   whole page already sits in (design rule 4) — the status ramp stays out
+   of it, since this is a recommendation, not a number doing well or badly. */
+.breath-suggest { margin-top: 14px; border: 1px solid rgba(var(--purple-rgb), .28); background: var(--purple-light); border-radius: 14px; padding: 12px 14px; }
+.breath-suggest-hd { display: flex; align-items: center; gap: 6px; font-size: 10px; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; color: var(--purple); }
+.breath-suggest strong { display: block; margin-top: 6px; font-size: 14px; font-weight: 800; color: var(--text); }
+.breath-suggest p { margin-top: 4px; font-size: 12px; line-height: 1.5; color: var(--text-2); }
+.breath-suggest .btn { margin-top: 10px; }
+
+/* Reference panel for the selected pattern. */
+.breath-info { margin-top: 12px; border: 1px solid var(--border); border-radius: 14px; padding: 13px 15px; background: var(--white); }
+.breath-info-hd { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.breath-info-hd strong { font-size: 14px; font-weight: 800; color: var(--text); }
+.breath-info-hd span { font-size: 11px; font-weight: 800; letter-spacing: .04em; color: var(--text-3); }
+.breath-use { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 0; padding: 0; list-style: none; }
+.breath-use li { font-size: 11px; font-weight: 800; color: var(--text-2); background: var(--white-soft); border: 1px solid var(--border); border-radius: 999px; padding: 3px 9px; }
+.breath-how { margin-top: 10px; font-size: 12.5px; line-height: 1.55; color: var(--text-2); }
+.breath-evidence, .breath-caution { display: flex; gap: 8px; margin-top: 10px; font-size: 12px; line-height: 1.5; }
+.breath-evidence { color: var(--text-3); }
+.breath-evidence .icon { flex: none; margin-top: 2px; }
+/* Safety copy, and the one place it would be tempting to reach for red.
+   Design rule 3 reserves red/amber/green for performance indicators, so a
+   colour shift in this app always means a number moved — a warning wearing
+   red would quietly break that contract everywhere else. It gets weight
+   from the icon, the left rule and the darker ink instead of from hue. */
+.breath-caution { color: var(--text); font-weight: 600; background: var(--white-soft); border-left: 3px solid var(--text); border-radius: 0 10px 10px 0; padding: 10px 12px; }
+.breath-caution .icon { flex: none; margin-top: 1px; }
+.breath-disclaimer { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); font-size: 11px; line-height: 1.5; color: var(--text-3); }
 /* Full-screen meditation view.
    The inner timer keeps its .timer-face class for layout, but every trace of
    the CARD it is on the dashboard (gradient fill, rounded corners, fixed
