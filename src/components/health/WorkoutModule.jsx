@@ -950,7 +950,7 @@ function SessionTab({ session, setSession, db, goals, plan, pastSessions, exerci
                           sets: ex.sets.map((x, j) => j === si ? { ...x, weight: e.target.value } : x),
                         })} />
                       <span className="tnum" style={{ fontSize: 12, fontWeight: 800, color: 'var(--text-3)', textAlign: 'center' }}>
-                        {((parseFloat(s.reps) || 0) * setLoadKg(ex.name, s.weight, bodyweightKg)) || '—'}
+                        {Math.round((parseFloat(s.reps) || 0) * setLoadKg(ex.name, s.weight, bodyweightKg) * 10) / 10 || '—'}
                       </span>
                       <button className={`set-done-btn${s.done ? ' done' : ''}`}
                         onClick={() => updateEx(i, {
