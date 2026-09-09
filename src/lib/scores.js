@@ -69,9 +69,17 @@
   claiming a contradiction that was never real.
 
   `nutritionScore` (1–10, self-rated) fills the weighted slot exercise used
-  to occupy. `isFastingDay` and `nutritionNotes` ride along on the same log
-  but are deliberately NOT scored — context for reading the number, not an
-  input to it, same principle as Fasting's own module-level note.
+  to occupy. `nutritionNotes` rides along on the same log but is
+  deliberately NOT scored — context for reading the number, not an input
+  to it, same principle as Fasting's own module-level note.
+
+  Fasting days (2026-09-09): `isFastingDay` DOES change the score, because
+  there is no nutrition to rate on a day you didn't eat — a self-rating
+  would just be noise. Nutrition's 0.15 weight is dropped entirely and
+  redistributed proportionally across the other five weighted components
+  (sleep/steps/water/energy/quality, which sum to 0.85) so the score is
+  still built from 100% weight and stays comparable in scale to a normal
+  day. Pain's subtraction is untouched — it was never part of that 0.85.
 
   Clarity Score (wellness.html clarityDetails)
     mood .22  stressEase .24  clarity .28  grounded .26
@@ -135,27 +143,46 @@ export function healthDetails(log, settings) {
   const nutritionRating = i(log.nutritionScore, 6)
   const nutrition = (nutritionRating / 10) * 100
 
+  // On a fasting day there's nothing to rate, so nutrition's weight is
+  // dropped and redistributed proportionally across the other five
+  // weighted components instead of scoring an unrated/irrelevant value.
+  // See the header comment (2026-09-09) for why this one weight change is
+  // deliberate rather than the "never touch a weight" default.
+  const isFasting = Boolean(log.isFastingDay)
+  const baseWeights = { sleep: 0.24, steps: 0.15, water: 0.11, energy: 0.20, quality: 0.15, nutrition: 0.15 }
+  const redistributeScale = 1 / (1 - baseWeights.nutrition)
+  const weights = isFasting
+    ? {
+        sleep: baseWeights.sleep * redistributeScale,
+        steps: baseWeights.steps * redistributeScale,
+        water: baseWeights.water * redistributeScale,
+        energy: baseWeights.energy * redistributeScale,
+        quality: baseWeights.quality * redistributeScale,
+        nutrition: 0,
+      }
+    : baseWeights
+
   const components = [
-    { key: 'sleepHours', label: 'Sleep', value: sleep, weight: 0.24, maxPoints: 24,
+    { key: 'sleepHours', label: 'Sleep', value: sleep, weight: weights.sleep, maxPoints: Math.round(weights.sleep * 100),
       detail: isMissing(log.sleepHours) ? `Not logged, assumed 60% of ${hmLabel(s.sleepTarget)}`
         : `${hmLabel(n(log.sleepHours)) || '0h'} / ${hmLabel(s.sleepTarget)}`,
       advice: 'Add an earlier shutdown cue or protect tomorrow morning from late-night drift.' },
-    { key: 'steps', label: 'Steps', value: steps, weight: 0.15, maxPoints: 15,
+    { key: 'steps', label: 'Steps', value: steps, weight: weights.steps, maxPoints: Math.round(weights.steps * 100),
       detail: isMissing(log.steps) ? `Not logged, assumed 60% of ${s.stepTarget.toLocaleString()}`
         : `${i(log.steps).toLocaleString()} / ${s.stepTarget.toLocaleString()}`,
       advice: 'Add a 10-minute walk to a transition you already have.' },
-    { key: 'water', label: 'Water', value: water, weight: 0.11, maxPoints: 11,
+    { key: 'water', label: 'Water', value: water, weight: weights.water, maxPoints: Math.round(weights.water * 100),
       detail: isMissing(log.water) ? `Not logged, assumed 60% of ${s.waterTarget}L`
         : `${n(log.water).toFixed(1)}L / ${s.waterTarget}L`,
       advice: 'Put water in reach and pair the next glass with food or a work start.' },
-    { key: 'energy', label: 'Energy', value: energy, weight: 0.20, maxPoints: 20,
+    { key: 'energy', label: 'Energy', value: energy, weight: weights.energy, maxPoints: Math.round(weights.energy * 100),
       detail: `${i(log.energy, 3)} / 5`,
       advice: 'Reduce friction: food, daylight, a short walk, or a lower-demand plan.' },
-    { key: 'sleepQuality', label: 'Sleep quality', value: quality, weight: 0.15, maxPoints: 15,
+    { key: 'sleepQuality', label: 'Sleep quality', value: quality, weight: weights.quality, maxPoints: Math.round(weights.quality * 100),
       detail: `${i(log.sleepQuality, 3)} / 5`,
       advice: 'Improve the pre-sleep environment before adding more effort tomorrow.' },
-    { key: 'nutrition', label: 'Nutrition', value: nutrition, weight: 0.15, maxPoints: 15,
-      detail: `${nutritionRating} / 10${log.isFastingDay ? ' · fasting day' : ''}`,
+    { key: 'nutrition', label: 'Nutrition', value: nutrition, weight: weights.nutrition, maxPoints: Math.round(weights.nutrition * 100),
+      detail: isFasting ? 'Fasting day · excluded from score' : `${nutritionRating} / 10`,
       advice: METRIC_ADVICE.nutrition },
     // Label is 'Pain', not 'Low pain' — this is the one driver where the
     // raw metric and the 0-100 "goodness" value move in OPPOSITE
@@ -179,7 +206,8 @@ export function healthDetails(log, settings) {
       advice: 'De-load today: mobility, easy walking, or rest instead of forcing intensity.' },
   ]
 
-  const base = sleep * 0.24 + steps * 0.15 + water * 0.11 + energy * 0.20 + quality * 0.15 + nutrition * 0.15 - pain * 7
+  const base = sleep * weights.sleep + steps * weights.steps + water * weights.water
+    + energy * weights.energy + quality * weights.quality + nutrition * weights.nutrition - pain * 7
   const exercised = Boolean(log.exercisedToday)
   const bonusAwarded = exercised ? MOVEMENT_BONUS_POINTS : 0
   const score = Math.max(0, Math.min(100, Math.round(base + bonusAwarded)))
