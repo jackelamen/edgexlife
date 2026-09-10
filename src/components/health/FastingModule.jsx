@@ -285,14 +285,6 @@ function ActiveFastCard({ session, onEnd, onEditStart }) {
                 ? `Started ${new Date(session.startedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}. Aiming for ${target}h.`
                 : `Started ${new Date(session.startedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}.`}
           </p>
-          <div className="hero-actions">
-            <button className="btn btn-primary" onClick={onEnd}>
-              <Icon name="stop_circle" size={17} /> End Fast
-            </button>
-            <button className="btn btn-secondary" onClick={onEditStart} title="Forgot to start the timer on time?">
-              <Icon name="edit" size={17} /> Fix start time
-            </button>
-          </div>
         </div>
         <div style={{ position: 'relative', width: 84, height: 84, marginLeft: 'auto' }}>
           <svg width="100%" height="100%" viewBox="0 0 84 84" style={{ transform: 'rotate(-90deg)', display: 'block' }}>
@@ -309,6 +301,20 @@ function ActiveFastCard({ session, onEnd, onEditStart }) {
               of target
             </div>
           </div>
+        </div>
+        {/* Direct child of .hero-content on purpose: its `grid-column: 1/-1`
+            only spans the hero if it IS a grid item. Nested inside the copy
+            column (where it used to live) that rule is inert, and on a phone
+            — where the ring sits beside the copy rather than under it — the
+            two buttons got squeezed into a 255px column and wrapped into a
+            ragged stack, with the wider one overflowing its own pill. */}
+        <div className="hero-actions">
+          <button className="btn btn-primary" onClick={onEnd}>
+            <Icon name="stop_circle" size={17} /> End Fast
+          </button>
+          <button className="btn btn-secondary" onClick={onEditStart} title="Forgot to start the timer on time?">
+            <Icon name="edit" size={17} /> Fix start time
+          </button>
         </div>
       </div>
     </div>
@@ -346,7 +352,12 @@ function WeeklyStats({ sessions }) {
   const m = metric('fasting')
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-3.5" style={{ marginBottom: 14 }}>
+    /* Two up on a phone rather than one: three single-column cards spent
+       320px of scroll on three short numbers. Three across doesn't fit —
+       "36h 42m" at this type size overflows a ~100px column on a 360px
+       phone — so the two bare counts pair off and the duration, the one
+       that actually needs the width, takes the full row underneath. */
+    <div className="grid grid-cols-2 lg:grid-cols-3 gap-3.5" style={{ marginBottom: 14 }}>
       <div className="row" style={rowStyle}>
         <span className="k" style={kStyle}>This week</span>
         <span className="v" style={vStyle}>{wkCount}</span>
@@ -357,7 +368,7 @@ function WeeklyStats({ sessions }) {
         <span className="v" style={{ ...vStyle, color: streak > 0 ? m.color : 'inherit' }}>{streak}</span>
         <span style={subStyle}>{streak > 0 ? 'consecutive weeks' : 'complete one this week to start'}</span>
       </div>
-      <div className="row" style={rowStyle}>
+      <div className="row col-span-2 lg:col-span-1" style={rowStyle}>
         <span className="k" style={kStyle}>Longest fast</span>
         <span className="v" style={vStyle}>{longest ? formatDuration(longest) : '--'}</span>
         <span style={subStyle}>all-time</span>
@@ -380,20 +391,25 @@ function FastRow({ session, confirm, onEdit, onDelete }) {
   const armed = confirm.isArmed(session.id)
 
   return (
-    <div className="check-row" style={{ cursor: 'default' }}>
-      <span style={{
-        width: 34, height: 34, borderRadius: 10, flexShrink: 0,
-        display: 'grid', placeItems: 'center', background: metric('fasting').tint, color: metric('fasting').color,
-      }}>
+    /* The badge sits with the date rather than as its own column. Five
+       competing columns (icon, text, badge, edit, delete) left the text
+       ~114px on a phone, so "36h 42m · 16:8" wrapped to two lines, the
+       date to a third, and the delete button pushed past the card edge.
+       Pairing it with the date costs nothing on desktop and stops the
+       row from having more fixed-width children than a phone can hold. */
+    <div className="check-row fast-row" style={{ cursor: 'default' }}>
+      <span className="fast-row-ic" style={{ background: metric('fasting').tint, color: metric('fasting').color }}>
         <Icon name="schedule" size={17} />
       </span>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontWeight: 700, fontSize: 13.5 }}>
           {formatDuration(ms)} <span style={{ color: 'var(--text-3)', fontWeight: 600 }}>&middot; {methodLabel(session.method)}</span>
         </div>
-        <div style={{ fontSize: 11.5, color: 'var(--text-3)', fontWeight: 600 }}>{pretty(session.startedAt.slice(0, 10))}</div>
+        <div className="fast-row-meta">
+          <span>{pretty(session.startedAt.slice(0, 10))}</span>
+          <Badge tone={hit ? 'green' : 'muted'}>{hit ? 'Hit target' : 'Under target'}</Badge>
+        </div>
       </div>
-      <Badge tone={hit ? 'green' : 'muted'}>{hit ? 'Hit target' : 'Under target'}</Badge>
       <button className="btn-icon btn-sm" onClick={onEdit} title="Edit">
         <Icon name="edit" size={15} />
       </button>
