@@ -8,6 +8,7 @@ import {
   MetricLegend, StatusDots, DesignLegend,
 } from '../components/ui/Kit'
 import { useAsync } from '../hooks/useAsync'
+import { useViewParam } from '../hooks/useViewParam'
 import {
   fetchHealthIndex, fetchHealthLogs, fetchHealthSettings, saveHealthLog,
   deleteHealthLog, saveHealthSettings, fetchRoutines, saveRoutines,
@@ -33,7 +34,7 @@ const VIEWS = [
 ]
 
 export default function HealthPage() {
-  const [view, setView] = useState('today')
+  const [view, setView] = useViewParam('today')
   const [editDate, setEditDate] = useState(null)
 
   const settings = useAsync((f) => fetchHealthSettings({ force: f }))

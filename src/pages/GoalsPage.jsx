@@ -7,6 +7,7 @@ import {
   ErrorNote, Modal, Ring, useConfirm,
 } from '../components/ui/Kit'
 import { useAsync } from '../hooks/useAsync'
+import { useViewParam } from '../hooks/useViewParam'
 import {
   AREAS, GOAL_STATUSES, METRIC_TYPES,
   fetchGoals, saveGoal, deleteGoal, fetchVisions, saveVision,
@@ -43,7 +44,7 @@ const VIEWS = [
 ]
 
 export default function GoalsPage() {
-  const [view, setView] = useState('today')
+  const [view, setView] = useViewParam('today')
   const [editGoal, setEditGoal] = useState(null)
   // A "start a cycle" request from anywhere in the module (Today's empty
   // state, a goal card with no live cycle) lands here: switch to Cycles and

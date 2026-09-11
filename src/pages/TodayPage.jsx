@@ -178,6 +178,13 @@ export default function TodayPage() {
   const dueDone = dueActions.filter((a) => a.done).length
   const habitsDone = doneToday.size
 
+  /* Both toggles below apply the change to local state before the network
+     call resolves, then revert on error. These are the two most-tapped
+     controls on the page — first thing checked most mornings — and
+     waiting a full round trip (checkbox does nothing → suddenly ticks)
+     read as lag every single time. `reload()` after a success still runs,
+     so the optimistic write is only ever a head start on the same data,
+     never a permanent fork from it. */
   async function toggleAction(a) {
     const wkChecks = { ...((a.sp.week_checks || {})[a.wk] || {}) }
     if (a.kind === 'xpw') {
@@ -195,18 +202,34 @@ export default function TodayPage() {
       if (wkChecks[key]) delete wkChecks[key]
       else wkChecks[key] = true
     }
+    const prevSprints = sprints.data
+    sprints.setData((rows) => (rows || []).map((s) => s.id === a.sp.id
+      ? { ...s, week_checks: { ...(s.week_checks || {}), [a.wk]: wkChecks } }
+      : s))
     try {
       await mergeSprintWeekChecks(a.sp.id, a.wk, wkChecks)
       sprints.reload()
-    } catch (e) { toast.error(e.message) }
+    } catch (e) {
+      sprints.setData(prevSprints)
+      toast.error(e.message)
+    }
   }
 
   async function toggleHabit(h) {
+    const wasDone = doneToday.has(h.id)
+    const prevLogs = habitLogs.data
+    habitLogs.setData((rows) => {
+      const rest = (rows || []).filter((l) => !(l.habit_id === h.id && l.logged_on === t))
+      return wasDone ? rest : [...rest, { habit_id: h.id, logged_on: t, count: 1 }]
+    })
     try {
-      if (doneToday.has(h.id)) await unlogHabit(h.id, t)
+      if (wasDone) await unlogHabit(h.id, t)
       else await logHabit(h.id, t, 1)
       habitLogs.reload()
-    } catch (e) { toast.error(e.message) }
+    } catch (e) {
+      habitLogs.setData(prevLogs)
+      toast.error(e.message)
+    }
   }
 
   /* ── Quick-capture, right from the attention queue ──────────────────
@@ -246,16 +269,16 @@ export default function TodayPage() {
   const alerts = useMemo(() => {
     const a = []
     if (healthAge == null) {
-      a.push({ sev: 'risk', icon: 'monitor_heart', text: 'No health log yet', to: '/health', cta: 'Log', kind: 'health' })
+      a.push({ sev: 'risk', icon: 'monitor_heart', text: 'No health log yet', to: '/health?v=log', cta: 'Log', kind: 'health' })
     } else if (healthAge >= 2) {
       a.push({ sev: healthAge >= 5 ? 'risk' : 'short', icon: 'monitor_heart',
-        text: `Health not logged in ${healthAge} days`, to: '/health', cta: 'Log', kind: 'health' })
+        text: `Health not logged in ${healthAge} days`, to: '/health?v=log', cta: 'Log', kind: 'health' })
     }
     if (checkinAge == null) {
-      a.push({ sev: 'risk', icon: 'self_improvement', text: 'No wellness check-in yet', to: '/wellness', cta: 'Check in', kind: 'wellness' })
+      a.push({ sev: 'risk', icon: 'self_improvement', text: 'No wellness check-in yet', to: '/wellness?v=checkin', cta: 'Check in', kind: 'wellness' })
     } else if (checkinAge >= 2) {
       a.push({ sev: checkinAge >= 5 ? 'risk' : 'short', icon: 'self_improvement',
-        text: `No check-in in ${checkinAge} days`, to: '/wellness', cta: 'Check in', kind: 'wellness' })
+        text: `No check-in in ${checkinAge} days`, to: '/wellness?v=checkin', cta: 'Check in', kind: 'wellness' })
     }
     const openDue = dueActions.length - dueDone
     if (openDue > 0) {
@@ -267,7 +290,7 @@ export default function TodayPage() {
         metricKey: weakest.key })
     }
     if (!liveCycles.length && activeGoals.length) {
-      a.push({ sev: 'short', icon: 'loop', text: 'Active goals with no live cycle', to: '/goals', cta: 'Start one' })
+      a.push({ sev: 'short', icon: 'loop', text: 'Active goals with no live cycle', to: '/goals?v=cycles', cta: 'Start one' })
     }
     const sorted = a.sort((x, y) => (x.sev === 'risk' ? -1 : 1) - (y.sev === 'risk' ? -1 : 1))
     // Intention nudge sits at the tail: it is a gentle "also do this",

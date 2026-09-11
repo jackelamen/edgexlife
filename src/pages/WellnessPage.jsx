@@ -7,6 +7,7 @@ import {
   ErrorNote, Modal, CoachCard, Ring, ScoreRow, useConfirm,
 } from '../components/ui/Kit'
 import { useAsync } from '../hooks/useAsync'
+import { useViewParam } from '../hooks/useViewParam'
 import {
   fetchWellnessIndex, fetchWellnessCheckins, fetchWellnessNotes,
   saveCheckin, deleteCheckin, saveThought, deleteThought,
@@ -47,7 +48,7 @@ const checkinTime = (c) => c?.savedAt
   Check In) and are preserved here rather than collapsed to "one per day."
 */
 export default function WellnessPage() {
-  const [view, setView] = useState('today')
+  const [view, setView] = useViewParam('today')
   const [editingDate, setEditingDate] = useState(null)
   const [editingId, setEditingId] = useState(null)
 
