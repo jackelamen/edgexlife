@@ -36,5 +36,14 @@ export function useAsync(fn, deps = [], { enabled = true } = {}) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [...deps, enabled])
 
-  return { ...state, reload: () => run(true) }
+  // Optimistic-update escape hatch. Accepts a value or an updater
+  // `(prevData) => nextData`, same shape as useState's setter, so a caller
+  // can reflect a mutation immediately (a checkbox tick) without waiting on
+  // the round trip, then revert it on error or let the next `reload()`
+  // reconcile with the server's real answer.
+  const setData = useCallback((next) => {
+    setState((s) => ({ ...s, data: typeof next === 'function' ? next(s.data) : next }))
+  }, [])
+
+  return { ...state, reload: () => run(true), setData }
 }
