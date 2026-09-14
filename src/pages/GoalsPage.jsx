@@ -256,7 +256,7 @@ function TodayView({ goals, rollup, cycleData, onStartCycle }) {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <CycleCard key={featured.sp.id} sprint={featured.sp} phases={featured.phases} tactics={featured.tactics}
-            goal={featured.goal} compact={false} onChanged={() => cycleData.sprints.reload()} />
+            goal={featured.goal} compact={false} sprintsAsync={cycleData.sprints} />
           {rest.length > 0 && (
             <>
               <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.06em', marginTop: 2 }}>
@@ -264,7 +264,7 @@ function TodayView({ goals, rollup, cycleData, onStartCycle }) {
               </div>
               {rest.map((c) => (
                 <CycleCard key={c.sp.id} sprint={c.sp} phases={c.phases} tactics={c.tactics} goal={c.goal}
-                  compact onChanged={() => cycleData.sprints.reload()} />
+                  compact sprintsAsync={cycleData.sprints} />
               ))}
             </>
           )}
@@ -276,7 +276,7 @@ function TodayView({ goals, rollup, cycleData, onStartCycle }) {
 
 /* ══════════════════ Cycle card (shared by Today + Cycles) ══════════════════ */
 
-function CycleCard({ sprint, phases, tactics, goal, compact, onChanged, onDelete, onEdit, onArchive, onDuplicate }) {
+function CycleCard({ sprint, phases, tactics, goal, compact, sprintsAsync, onDelete, onEdit, onArchive, onDuplicate }) {
   const [open, setOpen] = useState(!compact)
   const [week, setWeek] = useState(sprintCurrentWeek(sprint))
   const cw = sprintCurrentWeek(sprint)
@@ -294,6 +294,26 @@ function CycleCard({ sprint, phases, tactics, goal, compact, onChanged, onDelete
   const weekDone = weekRows.reduce((n, r) => n + r.done, 0)
   const weekPossible = weekRows.reduce((n, r) => n + r.possible, 0)
 
+  // Optimistic, same pattern as TodayPage's toggleAction: write the new
+  // week_checks into sprintsAsync's own cache before the network call
+  // resolves, so the checkbox reacts instantly. Without this, `onChanged`
+  // used to be a bare `sprints.reload()` — and useAsync.run() sets
+  // `loading: true` synchronously before its await, so every tap flipped
+  // `sprints.loading` true for a beat. Both call sites read that flag to
+  // decide between the whole card list and a <Loading /> spinner, so a
+  // single checkbox tap unmounted and remounted the entire cycle section —
+  // reading exactly like the whole page reloading, per Jack's report.
+  // `reload()` still runs after a successful write so the optimistic
+  // value is only ever a head start on the same data, never a permanent
+  // fork from it — matching TodayPage's own comment on the identical move.
+  function applyChecks(nextChecks) {
+    const prevSprints = sprintsAsync.data
+    sprintsAsync.setData((rows) => (rows || []).map((s) => s.id === sprint.id
+      ? { ...s, week_checks: { ...(s.week_checks || {}), [week]: nextChecks } }
+      : s))
+    return prevSprints
+  }
+
   async function toggle(t, dayIdx) {
     const key = checkKey(t, dayIdx)
     const willCheck = !checks[key]
@@ -306,8 +326,14 @@ function CycleCard({ sprint, phases, tactics, goal, compact, onChanged, onDelete
     // below), otherwise "done today" can't be told apart from "done on
     // some other day this week" (see todayDoneTotals in lib/goals.js).
     else nextChecks[key] = (t.freq === 'weekly' || t.freq === 'onetime') ? today() : true
-    await mergeSprintWeekChecks(sprint.id, week, nextChecks)
-    onChanged()
+    const prevSprints = applyChecks(nextChecks)
+    try {
+      await mergeSprintWeekChecks(sprint.id, week, nextChecks)
+      sprintsAsync.reload()
+    } catch (e) {
+      sprintsAsync.setData(prevSprints)
+      toast.error(e.message)
+    }
   }
 
   async function toggleXpw(t, slotIdx) {
@@ -316,8 +342,14 @@ function CycleCard({ sprint, phases, tactics, goal, compact, onChanged, onDelete
     const nextChecks = { ...checks }
     if (already) delete nextChecks[key]
     else nextChecks[key] = today()
-    await mergeSprintWeekChecks(sprint.id, week, nextChecks)
-    onChanged()
+    const prevSprints = applyChecks(nextChecks)
+    try {
+      await mergeSprintWeekChecks(sprint.id, week, nextChecks)
+      sprintsAsync.reload()
+    } catch (e) {
+      sprintsAsync.setData(prevSprints)
+      toast.error(e.message)
+    }
   }
 
   // Custom-day tactics only: move one day's obligation onto a different
@@ -325,8 +357,15 @@ function CycleCard({ sprint, phases, tactics, goal, compact, onChanged, onDelete
   // Completion history stays keyed by the original day (see lib/goals.js).
   async function swapDay(t, fromDay, toDay) {
     const day_swaps = withDaySwap(sprint, week, t, fromDay, toDay)
-    await saveSprint({ ...sprint, day_swaps })
-    onChanged()
+    const prevSprints = sprintsAsync.data
+    sprintsAsync.setData((rows) => (rows || []).map((s) => s.id === sprint.id ? { ...s, day_swaps } : s))
+    try {
+      await saveSprint({ ...sprint, day_swaps })
+      sprintsAsync.reload()
+    } catch (e) {
+      sprintsAsync.setData(prevSprints)
+      toast.error(e.message)
+    }
   }
 
   return (
@@ -1130,7 +1169,7 @@ function CyclesView({ goals, cycleData, cycleIntent }) {
             const myTactics = (tactics.data || []).filter((x) => x.sprint_id === s.id)
             return (
               <CycleCard key={s.id} sprint={s} phases={myPhases} tactics={myTactics} goal={goal}
-                onChanged={() => sprints.reload()} onEdit={() => setEditing(s)}
+                sprintsAsync={sprints} onEdit={() => setEditing(s)}
                 onDuplicate={() => duplicate(s)}
                 onArchive={async () => {
                   await setSprintArchived(s.id, !s.archived)
