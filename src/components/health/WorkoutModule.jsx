@@ -856,7 +856,12 @@ function SessionTab({ session, setSession, db, goals, plan, pastSessions, exerci
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
         {session.exercises.map((ex, i) => {
           const open = openEx === i
-          const done = (ex.sets || []).filter((s) => s.done).length
+          const doneSets = (ex.sets || []).filter((s) => s.done)
+          const done = doneSets.length
+          // Reps actually banked so far, not the reps typed into every box —
+          // an unchecked set is still a plan, not a rep you did, so it stays
+          // out of the running total until its checkbox says otherwise.
+          const doneReps = doneSets.reduce((n, s) => n + (parseFloat(s.reps) || 0), 0)
           const exGoalsHere = goalsByExercise[ex.name] || []
           const last = lastByExercise[(ex.name || '').trim()] || null
           const lastSummary = last ? fmtLastSets(last.sets) : null
@@ -871,7 +876,9 @@ function SessionTab({ session, setSession, db, goals, plan, pastSessions, exerci
                   onChange={(e) => updateEx(i, { name: e.target.value })}
                   style={{ border: 'none', background: 'transparent', padding: 0, fontWeight: 800, fontSize: 14 }}
                 />
-                <span className="ex-summary">{done}/{ex.sets?.length || 0}</span>
+                <span className="ex-summary">
+                  {done}/{ex.sets?.length || 0}{doneReps > 0 ? ` · ${doneReps} reps` : ''}
+                </span>
                 <button className="btn btn-icon btn-sm ex-move" disabled={i === 0}
                   onClick={(e) => { e.stopPropagation(); moveEx(i, -1) }}
                   aria-label="Move exercise up" title="Move up">
