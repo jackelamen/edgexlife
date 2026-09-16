@@ -481,6 +481,19 @@ function DayModal({ date, plan, effectiveByDate, db, allDates, sessions = [], on
     }
   }
 
+  // Same reorder move as SessionTab's moveEx, ported here so a planned
+  // day's exercise order can be fixed before the workout, not just
+  // mid-session — the plan is what "Copy from another day" and Start
+  // Session Now both seed from, so this order is the one that actually
+  // ends up in front of you.
+  function moveExercise(i, dir) {
+    const j = i + dir
+    if (j < 0 || j >= exercises.length) return
+    const next = exercises.slice()
+    ;[next[i], next[j]] = [next[j], next[i]]
+    setExercises(next)
+  }
+
   async function save() {
     try {
       await savePlanDay(date, {
@@ -533,6 +546,14 @@ function DayModal({ date, plan, effectiveByDate, db, allDates, sessions = [], on
             <input type="number" value={ex.sets ?? 3} min={1} max={12} title="Sets"
               onChange={(e) => setExercises(exercises.map((x, j) => j === i ? { ...x, sets: Number(e.target.value) } : x))}
               style={{ width: 62, fontSize: 13, padding: '8px 6px', textAlign: 'center', fontWeight: 800 }} />
+            <button className="btn btn-icon btn-sm ex-move" disabled={i === 0}
+              onClick={() => moveExercise(i, -1)} aria-label="Move exercise up" title="Move up">
+              <Icon name="arrow_upward" size={15} />
+            </button>
+            <button className="btn btn-icon btn-sm ex-move" disabled={i === exercises.length - 1}
+              onClick={() => moveExercise(i, 1)} aria-label="Move exercise down" title="Move down">
+              <Icon name="arrow_downward" size={15} />
+            </button>
             <button className="btn btn-icon btn-sm" onClick={() => setExercises(exercises.filter((_, j) => j !== i))}
               aria-label="Remove">
               <Icon name="close" size={15} />
