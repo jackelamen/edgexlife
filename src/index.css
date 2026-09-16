@@ -269,6 +269,16 @@ h1, h2, h3, h4, .page-title {
 }
 .tile-top { display: flex; align-items: center; justify-content: space-between; position: relative; z-index: 1; }
 .tile-ic { width: 32px; height: 32px; border-radius: 10px; display: grid; place-items: center; }
+
+/* Identity's per-thread "nothing tagged" row. Deliberately NOT the shared
+   .empty block (48px padding, 48px icon) — that's sized for a whole card
+   or page standing alone, and six of them stacked in a 2-col grid next to
+   populated cards (a goal title + a thin meter bar, ~40px) is what made
+   the empty ones read as taller and more prominent than the active ones.
+   This matches that ~40px row height instead of fighting it. */
+.thread-gap-row { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; color: var(--text-3); font-size: 12.5px; font-weight: 700; }
+.thread-gap-row .icon { flex-shrink: 0; }
+.thread-gap-row .btn { margin-left: auto; }
 .tile-bot { position: relative; z-index: 1; }
 .stat-label { font-size: 11px; font-weight: 700; color: var(--text-2); text-transform: uppercase; letter-spacing: .06em; }
 .stat-value { font-size: 26px; font-weight: 800; letter-spacing: -.02em; margin-top: 1px; }

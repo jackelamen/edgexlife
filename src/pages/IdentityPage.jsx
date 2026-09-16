@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import Icon from '../components/ui/Icon'
 import { View } from '../components/shell/Shell'
-import { Card, CardHead, PageHeader, Empty, Loading, Badge, ErrorNote, Ring } from '../components/ui/Kit'
+import { Card, CardHead, PageHeader, Empty, Loading, ErrorNote, Ring } from '../components/ui/Kit'
 import { useAsync } from '../hooks/useAsync'
 import {
   fetchGoals, fetchSprints, fetchSprintPhases, fetchSprintTactics, fetchWeeklyReviews,
@@ -98,6 +98,40 @@ export default function IdentityPage() {
 
   const reflections = (reviews.data || []).filter((r) => r.module_notes && r.module_notes.trim())
 
+  /*
+    Visual pass 2026-09-16: every thread card used the same identity-olive
+    border and chip regardless of whether it was thriving, struggling, or
+    completely uncovered, so the grid read as six identical boxes you had
+    to actually read to tell apart. An uncovered thread is a real status
+    (rule 3 in lib/design.js: colour is reserved for performance signals),
+    the same status the per-goal meter bars below already report via
+    scoreColor/scoreBadgeTone — so the card itself now wears that colour
+    too: green/amber/red border+chip when a live cycle says how it's
+    doing, the module's own olive only for "tagged but nothing measurable
+    right now" (dormant), and a quiet dashed neutral border for a genuine
+    gap. A thread with two goals is judged by its WEAKEST live one, same
+    "weakest lever" logic Health's score already uses — a thread isn't
+    covered just because ONE of its promises is thriving while another
+    quietly isn't.
+  */
+  function threadSignal(list) {
+    if (!list.length) return { kind: 'gap', worst: null }
+    const execs = list.map((g) => execForGoal(g.id)).filter((v) => v != null)
+    if (!execs.length) return { kind: 'dormant', worst: null }
+    return { kind: 'active', worst: Math.min(...execs) }
+  }
+  const TONE_BG = { green: 'var(--s-good-bg)', orange: 'var(--s-short-bg)', red: 'var(--s-risk-bg)' }
+  function threadAccent({ kind, worst }) {
+    if (kind === 'active') {
+      const tone = scoreBadgeTone(worst)
+      return { border: scoreColor(worst), chipColor: scoreColor(worst), chipBg: TONE_BG[tone] }
+    }
+    if (kind === 'dormant') {
+      return { border: MODULES.identity.color, chipColor: MODULES.identity.color, chipBg: MODULES.identity.tint }
+    }
+    return { border: 'var(--border-med)', chipColor: 'var(--text-3)', chipBg: 'var(--white-soft)', dashed: true }
+  }
+
   const taggedCount = IDENTITY_THREADS.reduce((n, t) => n + (goalsByThread[t.key]?.length ? 1 : 0), 0)
   const coveragePct = Math.round((taggedCount / IDENTITY_THREADS.length) * 100)
 
@@ -137,33 +171,37 @@ export default function IdentityPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5">
         {IDENTITY_THREADS.map((t) => {
           const list = goalsByThread[t.key] || []
+          const signal = threadSignal(list)
+          const accent = threadAccent(signal)
           return (
-            <Card key={t.key} style={{ borderLeft: `3px solid ${MODULES.identity.color}` }}>
+            <Card key={t.key}
+              style={{ borderLeft: `3px ${accent.dashed ? 'dashed' : 'solid'} ${accent.border}` }}>
               <CardHead
                 title={t.label}
                 sub={t.hint}
                 right={
-                  <div className="tile-ic" style={{ background: MODULES.identity.tint, color: MODULES.identity.color }}>
+                  <div className="tile-ic" style={{ background: accent.chipBg, color: accent.chipColor }}>
                     <Icon name={t.icon} size={17} />
                   </div>
                 }
               />
               {loading ? <Loading /> : !list.length ? (
-                <Empty icon={t.icon} title="Nothing tagged yet"
-                  action={<Link to="/goals" className="btn btn-secondary btn-sm">Tag a goal</Link>}>
-                  No active goal is serving this thread right now.
-                </Empty>
+                <div className="thread-gap-row">
+                  <Icon name={t.icon} size={15} />
+                  <span>No active goal yet</span>
+                  <Link to="/goals" className="btn btn-ghost btn-sm">Tag a goal</Link>
+                </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {list.map((g) => {
                     const exec = execForGoal(g.id)
                     return (
                       <div key={g.id}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 5 }}>
+                        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, marginBottom: 5 }}>
                           <span style={{ fontSize: 13, fontWeight: 700 }}>{g.title}</span>
                           {exec != null
-                            ? <Badge tone={scoreBadgeTone(exec)}>{exec}% exec</Badge>
-                            : <Badge tone="muted">no live cycle</Badge>}
+                            ? <span className="tnum" style={{ fontSize: 12.5, fontWeight: 800, color: scoreColor(exec), flexShrink: 0 }}>{exec}%</span>
+                            : <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text-3)', flexShrink: 0 }}>no live cycle</span>}
                         </div>
                         {exec != null && (
                           <div className="score-meter" style={{ height: 6 }}>
