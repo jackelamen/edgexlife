@@ -34,6 +34,15 @@ export const WK_TEMPLATES = {
 
 export const bodypartLabel = (k) => (k === 'FullBody' ? 'Full Body' : k)
 
+// The exercise-DB blob (fetchExerciseDB/saveExerciseDB) also carries the
+// per-workout-type "Quick template" lists under this one reserved key,
+// so editing templates in the Database tab needs no new table or RPC —
+// same JSON object, one more field. Every place that lists the DB's
+// bodypart categories needs to skip it, or "Quick template" would show
+// up as a fake bodypart in the picker.
+export const WORKOUT_TEMPLATES_KEY = '__workoutTemplates'
+export const bodypartKeys = (db) => Object.keys(db).filter((k) => k !== WORKOUT_TEMPLATES_KEY)
+
 /* Exercises where the meaningful "getting stronger" signal is reps, not
    load — curated from DEFAULT_EXERCISE_DB's own bodyweight movements.
    Matched by exact name so a session's exercise entries (free-typed or

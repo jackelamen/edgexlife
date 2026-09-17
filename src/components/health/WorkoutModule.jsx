@@ -12,7 +12,7 @@ import {
   fetchExerciseGoals, saveExerciseGoal, deleteExerciseGoal, fetchHealthSettings,
 } from '../../lib/data'
 import {
-  WK_TYPES, DEFAULT_EXERCISE_DB, WK_TEMPLATES, bodypartLabel,
+  WK_TYPES, DEFAULT_EXERCISE_DB, WK_TEMPLATES, bodypartLabel, bodypartKeys, WORKOUT_TEMPLATES_KEY,
   DAY_SHORT, weekDates, sessionVolume, sessionSetCount, fmtDuration,
   parseWorkoutCSV, WORKOUT_CSV_TEMPLATE, isBodyweightExercise, setLoadKg,
 } from '../../lib/workout'
@@ -476,8 +476,14 @@ function DayModal({ date, plan, effectiveByDate, db, allDates, sessions = [], on
 
   function selectType(id) {
     setType(id)
-    if (!exercises.length && WK_TEMPLATES[id]?.length) {
-      setExercises(WK_TEMPLATES[id].map((name) => ({ name, sets: 3, reps: '', weight: '' })))
+    // Templates edited in the Database tab live at db.__workoutTemplates,
+    // same JSON blob as the bodypart lists (see DatabaseTab) — no schema
+    // change needed since that blob was already an arbitrary object.
+    // Falls back to the built-in WK_TEMPLATES until a customized DB is
+    // ever saved, same fallback shape db itself already uses.
+    const templates = db.__workoutTemplates || WK_TEMPLATES
+    if (!exercises.length && templates[id]?.length) {
+      setExercises(templates[id].map((name) => ({ name, sets: 3, reps: '', weight: '' })))
     }
   }
 
@@ -526,7 +532,7 @@ function DayModal({ date, plan, effectiveByDate, db, allDates, sessions = [], on
       <SectionLabel>Quick template</SectionLabel>
       <div className="exercise-picker">
         <select value={bodypart} onChange={(e) => setBodypart(e.target.value)}>
-          {Object.keys(db).map((k) => <option key={k} value={k}>{bodypartLabel(k)}</option>)}
+          {bodypartKeys(db).map((k) => <option key={k} value={k}>{bodypartLabel(k)}</option>)}
         </select>
         <select value={pick} onChange={(e) => setPick(e.target.value)}>
           {list.map((x) => <option key={x} value={x}>{x}</option>)}
@@ -1058,7 +1064,7 @@ function AddFromDB({ db, onAdd }) {
   return (
     <>
       <select value={bodypart} onChange={(e) => setBodypart(e.target.value)}>
-        {Object.keys(db).map((k) => <option key={k} value={k}>{bodypartLabel(k)}</option>)}
+        {bodypartKeys(db).map((k) => <option key={k} value={k}>{bodypartLabel(k)}</option>)}
       </select>
       <select value={pick} onChange={(e) => setPick(e.target.value)}>
         {list.map((x) => <option key={x} value={x}>{x}</option>)}
@@ -1072,9 +1078,51 @@ function AddFromDB({ db, onAdd }) {
 
 /* ═══════════════ Exercise database ═══════════════ */
 
+/*
+  A single editable name-list — one bodypart's exercises, or one workout
+  type's quick-fill template. Extracted once "Quick Templates" needed the
+  exact same add/rename/delete row UI as the bodypart editor below it,
+  just bound to a different slice of the same `local` object.
+*/
+function ExerciseListEditor({ list, armPrefix, confirm, onChange, onCommit }) {
+  const [draft, setDraft] = useState('')
+  function add() {
+    if (!draft.trim()) return
+    onCommit([...list, draft.trim()]); setDraft('')
+  }
+  return (
+    <>
+      <div>
+        {list.map((name, i) => (
+          <div key={i} className="db-exercise-row">
+            <input value={name} style={{ fontSize: 13, padding: '8px 10px' }}
+              onChange={(e) => onChange(list.map((x, j) => j === i ? e.target.value : x))}
+              onBlur={() => onCommit(list)} />
+            <button className={`btn btn-icon btn-sm${confirm.isArmed(armPrefix + i) ? ' btn-danger' : ''}`}
+              onClick={() => {
+                if (!confirm.isArmed(armPrefix + i)) return confirm.arm(armPrefix + i)
+                onCommit(list.filter((_, j) => j !== i))
+              }} aria-label="Delete">
+              <Icon name="delete" size={15} />
+            </button>
+          </div>
+        ))}
+      </div>
+      <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+        <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Add exercise"
+          style={{ fontSize: 13, padding: '9px 10px', flex: 1 }}
+          onKeyDown={(e) => e.key === 'Enter' && add()} />
+        <button className="btn btn-primary btn-sm" disabled={!draft.trim()} onClick={add}>
+          <Icon name="add" size={15} /> Add
+        </button>
+      </div>
+    </>
+  )
+}
+
 function DatabaseTab({ db, onSaved }) {
   const [bodypart, setBodypart] = useState('Chest')
-  const [draft, setDraft] = useState('')
+  const [templateType, setTemplateType] = useState('Strength')
   const [local, setLocal] = useState(db)
   const confirm = useConfirm()
 
@@ -1086,69 +1134,92 @@ function DatabaseTab({ db, onSaved }) {
   }
 
   const list = local[bodypart] || []
+  // Templates ride along in the same blob under one reserved key (see
+  // WORKOUT_TEMPLATES_KEY) rather than a separate table — falls back to
+  // the built-ins exactly like DayModal's own selectType() does.
+  const templates = local[WORKOUT_TEMPLATES_KEY] || WK_TEMPLATES
+  const templateList = templates[templateType] || []
 
   return (
-    <Card>
-      <CardHead
-        title="Workout Database"
-        sub="Edit the exercises used by the planner and session logger."
-        right={
-          <button className="btn btn-secondary btn-sm"
-            onClick={() => commit(JSON.parse(JSON.stringify(DEFAULT_EXERCISE_DB)))}>
-            <Icon name="restart_alt" size={15} /> Reset
-          </button>
-        }
-      />
-      <div className="db-editor-grid">
-        <div>
-          <SectionLabel>Body parts</SectionLabel>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {Object.keys(local).map((k) => (
-              <button key={k} className={`db-bodypart-btn${k === bodypart ? ' active' : ''}`}
-                onClick={() => setBodypart(k)}>
-                {bodypartLabel(k)}
-                <span style={{ fontSize: 11, opacity: .7 }}>{(local[k] || []).length}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-        <div>
-          <SectionLabel>{bodypartLabel(bodypart)} exercises</SectionLabel>
-          <div>
-            {list.map((name, i) => (
-              <div key={i} className="db-exercise-row">
-                <input value={name} style={{ fontSize: 13, padding: '8px 10px' }}
-                  onChange={(e) => {
-                    const next = { ...local, [bodypart]: list.map((x, j) => j === i ? e.target.value : x) }
-                    setLocal(next)
-                  }}
-                  onBlur={() => commit(local)} />
-                <button className={`btn btn-icon btn-sm${confirm.isArmed(bodypart + i) ? ' btn-danger' : ''}`}
-                  onClick={() => {
-                    if (!confirm.isArmed(bodypart + i)) return confirm.arm(bodypart + i)
-                    commit({ ...local, [bodypart]: list.filter((_, j) => j !== i) })
-                  }} aria-label="Delete">
-                  <Icon name="delete" size={15} />
-                </button>
-              </div>
-            ))}
-          </div>
-          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-            <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Add exercise"
-              style={{ fontSize: 13, padding: '9px 10px', flex: 1 }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && draft.trim()) {
-                  commit({ ...local, [bodypart]: [...list, draft.trim()] }); setDraft('')
-                }
-              }} />
-            <button className="btn btn-primary btn-sm" disabled={!draft.trim()}
-              onClick={() => { commit({ ...local, [bodypart]: [...list, draft.trim()] }); setDraft('') }}>
-              <Icon name="add" size={15} /> Add
+    <>
+      <Card>
+        <CardHead
+          title="Workout Database"
+          sub="Edit the exercises used by the planner and session logger."
+          right={
+            <button className="btn btn-secondary btn-sm"
+              // Resetting the bodypart lists shouldn't silently wipe any
+              // Quick Template customizing done below — they're edited as
+              // one blob, but reset is scoped to what this card actually
+              // owns.
+              onClick={() => commit({
+                ...JSON.parse(JSON.stringify(DEFAULT_EXERCISE_DB)),
+                [WORKOUT_TEMPLATES_KEY]: local[WORKOUT_TEMPLATES_KEY],
+              })}>
+              <Icon name="restart_alt" size={15} /> Reset
             </button>
+          }
+        />
+        <div className="db-editor-grid">
+          <div>
+            <SectionLabel>Body parts</SectionLabel>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {bodypartKeys(local).map((k) => (
+                <button key={k} className={`db-bodypart-btn${k === bodypart ? ' active' : ''}`}
+                  onClick={() => setBodypart(k)}>
+                  {bodypartLabel(k)}
+                  <span style={{ fontSize: 11, opacity: .7 }}>{(local[k] || []).length}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <SectionLabel>{bodypartLabel(bodypart)} exercises</SectionLabel>
+            <ExerciseListEditor list={list} armPrefix={bodypart} confirm={confirm}
+              onChange={(next) => setLocal({ ...local, [bodypart]: next })}
+              onCommit={(next) => commit({ ...local, [bodypart]: next })} />
           </div>
         </div>
-      </div>
-    </Card>
+      </Card>
+
+      <Card style={{ marginTop: 14 }}>
+        <CardHead
+          title="Quick Templates"
+          sub="Exercises auto-filled onto a day in Plan when you pick its workout type."
+          right={
+            <button className="btn btn-secondary btn-sm"
+              onClick={() => commit({ ...local, [WORKOUT_TEMPLATES_KEY]: JSON.parse(JSON.stringify(WK_TEMPLATES)) })}>
+              <Icon name="restart_alt" size={15} /> Reset
+            </button>
+          }
+        />
+        <div className="db-editor-grid">
+          <div>
+            <SectionLabel>Workout type</SectionLabel>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {WK_TYPES.map((t) => (
+                <button key={t.id} className={`db-bodypart-btn${t.id === templateType ? ' active' : ''}`}
+                  onClick={() => setTemplateType(t.id)}>
+                  {t.em} {t.label}
+                  <span style={{ fontSize: 11, opacity: .7 }}>{(templates[t.id] || []).length}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <SectionLabel>{templateType} template</SectionLabel>
+            {!templateList.length && (
+              <p style={{ fontSize: 12.5, color: 'var(--text-3)', marginBottom: 10 }}>
+                Nothing auto-fills for {templateType} yet — picking it in Plan opens with a blank exercise list.
+              </p>
+            )}
+            <ExerciseListEditor list={templateList} armPrefix={`tpl-${templateType}`} confirm={confirm}
+              onChange={(next) => setLocal({ ...local, [WORKOUT_TEMPLATES_KEY]: { ...templates, [templateType]: next } })}
+              onCommit={(next) => commit({ ...local, [WORKOUT_TEMPLATES_KEY]: { ...templates, [templateType]: next } })} />
+          </div>
+        </div>
+      </Card>
+    </>
   )
 }
 
