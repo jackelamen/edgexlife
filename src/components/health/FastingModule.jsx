@@ -34,6 +34,12 @@ export default function FastingModule() {
   // fast is allowed to leave its end blank while every other case isn't.
   const [editing, setEditing] = useState(null)
   const [editRequireEnd, setEditRequireEnd] = useState(true)
+  // Holds the session right after "End Fast" so PostFastModal can prompt
+  // for a reflection immediately, while it's still fresh — separate from
+  // `editing` because that modal is framed as correcting a fact (start,
+  // end, method) and this one is a different kind of moment (how did it
+  // go), not a second way to edit the same fields.
+  const [reflecting, setReflecting] = useState(null)
 
   function openEdit(session) { setEditing(session); setEditRequireEnd(true) }
   function openEditActiveStart() { setEditing(activeSession); setEditRequireEnd(false) }
@@ -65,7 +71,18 @@ export default function FastingModule() {
       await saveFastingSession(ended)
       sessions.reload()
       toast.success(`Fast logged · ${formatDuration(elapsedMs(ended))}`)
+      setReflecting(ended)
     } catch (err) { toast.error(err.message || 'Could not end fast') }
+  }
+
+  async function saveReflection(notes) {
+    if (!reflecting) return
+    try {
+      await saveFastingSession({ ...reflecting, notes })
+      sessions.reload()
+      toast.success('Noted')
+    } catch (err) { toast.error(err.message || 'Could not save') }
+    finally { setReflecting(null) }
   }
 
   async function removeSession(id) {
@@ -122,6 +139,7 @@ export default function FastingModule() {
       </Card>
 
       <EditFastModal session={editing} requireEnd={editRequireEnd} onClose={() => setEditing(null)} onSave={updateSession} />
+      <PostFastModal session={reflecting} onSave={saveReflection} onSkip={() => setReflecting(null)} />
     </>
   )
 }
@@ -193,6 +211,43 @@ function EditFastModal({ session, requireEnd = true, onClose, onSave }) {
       </Field>
       <Field label="Notes" hint="Optional">
         <textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="How it went, why it ran long, etc." />
+      </Field>
+    </Modal>
+  )
+}
+
+/*
+  Fires right after "End Fast", while the experience is still fresh —
+  the alternative was hoping you'd remember to come back to Fasting
+  history and tap into the edit modal later, which is a much colder
+  moment to be asked "how did it feel." Writes to the same `notes`
+  column EditFastModal already edits, so a reflection made here shows up
+  there too (and can still be corrected there) rather than forking into
+  a second notes field. Skipping is a real, silent option — this is a
+  reflection prompt, not a form the fast can't be logged without.
+*/
+function PostFastModal({ session, onSave, onSkip }) {
+  const [notes, setNotes] = useState('')
+
+  useEffect(() => {
+    if (session) setNotes(session.notes || '')
+  }, [session])
+
+  if (!session) return null
+
+  return (
+    <Modal open={Boolean(session)} onClose={onSkip}
+      title="How did it go?"
+      sub={`${formatDuration(elapsedMs(session))} · ${methodLabel(session.method)}`}
+      footer={<>
+        <button className="btn btn-secondary" onClick={onSkip}>Skip</button>
+        <button className="btn btn-primary" onClick={() => onSave(notes)}>
+          <Icon name="check" size={16} /> Save
+        </button>
+      </>}>
+      <Field label="How do you feel?">
+        <textarea rows={3} autoFocus value={notes} onChange={(e) => setNotes(e.target.value)}
+          placeholder="Energy, hunger, mood, anything worth remembering next time." />
       </Field>
     </Modal>
   )
