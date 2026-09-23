@@ -38,6 +38,13 @@
   --text-3: #8d8a80;
   --border: #e9e5da;
   --border-med: #ddd8ca;
+  /* Fixed dark ink — NOT swapped in dark mode, unlike --text above.
+     .btn-primary's black-pill-white-text look is meant to hold in both
+     themes (the sidebar makes the same choice, always dark); it used
+     --text for that fill, which is exactly the token dark mode inverts,
+     so the button went near-white with white text on top of it — nearly
+     unreadable. This token gives it something to anchor to instead. */
+  --ink: #14140f;
 
   --sidebar-bg: #14140f;
   --sidebar-hover: rgba(255, 255, 255, 0.07);
@@ -73,6 +80,37 @@
   --accent-light: #dceceA;
   --accent-rgb: 14, 95, 82;
   --accent-grad-2: #14806e;
+}
+
+/* ── Dark mode ─────────────────────────────────────────────────
+   Follows the OS/browser preference — no in-app toggle, since this app
+   has never had a settings surface for it and adding one is a separate
+   decision from having a dark palette at all.
+
+   Deliberately scoped to the NEUTRAL surface tokens only (page bg, card
+   bg, borders, text) — not --accent/--s-good/--s-short/--s-risk or any
+   of the "-light"/"-dim" tinted badge backgrounds. Those are already a
+   saturated colour sitting on its OWN paired light chip (e.g. badge-blue
+   is --accent-dark text on --accent-light background) — that pairing's
+   contrast is self-contained and doesn't depend on the page's theme, so
+   it doesn't need touching. A badge, a button, a ring — every one of
+   them should look exactly as identifiable in the dark as in the light;
+   only the paper underneath them changes. --sidebar-bg and friends are
+   untouched for the same reason: the sidebar has been dark in both
+   themes since v3, this just brings the rest of the page to meet it. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #16150f;
+    --white: #201f19;
+    --white-soft: #2a281f;
+    --text: #f2efe6;
+    --text-2: #c2beb0;
+    --text-3: #8c8879;
+    --border: #35322a;
+    --border-med: #423e32;
+    --shadow-sm: 0 2px 6px rgba(0,0,0,.28);
+    --shadow: 0 8px 22px rgba(0,0,0,.4);
+  }
 }
 
 /* Today owns the graphite already declared as MODULES.today in
@@ -482,7 +520,7 @@ h1, h2, h3, h4, .page-title {
   transition: transform .15s, box-shadow .15s, background .15s, border-color .15s, opacity .15s;
 }
 .btn:disabled { opacity: .5; cursor: not-allowed; }
-.btn-primary { background: var(--text); color: #fff; }
+.btn-primary { background: var(--ink); color: #fff; }
 .btn-primary:hover:not(:disabled) { background: #000; box-shadow: var(--shadow); }
 .btn-secondary { background: var(--white); color: var(--text); box-shadow: var(--shadow-sm); }
 .btn-secondary:hover:not(:disabled) { background: var(--white-soft); }
@@ -532,7 +570,7 @@ h1, h2, h3, h4, .page-title {
   background-position: left, right, left, right;
   background-size: 22px 100%, 22px 100%, 10px 100%, 10px 100%;
   background-repeat: no-repeat;
-  background-color: var(--white);
+  background-color: #fff;
   background-attachment: local, local, scroll, scroll;
 }
 .tabs::-webkit-scrollbar { display: none; }
@@ -541,7 +579,7 @@ h1, h2, h3, h4, .page-title {
   font-family: inherit; font-size: 13px; font-weight: 700; white-space: nowrap;
   color: var(--text-2); cursor: pointer; transition: background .15s, color .15s;
 }
-.tab.active { background: var(--text); color: #fff; }
+.tab.active { background: var(--ink); color: #fff; }
 
 .form-section-label {
   font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
@@ -580,6 +618,24 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
   justify-content: center; font-weight: 800;
 }
 
+/* ── ScaleField — tappable 1-5(ish) segments, see Kit.jsx ──────── */
+.scale-field { display: flex; gap: 6px; }
+.scale-seg {
+  flex: 1; min-height: 40px; border-radius: var(--radius-sm);
+  border: 1.5px solid var(--border); background: var(--white-soft);
+  color: var(--text-2); font-weight: 800; font-size: 14px; cursor: pointer;
+  font-family: inherit; transition: background .15s, border-color .15s, color .15s, transform .1s;
+}
+.scale-seg:hover { border-color: var(--border-med); }
+.scale-seg:active { transform: scale(.94); }
+/* Bucketed by how good THIS reading is (see `invert` in ScaleField),
+   reusing the reserved status ramp — a 1-5 wellbeing rating is exactly
+   the "reports performance" case that ramp is reserved for. */
+.scale-seg.active { color: #fff; border-color: transparent; }
+.scale-seg.active.seg-good { background: var(--s-good); }
+.scale-seg.active.seg-mid { background: var(--s-short); }
+.scale-seg.active.seg-bad { background: var(--s-risk); }
+
 /* ── Meters, rows, coach ───────────────────────────────────── */
 /* Score bars carry the METRIC's hue (identity), set inline from
    lib/design.js — not the module accent, and never a status colour. */
@@ -608,12 +664,12 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
 .dot.short { background: var(--s-short); }
 .dot.risk { background: var(--s-risk); }
 
-.coach-card { border-radius: var(--radius-lg); background: var(--text); color: #fff; padding: 22px; position: relative; overflow: hidden; }
+.coach-card { border-radius: var(--radius-lg); background: var(--ink); color: #fff; padding: 22px; position: relative; overflow: hidden; }
 .coach-card::before {
   content: ''; position: absolute; width: 170px; height: 170px; border-radius: 50%;
   background: var(--accent); opacity: .30; top: -70px; right: -55px; pointer-events: none;
 }
-.coach-card.soft, .coach-card.green, .coach-card.blue { background: var(--text); }
+.coach-card.soft, .coach-card.green, .coach-card.blue { background: var(--ink); }
 .coach-kicker {
   font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em;
   opacity: .5; margin-bottom: 7px; position: relative; z-index: 1;
@@ -721,7 +777,7 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
 .db-bodypart-btn.active { border-color: var(--accent); background: var(--accent-dim); color: var(--accent); }
 .db-exercise-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); }
 
-.session-header { background: var(--sidebar-bg); border-top: 3px solid var(--accent); border-radius: var(--radius-lg); padding: 20px; color: var(--white); margin-bottom: 18px; }
+.session-header { background: var(--sidebar-bg); border-top: 3px solid var(--accent); border-radius: var(--radius-lg); padding: 20px; color: #fff; margin-bottom: 18px; }
 .session-type-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
 .ex-card { background: var(--white); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; box-shadow: var(--shadow-sm); }
 .ex-card-hdr { display: flex; align-items: center; gap: 10px; padding: 13px 14px; cursor: pointer; user-select: none; }
@@ -787,7 +843,7 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
   background: var(--white-soft); cursor: pointer; display: flex; align-items: center;
   justify-content: center; transition: all .12s;
 }
-.set-done-btn.done { background: var(--green); border-color: var(--green); color: var(--white); }
+.set-done-btn.done { background: var(--green); border-color: var(--green); color: #fff; }
 .ex-add-set {
   display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700;
   color: var(--accent); background: transparent; border: none; cursor: pointer;
@@ -799,7 +855,7 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
 }
 .timer-display { font-size: 28px; font-weight: 900; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
 .timer-btn { padding: 8px 14px; border-radius: 9px; border: none; font-size: 12px; font-weight: 800; font-family: inherit; cursor: pointer; }
-.timer-btn.start { background: var(--green); color: var(--white); }
+.timer-btn.start { background: var(--green); color: #fff; }
 .timer-btn.stop { background: var(--red-light); color: var(--red); }
 .timer-btn.reset { background: var(--border-med); color: var(--text); }
 
@@ -850,7 +906,7 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
 .tc-tip {
   position: absolute; z-index: 3; pointer-events: none;
   display: flex; flex-direction: column; gap: 1px; align-items: flex-start;
-  padding: 6px 9px; border-radius: 9px; background: var(--text); color: var(--white);
+  padding: 6px 9px; border-radius: 9px; background: var(--ink); color: #fff;
   box-shadow: var(--shadow-sm); white-space: nowrap;
 }
 .tc-tip::after {
@@ -874,12 +930,23 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
 .insight-card > span { display: block; font-size: 12px; font-weight: 800; color: var(--text-3); letter-spacing: .06em; text-transform: uppercase; margin-bottom: 2px; }
 .insight-card small { display: block; font-size: 12px; color: var(--text-2); margin-top: 2px; }
 
+/* Mobile-only duplicate of the hero's streak strip — see the comment on
+   `streakRow` in TodayPage.jsx. Hidden here; shown (and the desktop
+   original hidden) inside the max-width:1023px block below. */
+.hero-mc-strip-mobile { display: none; }
+
+/* "All caught up" — the positive twin of the attention queue. Reuses
+   .alert-row's shape (icon chip + one line) so it doesn't introduce a
+   fourth visual language for "here's a status", just recolors it into
+   the reserved status ramp's good end. */
+.all-clear-row .alert-text { color: var(--text-2); }
+
 .mob-fab {
   display: none; position: fixed; bottom: 24px; right: 20px;
   width: 56px; height: 56px; border-radius: 50%;
   background: linear-gradient(135deg, var(--accent), var(--accent-grad-2));
   border: none; box-shadow: 0 6px 20px rgba(var(--accent-rgb), .42);
-  cursor: pointer; z-index: 50; align-items: center; justify-content: center; color: var(--white);
+  cursor: pointer; z-index: 50; align-items: center; justify-content: center; color: #fff;
 }
 
 @media (max-width: 1023px) {
@@ -894,10 +961,40 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
   .hero-mc-rings {
     grid-column: 1 / -1; justify-content: space-around; gap: 10px;
     width: 100%; max-width: 460px; margin: 0 auto;
-    padding-top: 16px; border-top: 1px solid rgba(255,255,255,.14);
   }
   .hero-mc-strip { grid-template-columns: repeat(4, 1fr); }
   .hero-edge { opacity: .08; height: 150%; }
+
+  /* Today's mobile reorder — the checklist used to be the sixth thing on
+     the page below the header, identity line, full hero and intention
+     card. It's now the second, right after the collapsed hero, so it's
+     reachable without scrolling past everything the hero already reports.
+     `.today-flow` (a wrapper unique to TodayPage.jsx) is made a flex
+     column here only — the DOM order stays the natural reading order for
+     anyone using a screen reader, only the visual position moves. */
+  .today-flow { display: flex; flex-direction: column; }
+  .today-order-header { order: 1; }
+  .today-order-hero { order: 2; }
+  .today-order-checklist { order: 3; }
+  .today-order-streaks { order: 4; }
+  .today-order-intention { order: 5; }
+  .today-order-review { order: 6; }
+  .today-order-alerts { order: 7; }
+  .today-order-systems { order: 8; margin-top: 14px; }
+  .today-order-connects { order: 9; }
+  .today-order-goals { order: 10; }
+
+  /* The hero itself collapses to just the rings — the headline copy and
+     the streak strip both move out (the strip reappears as its own card
+     at order 4, above; the copy's "Health is climbing" line isn't
+     reproduced elsewhere, but the header above already gives the
+     one-glance version and the System panels below still carry each
+     system's own state). This is what actually buys back the scroll
+     distance to the checklist — a full hero is a lot of a phone screen. */
+  .hero-mc-main, .hero-mc-strip-desktop { display: none; }
+  .hero-mc-strip-mobile { display: block; margin-bottom: 14px; }
+  .hero-mc-strip-mobile .hero-mc-strip { padding: 18px 20px; }
+
   .db-editor-grid, .exercise-picker { grid-template-columns: 1fr; }
   .plan-week { gap: 5px; }
   .plan-slot { min-height: 60px; padding: 7px 5px; }
@@ -922,7 +1019,10 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
   .botnav-item {
     position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px;
     text-decoration: none; color: rgba(255,255,255,.42);
-    font-size: 9.5px; font-weight: 700; height: 60px; justify-content: center;
+    /* Was 9.5px — the fixed 60px-tall bar has plenty of vertical room
+       above the label (icon is 21px), and even the longest label here
+       ("Wellness") fits its ~90px column comfortably at this size. */
+    font-size: 11px; font-weight: 700; height: 60px; justify-content: center;
   }
   .botnav-item .icon { font-size: 21px; color: inherit; }
   /* Active tab wears the module's own hue, same answer to "where am I"
@@ -992,7 +1092,12 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
   .hero-mc { padding: 16px; gap: 14px; }
   .hero-mc-rings { gap: 6px; padding-top: 14px; }
   .hero-mc-rings .score-ring { width: 76px !important; height: 76px !important; }
-  .hero-ring-caption, .hero-delta { font-size: 9.5px; }
+  /* .hero-ring-caption stays 9.5px here on purpose (overriding its 12px
+     base) — "building history" is long enough that going bigger risks
+     the three-ring row overflowing its 76px-shrunk rings at this width,
+     unlike .hero-delta's short "+3"/"-2", which has room to spare. */
+  .hero-ring-caption { font-size: 9.5px; }
+  .hero-delta { font-size: 11px; }
   .hero-mc-strip { grid-template-columns: repeat(2, 1fr); gap: 10px 12px; padding-top: 14px; }
   .hero-stat { padding-left: 9px; }
   .hero-stat-v { font-size: 19px; }
@@ -1178,11 +1283,11 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
 .entry-field p { font-size: 13px; color: var(--text-2); white-space: pre-wrap; }
 .entry-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
 
-.timer-face { display: flex; align-items: center; justify-content: center; flex-direction: column; min-height: 300px; border-radius: 18px; background: linear-gradient(135deg, var(--accent), var(--accent-grad-2)); color: var(--white); position: relative; overflow: hidden; }
+.timer-face { display: flex; align-items: center; justify-content: center; flex-direction: column; min-height: 300px; border-radius: 18px; background: linear-gradient(135deg, var(--accent), var(--accent-grad-2)); color: #fff; position: relative; overflow: hidden; }
 .timer-face::after { content: ''; position: absolute; inset: 0; background: radial-gradient(circle at 50% 30%, rgba(255,255,255,.12), transparent 45%); pointer-events: none; }
 .timer-face > * { position: relative; z-index: 1; }
 .timer-time { font-size: 46px; font-weight: 800; font-variant-numeric: tabular-nums; margin-top: 8px; }
-.med-full-btn { position: absolute; top: 12px; right: 12px; z-index: 2; width: 34px; height: 34px; border: none; border-radius: 10px; background: rgba(255,255,255,.10); color: var(--white); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background .18s, transform .18s; }
+.med-full-btn { position: absolute; top: 12px; right: 12px; z-index: 2; width: 34px; height: 34px; border: none; border-radius: 10px; background: rgba(255,255,255,.10); color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background .18s, transform .18s; }
 .med-full-btn:hover { background: rgba(255,255,255,.22); transform: translateY(-1px); }
 .breath-visual { width: 190px; height: 190px; position: relative; display: flex; align-items: center; justify-content: center; margin-bottom: 2px; }
 .breath-visual svg { position: absolute; inset: 0; transform: rotate(-90deg); }
@@ -1248,7 +1353,7 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
    of filling the display. Sizing is viewport-relative (vmin/vh) so the orb
    is as large as the screen allows on a phone, a laptop, and an external
    monitor alike. */
-.meditation-fullscreen { position: fixed; inset: 0; z-index: 220; display: flex; align-items: center; justify-content: center; overflow: hidden; background: radial-gradient(circle at 50% 30%, rgba(var(--accent-rgb),.30), transparent 46%), linear-gradient(135deg, #0d0710, var(--accent-dark) 58%, #1b0d1f); color: var(--white); }
+.meditation-fullscreen { position: fixed; inset: 0; z-index: 220; display: flex; align-items: center; justify-content: center; overflow: hidden; background: radial-gradient(circle at 50% 30%, rgba(var(--accent-rgb),.30), transparent 46%), linear-gradient(135deg, #0d0710, var(--accent-dark) 58%, #1b0d1f); color: #fff; }
 .meditation-fullscreen .fs-inner { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: clamp(10px, 2.4vh, 26px); width: 100%; height: 100%; min-height: 100dvh; padding: max(20px, env(safe-area-inset-top)) 20px max(20px, env(safe-area-inset-bottom)); text-align: center; }
 .meditation-fullscreen .timer-face { background: none; border-radius: 0; min-height: 0; width: 100%; flex: 0 1 auto; overflow: visible; gap: clamp(8px, 2vh, 22px); }
 .meditation-fullscreen .timer-face::after { display: none; }
@@ -1278,7 +1383,7 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
   .fs-aura i { animation: none; }
   .breath-halo { display: none; }
 }
-.fs-exit { position: absolute; z-index: 3; top: max(24px, env(safe-area-inset-top)); right: 24px; width: 44px; height: 44px; border: none; border-radius: 14px; background: rgba(255,255,255,.10); color: var(--white); display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.fs-exit { position: absolute; z-index: 3; top: max(24px, env(safe-area-inset-top)); right: 24px; width: 44px; height: 44px; border: none; border-radius: 14px; background: rgba(255,255,255,.10); color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; }
 .fs-exit:hover { background: rgba(255,255,255,.22); }
 .fs-controls { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
 .audio-panel { margin-top: 14px; padding: 12px; border: 1px solid var(--border); border-radius: 14px; background: var(--white-soft); }
@@ -1295,7 +1400,7 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
 .trend-bar { flex: 1; min-width: 20px; border-radius: 6px 6px 3px 3px; position: relative; display: flex; align-items: flex-end; justify-content: center; cursor: default; transition: opacity .15s; }
 .trend-bar:hover { opacity: .82; }
 .trend-bar span { position: absolute; bottom: -22px; font-size: 10px; font-weight: 700; color: var(--text-3); }
-.trend-bar-tip { position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%); background: #111827; color: var(--white); border-radius: 8px; padding: 6px 10px; font-size: 11px; font-weight: 700; white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity .15s; z-index: 10; box-shadow: 0 4px 12px rgba(0,0,0,.2); }
+.trend-bar-tip { position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%); background: #111827; color: #fff; border-radius: 8px; padding: 6px 10px; font-size: 11px; font-weight: 700; white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity .15s; z-index: 10; box-shadow: 0 4px 12px rgba(0,0,0,.2); }
 .trend-bar:hover .trend-bar-tip { opacity: 1; }
 .trend-avg-line { position: absolute; left: 0; right: 0; height: 2px; background: rgba(var(--accent-rgb), .35); border-radius: 1px; pointer-events: none; }
 .trend-avg-label { position: absolute; right: 0; background: rgba(var(--accent-rgb), .12); color: var(--accent); font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 4px; transform: translateY(-50%); white-space: nowrap; }
@@ -1313,7 +1418,7 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
    which belonged to Goals' clay hue. */
 .hero-banner {
   background: var(--accent); border-radius: var(--radius-xl); padding: 28px 32px 26px;
-  color: var(--white); margin-bottom: 24px; position: relative; overflow: hidden;
+  color: #fff; margin-bottom: 24px; position: relative; overflow: hidden;
 }
 .hero-banner::before {
   content: ''; position: absolute; width: 330px; height: 330px; border-radius: 50%;
@@ -1651,14 +1756,14 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
   color: var(--text-2); font-size: 12px; font-weight: 600; cursor: pointer; transition: all .18s; box-shadow: var(--shadow-sm);
 }
 .filter-tab:hover { background: var(--accent-light); border-color: var(--accent); color: var(--accent-dark); }
-.filter-tab.active { background: var(--accent); border-color: var(--accent); color: var(--white); box-shadow: 0 4px 12px rgba(var(--accent-rgb),.25); }
+.filter-tab.active { background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: 0 4px 12px rgba(var(--accent-rgb),.25); }
 
 .roadmap-label { width: 160px; flex-shrink: 0; padding-top: 10px; }
 .roadmap-label-title { font-size: 13px; font-weight: 800; color: var(--text); line-height: 1.3; margin-bottom: 4px; }
 .roadmap-label-sub { font-size: 12px; color: var(--text-3); font-weight: 500; }
 .roadmap-bar {
   height: 34px; border-radius: 10px; display: flex; align-items: center; padding: 0 12px; position: absolute;
-  font-size: 12px; font-weight: 700; color: var(--white); white-space: nowrap; overflow: hidden;
+  font-size: 12px; font-weight: 700; color: #fff; white-space: nowrap; overflow: hidden;
   text-overflow: ellipsis; box-shadow: 0 2px 8px rgba(0,0,0,.18);
 }
 .roadmap-today-line { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--accent); z-index: 5; }
@@ -1673,7 +1778,7 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
 
 .vview-tabs { display: flex; gap: 4px; background: rgba(255,255,255,.1); border-radius: 10px; padding: 4px; width: fit-content; }
 .vview-tab { padding: 7px 16px; border-radius: 7px; font-size: 12px; font-weight: 700; letter-spacing: .03em; cursor: pointer; color: rgba(255,255,255,.55); border: none; background: transparent; transition: background .15s, color .15s; }
-.vview-tab.active { background: rgba(255,255,255,.18); color: var(--white); }
+.vview-tab.active { background: rgba(255,255,255,.18); color: #fff; }
 .vview-tab:hover:not(.active) { color: rgba(255,255,255,.85); }
 
 .vphoto-masonry { columns: 3; column-gap: 12px; }
@@ -1684,9 +1789,9 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
 .vphoto-item:hover img { transform: scale(1.04); }
 .vphoto-item-overlay { position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,.5) 0%, transparent 50%); pointer-events: none; opacity: 0; transition: opacity .25s; border-radius: 14px; }
 .vphoto-item:hover .vphoto-item-overlay { opacity: 1; }
-.vphoto-caption { position: absolute; bottom: 0; left: 0; right: 0; padding: 14px 12px 10px; color: var(--white); font-size: 11px; font-weight: 600; line-height: 1.3; opacity: 0; transition: opacity .25s; }
+.vphoto-caption { position: absolute; bottom: 0; left: 0; right: 0; padding: 14px 12px 10px; color: #fff; font-size: 11px; font-weight: 600; line-height: 1.3; opacity: 0; transition: opacity .25s; }
 .vphoto-item:hover .vphoto-caption { opacity: 1; }
-.vphoto-area-badge { position: absolute; top: 8px; left: 8px; padding: 3px 8px; border-radius: 99px; font-size: 10px; font-weight: 700; color: var(--white); letter-spacing: .04em; backdrop-filter: blur(6px); background: rgba(0,0,0,.35); }
+.vphoto-area-badge { position: absolute; top: 8px; left: 8px; padding: 3px 8px; border-radius: 99px; font-size: 10px; font-weight: 700; color: #fff; letter-spacing: .04em; backdrop-filter: blur(6px); background: rgba(0,0,0,.35); }
 .vbento-add {
   border-radius: 14px; border: 2px dashed var(--border-med); background: var(--white-soft); display: flex;
   flex-direction: column; align-items: center; justify-content: center; gap: 6px; cursor: pointer; color: var(--text-3);
@@ -1743,7 +1848,7 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
 .medit-title { font-size: 15px; font-weight: 700; color: rgba(255,255,255,.55); letter-spacing: .12em; text-transform: uppercase; }
 .medit-hint { font-size: 11px; color: rgba(255,255,255,.3); letter-spacing: .06em; margin-top: 2px; }
 .medit-close {
-  background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.15); color: var(--white);
+  background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.15); color: #fff;
   border-radius: 10px; padding: 8px 18px; font-family: inherit; font-size: 13px; font-weight: 700;
   cursor: pointer; display: flex; align-items: center; gap: 6px; backdrop-filter: blur(8px);
   transition: background .15s;
