@@ -2303,24 +2303,44 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
   .rvf-body { grid-template-columns: 1fr; }
   .rvf-side { display: none; }
 }
-.rvf-rail { list-style: none; margin: 4px 0 14px; padding: 0; display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; }
-.rvf-rail::-webkit-scrollbar { display: none; }
-.rvf-rail li { flex: 1 0 auto; }
+/* Stepper: a 4px track spanning dot centre to dot centre (half a column
+   in from each edge), with a fill up to the current step (--rail-fill,
+   set inline). Dots sit on the line, labels underneath. */
+.rvf-rail {
+  list-style: none; margin: 6px 0 18px; padding: 0; position: relative;
+  display: grid; grid-template-columns: repeat(var(--rail-n), 1fr);
+}
+.rvf-rail::before, .rvf-rail::after {
+  content: ''; position: absolute; top: 15px; height: 4px; border-radius: 99px;
+  left: calc(50% / var(--rail-n));
+}
+.rvf-rail::before { right: calc(50% / var(--rail-n)); background: var(--border); }
+.rvf-rail::after {
+  width: calc((100% - 100% / var(--rail-n)) * var(--rail-fill));
+  background: var(--accent); transition: width .35s ease;
+}
+.rvf-rail li { position: relative; z-index: 1; display: flex; justify-content: center; }
 .rvf-dot {
-  width: 100%; display: flex; align-items: center; gap: 8px; padding: 8px 10px 10px;
-  background: none; border: none; border-bottom: 3px solid var(--border); font-family: inherit; cursor: pointer;
-  color: var(--text-3); transition: color .15s, border-color .15s;
+  display: flex; flex-direction: column; align-items: center; gap: 7px;
+  background: none; border: none; padding: 0; font-family: inherit; cursor: pointer; color: var(--text-3);
 }
-.rvf-dot:hover { color: var(--text-2); }
+.rvf-dot:focus-visible { outline: none; }
+.rvf-dot:focus-visible .rvf-dot-n { box-shadow: 0 0 0 3px var(--accent-dim), 0 0 0 5px var(--accent); }
 .rvf-dot-n {
-  width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; flex-shrink: 0;
-  font-size: 12px; font-weight: 800; background: var(--white-soft); color: var(--text-3);
+  width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
+  font-size: 13px; font-weight: 800; background: var(--white); color: var(--text-3);
+  border: 2px solid var(--border-med); transition: all .2s;
 }
+.rvf-dot:hover .rvf-dot-n { border-color: var(--accent); color: var(--accent); }
 .rvf-dot-l { font-size: 12.5px; font-weight: 700; white-space: nowrap; }
-.rvf-dot.is-done { border-bottom-color: var(--accent); color: var(--text-2); }
-.rvf-dot.is-done .rvf-dot-n { background: var(--accent-dim); color: var(--accent); }
-.rvf-dot.is-cur { border-bottom-color: var(--accent); color: var(--text); }
-.rvf-dot.is-cur .rvf-dot-n { background: var(--accent); color: #fff; }
+.rvf-dot.is-done { color: var(--text-2); }
+.rvf-dot.is-done .rvf-dot-n { background: var(--accent); border-color: var(--accent); color: #fff; }
+.rvf-dot.is-cur { color: var(--text); }
+.rvf-dot.is-cur .rvf-dot-n {
+  background: var(--white); border: 3px solid var(--accent); color: var(--accent);
+  box-shadow: 0 0 0 5px var(--accent-dim); transform: scale(1.08);
+}
+.rvf-dot.is-cur .rvf-dot-l { font-weight: 800; }
 
 .rvf-card {
   background: var(--white); border-radius: var(--radius-lg); box-shadow: var(--shadow);
@@ -2383,8 +2403,8 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
 @media (max-width: 640px) {
   .rvf-card { padding: 24px 20px 18px; }
   .rvf-dot-l { display: none; }
-  .rvf-rail li { flex: 1 1 0; }
-  .rvf-dot { justify-content: center; }
+  .rvf-dot-n { width: 28px; height: 28px; font-size: 12px; }
+  .rvf-rail::before, .rvf-rail::after { top: 12px; }
   .rvf-score { grid-template-columns: repeat(5, 1fr); }
   .rvf-hint { margin-left: 0; }
   .rvr-score { font-size: 44px; }

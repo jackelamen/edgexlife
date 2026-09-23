@@ -239,12 +239,14 @@ export function ReviewFlow({ step, setStep, draft, edit, dirty, busy, saved, onS
 
   return (
     <div className="rvf">
-      <ol className="rvf-rail">
+      {/* A stepper, not tabs: one track behind the dots that fills up to
+          the current step, so it reads as progress through the review. */}
+      <ol className="rvf-rail" style={{ '--rail-fill': i / (steps.length - 1), '--rail-n': steps.length }}>
         {steps.map((st, n) => (
           <li key={st.id}>
             <button type="button" onClick={() => go(n)}
-              className={`rvf-dot${n === i ? ' is-cur' : ''}${st.done && n !== i ? ' is-done' : ''}`}>
-              <span className="rvf-dot-n">{st.done && n !== i ? <Icon name="check" size={13} /> : n + 1}</span>
+              className={`rvf-dot${n === i ? ' is-cur' : n < i ? ' is-done' : ''}`}>
+              <span className="rvf-dot-n">{n < i ? <Icon name="check" size={15} /> : n + 1}</span>
               <span className="rvf-dot-l">{st.label}</span>
             </button>
           </li>
