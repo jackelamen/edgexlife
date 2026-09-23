@@ -465,11 +465,18 @@ export default function TodayPage() {
           title={checklistClear ? 'All clear today' : `${totalOpen} open today`}
         />
 
-        {/* The reason any of the rest of this page exists. See lib/identity.js. */}
-        <div className="north-star">
-          <Icon name="star" size={13} />
-          <span>{IDENTITY_STATEMENT}</span>
-        </div>
+        {/* The reason any of the rest of this page exists. See lib/identity.js.
+            Was 12px grey italic, which read as a footnote. Now a slim gold
+            strip in Identity's own colour: stands out, but stays lighter
+            than the hero below it so the two don't compete. */}
+        <Link to="/identity" className="north-star">
+          <span className="north-star-ic"><Icon name="star" size={16} fill /></span>
+          <span className="north-star-txt">
+            <small>Who I'm becoming</small>
+            {IDENTITY_STATEMENT}
+          </span>
+          <Icon name="chevron_right" size={18} className="north-star-go" />
+        </Link>
 
         {/* Every other page has this; Today was the one page without it,
             which meant a network failure here rendered indistinguishable
