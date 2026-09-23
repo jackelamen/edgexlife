@@ -430,27 +430,6 @@ function SleepHoursField({ value, onChange }) {
   )
 }
 
-/* Kept only for the nutrition Rating field's 1-10 range — Kit's
-   ScaleField (tappable segments) covers every other scale in this editor
-   now, but ten segments in a row is more real estate than "a few
-   tappable buttons" can spend cleanly, so this one stays a slider. */
-function RangeField({ label, value, onChange, low, high, min = 1, max = 5 }) {
-  const mid = Math.round((min + max) / 2)
-  return (
-    <div className="field">
-      <label>{label}</label>
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-        <input type="range" min={min} max={max} step={1} value={value ?? mid}
-          onChange={(e) => onChange(Number(e.target.value))} />
-        <span className="score-pill">{value ?? '–'}</span>
-      </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-3)', fontWeight: 600 }}>
-        <span>{low}</span><span>{high}</span>
-      </div>
-    </div>
-  )
-}
-
 function LogEditor({ date, settings, onClose, onSaved, onBodyweightSynced }) {
   const open = Boolean(date)
   const existing = useAsync((f) => fetchHealthLogs(date, date, { force: f }), [date], { enabled: open })
@@ -571,7 +550,9 @@ function LogEditor({ date, settings, onClose, onSaved, onBodyweightSynced }) {
 
           <div style={{ marginTop: 20 }}>
             <SectionLabel>How it felt</SectionLabel>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
+            {/* One per row: three 5-6 segment scales side by side left each
+                segment ~30px and ran one scale's end label into the next. */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 16 }}>
               <ScaleField label="Energy" value={f.energy} onChange={(v) => set('energy', v)} low="Depleted" high="Charged" />
               <ScaleField label="Sleep quality" value={f.sleepQuality} onChange={(v) => set('sleepQuality', v)} low="Broken" high="Deep" />
               <ScaleField label="Pain / strain" value={f.pain} onChange={(v) => set('pain', v)} low="None" high="Severe" min={0} invert />
@@ -580,7 +561,7 @@ function LogEditor({ date, settings, onClose, onSaved, onBodyweightSynced }) {
 
           <div style={{ marginTop: 20 }}>
             <SectionLabel>Nutrition</SectionLabel>
-            <RangeField label="Rating" value={f.nutritionScore} onChange={(v) => set('nutritionScore', v)}
+            <ScaleField label="Rating" value={f.nutritionScore} onChange={(v) => set('nutritionScore', v)}
               min={1} max={10} low="Rough day" high="On point" />
             <div style={{ marginTop: 12 }}>
               <Field label="Reasoning" hint="What made it that number">

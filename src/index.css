@@ -28,6 +28,9 @@
 */
 
 :root {
+  /* Tells the browser's own controls (time/date pickers, checkboxes,
+     scrollbars) which theme to draw in; flipped in the dark blocks. */
+  color-scheme: light;
   --font: 'Bricolage Grotesque', ui-sans-serif, system-ui, sans-serif;
 
   --bg: #f6f4ef;
@@ -107,6 +110,7 @@
    themes since v3, this just brings the rest of the page to meet it. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
+    color-scheme: dark;
     --bg: #16150f;
     --white: #201f19;
     --white-soft: #2a281f;
@@ -120,6 +124,7 @@
   }
 }
 :root[data-theme="dark"] {
+  color-scheme: dark;
   --bg: #16150f;
   --white: #201f19;
   --white-soft: #2a281f;
@@ -338,6 +343,32 @@ h1, h2, h3, h4, .page-title {
 /* Settings → Data & diagnostics disclosure. Plain <details>/<summary>
    (see DataDiagnostics in SettingsPage.jsx) restyled to read as a card
    row rather than the browser's default marker-and-indent look. */
+/* Two more class names used in markup but never defined: the Goals
+   savings bar (.prog-track/.prog-fill) drew nothing at all, and the
+   Workout history exercise chips (.sl-chips) had no wrapping row. */
+.prog-track { height: 8px; border-radius: 99px; background: var(--white-soft); overflow: hidden; }
+.prog-fill { height: 100%; border-radius: 99px; background: var(--accent); transition: width .3s; }
+.prog-fill.green { background: var(--s-good); }
+.sl-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+
+/* Settings rows and chips. SettingsPage used `.row`, `.chip` and
+   `.lf-display` — class names carried over from a sibling app that were
+   never defined here, so each reminder's time box dropped under its
+   label (and clipped) and "Enabled on this device" rendered as bare
+   highlighted text. Named settings-* rather than a global `.row`, which
+   FastingModule also uses with its own inline layout. */
+.settings-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 8px 0; border-bottom: 1px solid var(--border);
+}
+.settings-row:last-child { border-bottom: none; }
+.settings-row input[type=time] { padding: 9px 11px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 99px;
+  font-size: 12px; font-weight: 800; background: var(--white-soft); color: var(--text-2);
+}
+.chip-good { background: var(--s-good-bg); color: var(--s-good); }
+
 .settings-diagnostics > summary {
   list-style: none; cursor: pointer; display: flex; align-items: center;
   justify-content: space-between; font-size: 15px; font-weight: 800;
@@ -658,6 +689,9 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
 
 /* ── ScaleField — tappable 1-5(ish) segments, see Kit.jsx ──────── */
 .scale-field { display: flex; gap: 6px; }
+/* 7+ segments (the 1-10 nutrition rating) need the gap back to fit a
+   phone-width row without shrinking the tap targets below ~28px. */
+.scale-field:has(> :nth-child(7)) { gap: 4px; }
 .scale-seg {
   flex: 1; min-height: 40px; border-radius: var(--radius-sm);
   border: 1.5px solid var(--border); background: var(--white-soft);

@@ -792,7 +792,7 @@ function QuickHealthForm({ busy, onCancel, onSave }) {
 
   return (
     <div className="card card-pad" style={{ marginTop: 6, marginLeft: 40 }}>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Field label="Sleep (hrs)">
           <input type="number" min="0" max="16" step="0.5" value={sleepHours}
             onChange={(e) => setSleepHours(e.target.value)} placeholder="7.5" />
@@ -833,7 +833,7 @@ function QuickWellnessForm({ busy, onCancel, onSave }) {
 
   return (
     <div className="card card-pad" style={{ marginTop: 6, marginLeft: 40 }}>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <ScaleField label="Mood" value={mood} onChange={setMood} low="Heavy" high="Bright" />
         <ScaleField label="Stress" value={stress} onChange={setStress} low="Easy" high="High" invert />
         <ScaleField label="Clarity" value={clarity} onChange={setClarity} low="Foggy" high="Clear" />

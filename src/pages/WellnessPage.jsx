@@ -514,7 +514,7 @@ function CheckinView({ date, entryId, onSaved, onDeleted, onNav }) {
 
         <div className="form-section" style={{ marginTop: 20 }}>
           <div className="form-section-label">Scores</div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             {/* Stress is the one scale here where a HIGHER number is a
                 WORSE reading — invert so its green lands on "calm", not
                 on "5", matching Clarity/Groundedness where high is good. */}

@@ -53,7 +53,7 @@ export default function SettingsPage() {
             <p className="text-[12px] mb-3" style={{ color: 'var(--text-3)' }}>
               Shared with Pulse and xFocus, same Supabase project, same user id.
             </p>
-            <button className="btn" onClick={signOut}>Sign out</button>
+            <button className="btn btn-secondary btn-sm" onClick={signOut}>Sign out</button>
           </Panel>
 
           <DataDiagnostics />
@@ -109,7 +109,7 @@ function DataDiagnostics() {
       <div className="flex flex-col gap-3.5" style={{ marginTop: 14 }}>
         <Panel title={`Egress this month (${ledger.month})`}
           actions={<span className="chip">{ledger.calls} reads</span>}>
-          <div className="lf-display tnum text-[30px]" style={{ color: 'var(--accent)' }}>
+          <div className="tnum" style={{ fontSize: 30, fontWeight: 800, letterSpacing: '-.02em', color: 'var(--accent)' }}>
             {formatBytes(ledger.bytes)}
           </div>
           <p className="text-[12.5px] mt-1" style={{ color: 'var(--text-3)' }}>
@@ -122,7 +122,7 @@ function DataDiagnostics() {
         {rows.length > 0 && (
           <Panel title="By query" bodyClass="">
             {rows.map(([name, bytes]) => (
-              <div key={name} className="row">
+              <div key={name} className="settings-row">
                 <span className="text-[13px] flex-1 min-w-0 truncate"
                   style={{ color: 'var(--text-2)' }}>{name}</span>
                 <span className="text-[13px] tnum">{formatBytes(bytes)}</span>
@@ -135,13 +135,13 @@ function DataDiagnostics() {
 
         <Panel title="Caches">
           <div className="flex flex-col gap-2">
-            <button className="btn" onClick={() => {
+            <button className="btn btn-secondary btn-sm" onClick={() => {
               refreshAll(); toast.success('Cleared. Next load refetches')
             }}>Clear data cache</button>
-            <button className="btn" onClick={async () => {
+            <button className="btn btn-secondary btn-sm" onClick={async () => {
               await clearVisionCache(); toast.success('Vision images cleared')
             }}>Clear vision image cache</button>
-            <button className="btn" onClick={() => {
+            <button className="btn btn-secondary btn-sm" onClick={() => {
               resetLedger(); toast.success('Counter reset')
             }}>Reset egress counter</button>
           </div>
@@ -210,10 +210,10 @@ function ReminderPanel() {
         </p>
       ) : permission === 'granted' ? (
         <div className="flex items-center justify-between gap-3" style={{ marginBottom: 16 }}>
-          <span className="chip" style={{ background: 'var(--green-light, #dcfce7)', color: '#16a34a' }}>
+          <span className="chip chip-good">
             Enabled on this device
           </span>
-          <button className="btn btn-sm" onClick={disable} disabled={subBusy}>
+          <button className="btn btn-secondary btn-sm" onClick={disable} disabled={subBusy}>
             {subBusy ? 'Working…' : 'Turn off'}
           </button>
         </div>
@@ -228,31 +228,31 @@ function ReminderPanel() {
       )}
 
       <div className="flex flex-col gap-3">
-        <div className="row" style={{ alignItems: 'center' }}>
+        <div className="settings-row">
           <label className="flex items-center gap-2 text-[13px]" style={{ flex: 1 }}>
             <input type="checkbox" checked={p.health_enabled}
               onChange={(e) => setForm({ ...p, health_enabled: e.target.checked })} />
             Health · log your day
           </label>
-          <input type="time" value={p.health_time} style={{ width: 110 }}
+          <input type="time" value={p.health_time} style={{ width: 150, flexShrink: 0 }}
             onChange={(e) => setForm({ ...p, health_time: e.target.value })} />
         </div>
-        <div className="row" style={{ alignItems: 'center' }}>
+        <div className="settings-row">
           <label className="flex items-center gap-2 text-[13px]" style={{ flex: 1 }}>
             <input type="checkbox" checked={p.wellness_enabled}
               onChange={(e) => setForm({ ...p, wellness_enabled: e.target.checked })} />
             Wellness · check in
           </label>
-          <input type="time" value={p.wellness_time} style={{ width: 110 }}
+          <input type="time" value={p.wellness_time} style={{ width: 150, flexShrink: 0 }}
             onChange={(e) => setForm({ ...p, wellness_time: e.target.value })} />
         </div>
-        <div className="row" style={{ alignItems: 'center' }}>
+        <div className="settings-row">
           <label className="flex items-center gap-2 text-[13px]" style={{ flex: 1 }}>
             <input type="checkbox" checked={p.intention_enabled}
               onChange={(e) => setForm({ ...p, intention_enabled: e.target.checked })} />
             Intention · name your day
           </label>
-          <input type="time" value={p.intention_time} style={{ width: 110 }}
+          <input type="time" value={p.intention_time} style={{ width: 150, flexShrink: 0 }}
             onChange={(e) => setForm({ ...p, intention_time: e.target.value })} />
         </div>
       </div>
