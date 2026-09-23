@@ -290,11 +290,9 @@ export default function TodayPage() {
     if (openDue > 0) {
       a.push({ sev: 'short', icon: 'flag', text: `${openDue} cycle action${openDue > 1 ? 's' : ''} still open today`, to: '/goals', cta: 'Goals' })
     }
-    if (weakest && weakest.value < 60) {
-      a.push({ sev: weakest.value < 40 ? 'risk' : 'short', icon: metric(weakest.key).icon,
-        text: `${weakest.label} is dragging your score (${weakest.detail})`, to: '/health', cta: 'Health',
-        metricKey: weakest.key })
-    }
+    // The weakest-driver alert that used to sit here ("Water is dragging
+    // your score") now lives in the Where to focus card below, with its
+    // advice and trend. Listing it in both places was pure repetition.
     if (!liveCycles.length && activeGoals.length) {
       a.push({ sev: 'short', icon: 'loop', text: 'Active goals with no live cycle', to: '/goals?v=cycles', cta: 'Start one' })
     }
@@ -721,11 +719,11 @@ export default function TodayPage() {
              one-line teaser rather than a full empty card while it doesn't. ── */}
       <Card style={{ marginTop: 14 }} className="today-order-connects">
         <CardHead title="Where to focus" sub="The one lever worth pulling in each system right now." />
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5">
+        <div className="focus-list">
           <FocusLever mod="health" label="Health" to="/health"
-            weakest={weakest} points={healthPoints} dir={healthDir} />
+            weakest={weakest} points={healthPoints} />
           <FocusLever mod="wellness" label="Wellness" to="/wellness"
-            weakest={weakestWellness} points={wellnessPoints} dir={wellnessDir} />
+            weakest={weakestWellness} points={wellnessPoints} />
         </div>
 
         {patterns.length > 0 ? (
@@ -883,54 +881,73 @@ function QuickWellnessForm({ busy, onCancel, onSave }) {
   )
 }
 
+/* Wellness scores stress as "Stress ease" (inverted so higher = better
+   inside the formula), which reads backwards on its own. Shown by the
+   raw name here; the detail already carries the real reading. */
+const FOCUS_LABEL = { stress: 'Stress' }
+
 /**
- * One system's card in "Where to focus" — its weakest driver plus a
- * small sparkline of the last 30 days, so the card says something useful
- * from the first log ever ("here's your weakest driver") and gets more
- * informative once there's history (the line), rather than needing
- * months of data before it can say anything at all.
+ * One row of "Where to focus": which driver is weakest, what it reads,
+ * what to do about it (every driver in lib/scores.js carries its own
+ * advice line), and where the score has been heading. Was a pair of large
+ * boxes with a raw day-by-day line wedged in a corner — mostly empty
+ * space, and the unsmoothed line was daily noise that read as alarming.
  */
-function FocusLever({ mod, label, to, weakest, points, dir }) {
+function FocusLever({ mod, label, to, weakest, points }) {
   const m = MODULES[mod]
   return (
-    <Link to={to} className="focus-lever" data-mod={mod}>
-      <div className="focus-lever-top">
-        <span className="focus-lever-label" style={{ color: m.color }}>{label}</span>
-        <Sparkline points={points} tone={dir?.tone} />
+    <Link to={to} className="focus-row" style={{ '--focus-hue': m.color }}>
+      <div className="focus-main">
+        <div className="focus-eyebrow"><span className="focus-dot" />{label}</div>
+        {weakest ? (
+          <>
+            <div className="focus-title">
+              {FOCUS_LABEL[weakest.key] || weakest.label}
+              <span className="focus-value">{weakest.detail}</span>
+            </div>
+            {weakest.advice && <p className="focus-advice">{weakest.advice}</p>}
+          </>
+        ) : (
+          <p className="focus-advice">Log {label.toLowerCase()} once and its weakest driver shows up here.</p>
+        )}
       </div>
-      {weakest ? (
-        <>
-          <div className="focus-lever-title">{weakest.label}</div>
-          <div className="focus-lever-detail">{weakest.detail}</div>
-        </>
-      ) : (
-        <div className="focus-lever-detail">Log {label.toLowerCase()} once to see your weakest lever here.</div>
-      )}
-      <span className="focus-lever-go">Open <Icon name="arrow_forward" size={13} /></span>
+      <FocusTrend points={points} />
+      <Icon name="chevron_right" size={20} className="focus-chev" />
     </Link>
   )
 }
 
-/** Last-30-day line, no axes or labels — just shape. Deliberately not the
-    full TrendChart component (a whole different weight of visual for a
-    card whose job is "one glance"), and colored by the same up/down/flat
-    tone the hero's own delta pill already uses, so green/red here means
-    the same thing it does everywhere else on this page. */
-function Sparkline({ points, tone }) {
-  const pts = (points || []).filter((p) => p.score != null).slice(-30)
-  if (pts.length < 2) return null
-  const w = 84, h = 26
-  const scores = pts.map((p) => p.score)
-  const min = Math.min(...scores), max = Math.max(...scores)
-  const range = Math.max(1, max - min)
-  const step = w / (pts.length - 1)
-  const path = pts.map((p, i) =>
-    `${i === 0 ? 'M' : 'L'} ${(i * step).toFixed(1)} ${(h - ((p.score - min) / range) * h).toFixed(1)}`).join(' ')
-  const color = tone === 'up' ? 'var(--s-good)' : tone === 'down' ? 'var(--s-risk)' : 'var(--text-3)'
+/**
+ * 30-day direction, not daily noise: a 7-log rolling average drawn as a
+ * soft line in the module's own hue, with the change spelled out in words
+ * beside it. Needs at least 7 logs; below that there's no honest trend
+ * to show, so it renders nothing rather than a guess.
+ */
+function FocusTrend({ points }) {
+  const raw = (points || []).filter((p) => p.score != null).slice(-30).map((p) => p.score)
+  if (raw.length < 7) return <div className="focus-trend" />
+  const win = 7
+  const smooth = raw.slice(win - 1).map((_, i) =>
+    raw.slice(i, i + win).reduce((a, b) => a + b, 0) / win)
+  const delta = Math.round(smooth[smooth.length - 1] - smooth[0])
+  const tone = delta >= 3 ? 'up' : delta <= -3 ? 'down' : 'flat'
+  const words = tone === 'flat' ? 'Steady' : `${delta > 0 ? 'Up' : 'Down'} ${Math.abs(delta)} pts`
+
+  const w = 120, h = 36, pad = 3
+  const min = Math.min(...smooth) - 4, max = Math.max(...smooth) + 4
+  const x = (i) => (i / Math.max(1, smooth.length - 1)) * w
+  const y = (v) => pad + (1 - (v - min) / Math.max(1, max - min)) * (h - pad * 2)
+  const line = smooth.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join(' ')
+  const area = `${line} L${w} ${h} L0 ${h} Z`
   return (
-    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="focus-spark" aria-hidden="true">
-      <path d={path} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
+    <div className="focus-trend">
+      <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} aria-hidden="true">
+        <path d={area} fill="var(--focus-hue)" opacity=".12" />
+        <path d={line} fill="none" stroke="var(--focus-hue)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        <circle cx={x(smooth.length - 1)} cy={y(smooth[smooth.length - 1])} r="3" fill="var(--focus-hue)" />
+      </svg>
+      <span className={`focus-delta is-${tone}`}>{words}<small> · 30 days</small></span>
+    </div>
   )
 }
 
