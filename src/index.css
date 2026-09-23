@@ -257,6 +257,20 @@ h1, h2, h3, h4, .page-title {
   .north-star { font-size: 11px; margin-bottom: 14px; }
 }
 
+/* ── Loading skeleton — see Loading in components/ui/Kit.jsx ──── */
+.skeleton-stack { display: flex; flex-direction: column; gap: 10px; padding: 2px 0; }
+.skeleton-row {
+  height: 44px; border-radius: var(--radius-sm); background: var(--white-soft);
+  position: relative; overflow: hidden;
+}
+.skeleton-row::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.6), transparent);
+  animation: skeleton-sweep 1.3s ease-in-out infinite;
+}
+@keyframes skeleton-sweep { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) { .skeleton-row::after { animation: none; opacity: .5; } }
+
 /* ── Surfaces ──────────────────────────────────────────────── */
 .card {
   background: var(--white); border: none;

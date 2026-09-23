@@ -245,8 +245,24 @@ export function Empty({ icon = 'inbox', title, children, action }) {
   )
 }
 
-export function Loading({ label = 'Loading' }) {
-  return <div style={{ padding: '32px 0', fontSize: 13, color: 'var(--text-3)', fontWeight: 600 }}>{label}…</div>
+/**
+ * Was a single line of text — "Loading…" — everywhere, so a page that
+ * fires a dozen queries assembled as a series of layout shifts: a 13px
+ * line jumping to whatever height the real content turned out to need.
+ * Renders a stack of pulsing placeholder rows instead, close to the
+ * height a real row/card ends up at, so the page doesn't hop around as
+ * data arrives. Same [label]/no-prop call signature as before (all ~30
+ * call sites are untouched), plus an optional `rows` for a caller loading
+ * a single item to hint back down to one.
+ */
+export function Loading({ label = 'Loading', rows = 3 }) {
+  return (
+    <div className="skeleton-stack" role="status" aria-label={`${label}…`}>
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} className="skeleton-row" style={i === rows - 1 && rows > 1 ? { width: '62%' } : undefined} />
+      ))}
+    </div>
+  )
 }
 
 export function ErrorNote({ error }) {
