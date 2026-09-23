@@ -3,7 +3,7 @@ import toast from 'react-hot-toast'
 import Icon from '../components/ui/Icon'
 import { View } from '../components/shell/Shell'
 import {
-  Card, CardHead, PageHeader, Empty, Loading, Badge, ErrorNote, Tabs, SectionLabel,
+  Card, PageHeader, Empty, Loading, Badge, ErrorNote, Tabs,
 } from '../components/ui/Kit'
 import { useAsync } from '../hooks/useAsync'
 import {
@@ -16,7 +16,7 @@ import { isSprintActive, sprintCurrentWeek, tacticWeekRows } from '../lib/goals'
 import { statusFor } from '../lib/design'
 import {
   REVIEW_PROMPTS, PLAN_PROMPTS, EMPTY_REVIEW, weekIdFor, weekRange, prevWeekId, nextWeekId,
-  prettyWeek, gatherWeek, tacticBreakdown, isReviewStarted, reviewTargetWeekId,
+  prettyWeek, gatherWeek, tacticBreakdown, reviewTargetWeekId,
 } from '../lib/review'
 import { IDENTITY_STATEMENT } from '../lib/identity'
 
@@ -85,6 +85,13 @@ export default function ReviewPage() {
      Persisted to localStorage per week. The Visions textarea in Goals
      loses everything typed the moment you switch tabs, and this is the
      longest-form writing in the app — it does not get to repeat that. */
+  // Guided flow: which step is open, and whether a SAVED review has been
+  // reopened for editing (a saved week shows its recap instead). Both
+  // reset whenever the week changes.
+  const [step, setStep] = useState(0)
+  const [editing, setEditing] = useState(false)
+  useEffect(() => { setStep(0); setEditing(false) }, [weekId])
+
   const [draft, setDraft] = useState(EMPTY_REVIEW)
   const [dirty, setDirty] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -116,7 +123,8 @@ export default function ReviewPage() {
       await saveWeeklyReview({ ...draft, week_id: weekId })
       try { localStorage.removeItem(DRAFT_KEY(weekId)) } catch { /* ignore */ }
       setDirty(false)
-      toast.success('Review saved')
+      setEditing(false)
+      toast.success('Week closed out')
       reviews.reload()
     } catch (e) { toast.error(e.message) } finally { setBusy(false) }
   }
@@ -150,7 +158,6 @@ export default function ReviewPage() {
 
   const loading = healthLogs.loading || checkins.loading || reviews.loading
   const isThisWeek = weekId === weekIdFor()
-  const status = saved ? 'Saved' : isReviewStarted(draft) ? 'Draft' : 'Not started'
 
   return (
     <View>
@@ -176,11 +183,6 @@ export default function ReviewPage() {
           This is the page that closes the loop on it weekly; the
           "Identity check" reflection further down is where it actually
           gets answered to, not just displayed. */}
-      <div className="north-star">
-        <Icon name="star" size={13} />
-        <span>{IDENTITY_STATEMENT}</span>
-      </div>
-
       <ErrorNote error={reviews.error || healthLogs.error} />
 
       <Tabs value={tab} onChange={setTab} options={[
@@ -190,164 +192,275 @@ export default function ReviewPage() {
 
       {tab === 'history' ? (
         <HistoryView state={allReviews} onOpen={(id) => { setWeekId(id); setTab('week') }} />
+      ) : saved && !editing && !dirty ? (
+        <ReviewRecap review={saved} summary={summary} loading={loading}
+          onEdit={() => { setEditing(true); setStep(0) }} />
       ) : (
-        <>
-          <div className="rv-status">
-            <Badge tone={saved ? 'green' : status === 'Draft' ? 'orange' : 'muted'}>{status}</Badge>
-            {dirty && <span className="rv-unsaved">Unsaved changes, kept on this device</span>}
-          </div>
+        <ReviewFlow
+          step={step} setStep={setStep}
+          draft={draft} edit={edit} dirty={dirty} busy={busy} saved={saved} onSave={save}
+          summary={summary} loading={loading} lastWeek={lastWeek} lastWeekId={prevWeekId(weekId)}
+          cycleRows={cycleRows} weekLabel={prettyWeek(weekId)}
+        />
+      )}
+    </View>
+  )
+}
 
-          {/* ── 1. The week in numbers ── */}
-          <Card style={{ marginTop: 12 }}>
-            <CardHead title="What the data says"
-              sub="Gathered from what you logged. You did not type any of this." />
+/* ── Guided review ────────────────────────────────────────────────
+   Rebuilt 2026-09-24. The review used to be six stacked cards of
+   textareas, all visible at once, which read as a form to fill in
+   rather than a ritual worth sitting down for. Now one question at a
+   time with a progress rail: the data first (it argues back against
+   memory, see the note at the top of this file), then last week's
+   promises, then the rating, reflection, identity check and next
+   week's priorities. Same draft/save mechanics as before; only the
+   presentation changed. */
+const SCORE_WORD = (n) => (n <= 3 ? 'Rough' : n <= 5 ? 'Mixed' : n <= 7 ? 'Solid' : n <= 9 ? 'Strong' : 'Best in a while')
+const CORE = ['wins', 'challenges', 'learning']
+
+export function ReviewFlow({ step, setStep, draft, edit, dirty, busy, saved, onSave,
+  summary, loading, lastWeek, lastWeekId, cycleRows, weekLabel }) {
+  const promised = lastWeek && [lastWeek.priority_1, lastWeek.priority_2, lastWeek.priority_3].filter(Boolean)
+  const hasPromises = (promised && promised.length) || cycleRows.length
+  const steps = [
+    { id: 'look', label: 'The week', done: true },
+    ...(hasPromises ? [{ id: 'promises', label: 'Promises', done: true }] : []),
+    { id: 'rate', label: 'Rate it', done: draft.score != null },
+    { id: 'reflect', label: 'Reflect', done: CORE.some((k) => String(draft[k] || '').trim()) },
+    { id: 'identity', label: 'Identity', done: Boolean(String(draft.module_notes || '').trim()) },
+    { id: 'forward', label: 'Next week', done: Boolean(String(draft.priority_1 || '').trim()) },
+    { id: 'finish', label: 'Finish', done: Boolean(saved) && !dirty },
+  ]
+  const i = Math.min(step, steps.length - 1)
+  const cur = steps[i]
+  const last = i === steps.length - 1
+  const go = (n) => { setStep(n); window.scrollTo({ top: 0, behavior: 'smooth' }) }
+
+  return (
+    <div className="rvf">
+      <ol className="rvf-rail">
+        {steps.map((st, n) => (
+          <li key={st.id}>
+            <button type="button" onClick={() => go(n)}
+              className={`rvf-dot${n === i ? ' is-cur' : ''}${st.done && n !== i ? ' is-done' : ''}`}>
+              <span className="rvf-dot-n">{st.done && n !== i ? <Icon name="check" size={13} /> : n + 1}</span>
+              <span className="rvf-dot-l">{st.label}</span>
+            </button>
+          </li>
+        ))}
+      </ol>
+
+      <div className="rvf-card" key={cur.id}>
+        <div className="rvf-kicker">{weekLabel} · Step {i + 1} of {steps.length}</div>
+
+        {cur.id === 'look' && (
+          <>
+            <h2 className="rvf-q">Here's what the week actually did.</h2>
+            <p className="rvf-sub">Gathered from what you logged, before you write anything. Memory rounds a week off; this doesn't.</p>
             {loading ? <Loading /> : <WeekStats s={summary} />}
-          </Card>
+          </>
+        )}
 
-          {/* ── 2. Close last week's loop ── */}
-          {lastWeek && (lastWeek.priority_1 || lastWeek.priority_2 || lastWeek.priority_3) && (
-            <Card style={{ marginTop: 14 }}>
-              <CardHead title="What you said you'd do"
-                sub={`Set in your review of ${prettyWeek(prevWeekId(weekId))}.`} />
-              <div className="rv-carry">
-                {[lastWeek.priority_1, lastWeek.priority_2, lastWeek.priority_3]
-                  .filter(Boolean).map((p, i) => (
-                    <div key={i} className="rv-carry-row">
-                      <span className="rv-carry-n">{i + 1}</span>
-                      <span>{p}</span>
-                    </div>
-                  ))}
-                {lastWeek.protect && (
-                  <div className="rv-carry-row rv-carry-aside">
-                    <Icon name="shield" size={15} /><span>Protect: {lastWeek.protect}</span>
-                  </div>
-                )}
-                {lastWeek.let_go && (
-                  <div className="rv-carry-row rv-carry-aside">
-                    <Icon name="do_not_disturb_on" size={15} /><span>Let go: {lastWeek.let_go}</span>
-                  </div>
-                )}
+        {cur.id === 'promises' && (
+          <>
+            <h2 className="rvf-q">Did you keep your word?</h2>
+            <p className="rvf-sub">What you committed to last week, and how each cycle action went.</p>
+            {promised && promised.length > 0 && (
+              <div className="rvf-block">
+                <div className="rvf-label">From your review of {prettyWeek(lastWeekId)}</div>
+                {promised.map((p, n) => (
+                  <div key={n} className="rvf-promise"><span className="rv-carry-n">{n + 1}</span><span>{p}</span></div>
+                ))}
+                {lastWeek.protect && <div className="rvf-aside"><Icon name="shield" size={15} /> Protect: {lastWeek.protect}</div>}
+                {lastWeek.let_go && <div className="rvf-aside"><Icon name="do_not_disturb_on" size={15} /> Let go: {lastWeek.let_go}</div>}
               </div>
-            </Card>
-          )}
-
-          {/* ── 3. What slipped ── */}
-          {cycleRows.length > 0 && (
-            <Card style={{ marginTop: 14 }}>
-              <CardHead title="Commitments, one by one"
-                sub="Worst first. A cycle score tells you how far off you were; this tells you which action did it." />
-              <div className="rv-tactics">
-                {cycleRows.map((r, i) => {
-                  const st = r.pct == null ? null : statusFor(r.pct)
-                  return (
-                    <div key={i} className="rv-tactic">
-                      <span className="rv-tactic-bar"
-                        style={{ background: st?.color || 'var(--border-med)' }} />
-                      <span className="rv-tactic-txt">
-                        {r.text || 'Untitled action'}
-                        <small>{r.cycle} &middot; week {r.week}</small>
-                      </span>
-                      <span className="rv-tactic-n tnum">
-                        {r.possible ? `${r.done}/${r.possible}` : 'not due'}
-                      </span>
-                      {r.pct != null && (
-                        <Badge tone={r.pct >= 85 ? 'green' : r.pct >= 60 ? 'orange' : 'red'}>{r.pct}%</Badge>
-                      )}
-                    </div>
-                  )
-                })}
+            )}
+            {cycleRows.length > 0 && (
+              <div className="rvf-block">
+                <div className="rvf-label">Cycle actions, worst first</div>
+                <div className="rv-tactics">
+                  {cycleRows.map((r, n) => {
+                    const st = r.pct == null ? null : statusFor(r.pct)
+                    return (
+                      <div key={n} className="rv-tactic">
+                        <span className="rv-tactic-bar" style={{ background: st?.color || 'var(--border-med)' }} />
+                        <span className="rv-tactic-txt">{r.text || 'Untitled action'}<small>{r.cycle} &middot; week {r.week}</small></span>
+                        <span className="rv-tactic-n tnum">{r.possible ? `${r.done}/${r.possible}` : 'not due'}</span>
+                        {r.pct != null && <Badge tone={r.pct >= 85 ? 'green' : r.pct >= 60 ? 'orange' : 'red'}>{r.pct}%</Badge>}
+                      </div>
+                    )
+                  })}
+                </div>
               </div>
-            </Card>
-          )}
+            )}
+          </>
+        )}
 
-          {/* ── 4. Identity check ──────────────────────────────────────
-              The reason this whole app exists, and the one question
-              nothing else on this page can answer for you — the data
-              above says what happened, this asks what it meant. Its own
-              card, not folded into "How was it" below: naming it
-              separately is the difference between a real checkpoint and
-              one more textarea in a list. Written to `module_notes`, a
-              column that already existed in the schema and had no
-              consumer anywhere in the app until this. */}
-          <Card style={{ marginTop: 14 }} className="rv-identity">
-            <CardHead title="Identity check"
-              sub="Where this week actually served it, and where it didn't." />
-            <p className="rv-hint">
-              Be specific: "led with compassion" or "cut a corner on integrity" is
-              something you can act on next week; "did okay" isn't.
-            </p>
-            <textarea value={draft.module_notes || ''} rows={4}
-              placeholder="Where did you live it? Where did you fall short?"
-              onChange={(e) => edit({ module_notes: e.target.value })} />
-          </Card>
-
-          {/* ── 5. The reflection ── */}
-          <Card style={{ marginTop: 14 }}>
-            <CardHead title="How was it" sub="Your read on the week, in your words." />
-
-            <SectionLabel>Overall, out of 10</SectionLabel>
-            <div className="rv-score">
-              {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
-                <button key={n} type="button"
-                  className={`rv-score-btn${Number(draft.score) === n ? ' on' : ''}`}
-                  onClick={() => edit({ score: Number(draft.score) === n ? null : n })}>
-                  {n}
-                </button>
+        {cur.id === 'rate' && (
+          <>
+            <h2 className="rvf-q">How was this week, honestly?</h2>
+            <p className="rvf-sub">Your gut call, out of 10. The numbers were step one; this is your read.</p>
+            <div className="rvf-score">
+              {Array.from({ length: 10 }, (_, n) => n + 1).map((n) => (
+                <button key={n} type="button" className={`rvf-score-btn${Number(draft.score) === n ? ' on' : ''}`}
+                  onClick={() => edit({ score: Number(draft.score) === n ? null : n })}>{n}</button>
               ))}
             </div>
-
-            <div style={{ marginTop: 16 }}>
-              <SectionLabel>One word for this week</SectionLabel>
-              <input value={draft.theme_word || ''} placeholder="Focus, scattered, steady&hellip;"
+            <div className="rvf-score-word">{draft.score ? SCORE_WORD(Number(draft.score)) : '\u00a0'}</div>
+            <div className="rvf-block">
+              <div className="rvf-label">One word for this week</div>
+              <input className="rvf-word" value={draft.theme_word || ''} placeholder="Focused, scattered, steady..."
                 onChange={(e) => edit({ theme_word: e.target.value })} />
             </div>
+          </>
+        )}
 
-            {REVIEW_PROMPTS.map((p) => (
-              <div key={p.key} style={{ marginTop: 16 }}>
-                <SectionLabel>{p.label}</SectionLabel>
-                {p.hint && <p className="rv-hint">{p.hint}</p>}
-                <textarea value={draft[p.key] || ''} rows={3}
-                  onChange={(e) => edit({ [p.key]: e.target.value })} />
-              </div>
+        {cur.id === 'reflect' && (
+          <>
+            <h2 className="rvf-q">What happened, in your words?</h2>
+            <p className="rvf-sub">Specific beats thorough. A line each is enough.</p>
+            {REVIEW_PROMPTS.filter((p) => CORE.includes(p.key)).map((p) => (
+              <Prompt key={p.key} p={p} value={draft[p.key]} onChange={(v) => edit({ [p.key]: v })} />
             ))}
-          </Card>
+            <details className="rvf-more" open={REVIEW_PROMPTS.some((p) => !CORE.includes(p.key) && String(draft[p.key] || '').trim())}>
+              <summary>More, if you want it <small>energy, gratitude, anything else</small></summary>
+              {REVIEW_PROMPTS.filter((p) => !CORE.includes(p.key)).map((p) => (
+                <Prompt key={p.key} p={p} value={draft[p.key]} onChange={(v) => edit({ [p.key]: v })} />
+              ))}
+            </details>
+          </>
+        )}
 
-          {/* ── 6. Forward ── */}
-          <Card style={{ marginTop: 14 }}>
-            <CardHead title="Next week"
-              sub="Three things, not ten. These come back to you in next week's review." />
-            {PLAN_PROMPTS.map((p, i) => (
-              <div key={p.key} className="rv-prio">
-                <span className="rv-carry-n">{i + 1}</span>
-                <input value={draft[p.key] || ''} placeholder={i === 0 ? 'The one that matters most' : ''}
+        {cur.id === 'identity' && (
+          <>
+            <h2 className="rvf-q">Did this week sound like you?</h2>
+            <blockquote className="rvf-statement">{IDENTITY_STATEMENT}</blockquote>
+            <p className="rvf-sub">Where did you live it, and where did you fall short? "Led with compassion when it cost me" is something to build on; "did okay" isn't.</p>
+            <textarea className="rvf-text" rows={5} value={draft.module_notes || ''}
+              placeholder="Where I lived it... Where I didn't..."
+              onChange={(e) => edit({ module_notes: e.target.value })} />
+          </>
+        )}
+
+        {cur.id === 'forward' && (
+          <>
+            <h2 className="rvf-q">What matters next week?</h2>
+            <p className="rvf-sub">Three things, not ten. They'll be waiting for you at the start of next week's review.</p>
+            {PLAN_PROMPTS.map((p, n) => (
+              <div key={p.key} className="rvf-prio">
+                <span className="rv-carry-n">{n + 1}</span>
+                <input value={draft[p.key] || ''} placeholder={n === 0 ? 'The one that matters most' : n === 1 ? 'Second' : 'Third'}
                   onChange={(e) => edit({ [p.key]: e.target.value })} />
               </div>
             ))}
             <div className="rv-pair">
               <div>
-                <SectionLabel>Protect</SectionLabel>
+                <div className="rvf-label"><Icon name="shield" size={14} /> Protect</div>
                 <input value={draft.protect || ''} placeholder="Time, energy, a boundary"
                   onChange={(e) => edit({ protect: e.target.value })} />
               </div>
               <div>
-                <SectionLabel>Let go</SectionLabel>
-                <input value={draft.let_go || ''} placeholder="What you are dropping on purpose"
+                <div className="rvf-label"><Icon name="do_not_disturb_on" size={14} /> Let go</div>
+                <input value={draft.let_go || ''} placeholder="What you're dropping on purpose"
                   onChange={(e) => edit({ let_go: e.target.value })} />
               </div>
             </div>
-          </Card>
+          </>
+        )}
 
-          <div className="rv-save">
-            <button className="btn btn-primary" onClick={save} disabled={busy || !dirty}>
-              <Icon name="check" size={17} /> {busy ? 'Saving…' : saved ? 'Update review' : 'Save review'}
+        {cur.id === 'finish' && (
+          <>
+            <h2 className="rvf-q">Close out the week.</h2>
+            <p className="rvf-sub">Here's what you're filing. You can reopen it any time.</p>
+            <RecapBody review={draft} />
+          </>
+        )}
+
+        <div className="rvf-nav">
+          <button className="btn btn-ghost" onClick={() => go(i - 1)} disabled={i === 0}>
+            <Icon name="arrow_back" size={17} /> Back
+          </button>
+          <span className="rvf-saved">{dirty ? 'Draft kept on this device' : saved ? 'Saved' : ''}</span>
+          {last ? (
+            <button className="btn btn-primary" onClick={onSave} disabled={busy || (!dirty && saved)}>
+              <Icon name="check" size={17} /> {busy ? 'Saving...' : saved ? 'Update review' : 'Close out the week'}
             </button>
-            {saved && !dirty && (
-              <span className="rv-unsaved">Saved. Reopen any time to add to it.</span>
-            )}
-          </div>
-        </>
+          ) : (
+            <button className="btn btn-primary" onClick={() => go(i + 1)}>
+              Next <Icon name="arrow_forward" size={17} />
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function Prompt({ p, value, onChange }) {
+  return (
+    <div className="rvf-prompt">
+      <div className="rvf-prompt-hd">
+        <span className="rvf-prompt-ic"><Icon name={p.icon} size={16} /></span>
+        <span>{p.label}</span>
+      </div>
+      {p.hint && <p className="rvf-hint">{p.hint}</p>}
+      <textarea className="rvf-text" rows={3} value={value || ''} onChange={(e) => onChange(e.target.value)} />
+    </div>
+  )
+}
+
+/* The shape of a filed review: rating, word, wins, next week. Shared by
+   the Finish step (a preview of what you're about to save) and the recap
+   a saved week opens to. */
+function RecapBody({ review }) {
+  const prios = [review.priority_1, review.priority_2, review.priority_3].filter((p) => String(p || '').trim())
+  const score = review.score != null ? Number(review.score) : null
+  return (
+    <div className="rvr">
+      <div className="rvr-top">
+        <div className="rvr-score" style={score ? { color: statusFor(score * 10)?.color } : undefined}>
+          <span className="tnum">{score ?? '–'}</span><small>/10</small>
+        </div>
+        <div>
+          <div className="rvr-word">{review.theme_word ? `"${review.theme_word}"` : 'No word yet'}</div>
+          <div className="rvr-word-sub">{score ? SCORE_WORD(score) : 'Not rated'}</div>
+        </div>
+      </div>
+      {String(review.wins || '').trim() && (
+        <div className="rvr-sec"><div className="rvf-label">What went well</div><p>{review.wins}</p></div>
       )}
-    </View>
+      {String(review.module_notes || '').trim() && (
+        <div className="rvr-sec"><div className="rvf-label">Identity check</div><p>{review.module_notes}</p></div>
+      )}
+      <div className="rvr-sec">
+        <div className="rvf-label">Next week</div>
+        {prios.length ? prios.map((p, n) => (
+          <div key={n} className="rvf-promise"><span className="rv-carry-n">{n + 1}</span><span>{p}</span></div>
+        )) : <p className="rvf-hint">No priorities set.</p>}
+      </div>
+    </div>
+  )
+}
+
+export function ReviewRecap({ review, summary, loading, onEdit }) {
+  return (
+    <div className="rvf">
+      <div className="rvf-card">
+        <div className="rvr-hd">
+          <div>
+            <div className="rvf-kicker"><Icon name="check_circle" size={14} /> Week closed out</div>
+            <h2 className="rvf-q" style={{ marginBottom: 0 }}>Your review</h2>
+          </div>
+          <button className="btn btn-secondary btn-sm" onClick={onEdit}><Icon name="edit" size={15} /> Edit</button>
+        </div>
+        <RecapBody review={review} />
+      </div>
+      <div className="rvf-card" style={{ marginTop: 14 }}>
+        <div className="rvf-label" style={{ marginBottom: 12 }}>The week in numbers</div>
+        {loading ? <Loading /> : <WeekStats s={summary} />}
+      </div>
+    </div>
   )
 }
 
