@@ -63,9 +63,9 @@ export default function TodayPage() {
   const lastCheckinDate = wellnessIdx.data?.[0]?.date || null
 
   const health = useAsync((f) => fetchHealthLogs(lastHealthDate, lastHealthDate, { force: f }),
-    [lastHealthDate], { enabled: Boolean(lastHealthDate) })
+    [lastHealthDate], { enabled: Boolean(lastHealthDate), keepPrevious: true })
   const wellness = useAsync((f) => fetchWellnessCheckins(lastCheckinDate, lastCheckinDate, { force: f }),
-    [lastCheckinDate], { enabled: Boolean(lastCheckinDate) })
+    [lastCheckinDate], { enabled: Boolean(lastCheckinDate), keepPrevious: true })
 
   const lastHealth = (health.data || [])[0]
   const lastCheckin = (wellness.data || [])[0]
@@ -89,9 +89,9 @@ export default function TodayPage() {
     : lastHealthDate || lastCheckinDate
   const patternFrom = patternAnchor ? shiftDate(patternAnchor, -199) : null
   const patternHealth = useAsync((f) => fetchHealthLogs(patternFrom, patternAnchor, { force: f }),
-    [patternFrom, patternAnchor], { enabled: Boolean(patternFrom) })
+    [patternFrom, patternAnchor], { enabled: Boolean(patternFrom), keepPrevious: true })
   const patternWellness = useAsync((f) => fetchWellnessCheckins(patternFrom, patternAnchor, { force: f }),
-    [patternFrom, patternAnchor], { enabled: Boolean(patternFrom) })
+    [patternFrom, patternAnchor], { enabled: Boolean(patternFrom), keepPrevious: true })
 
   const { patterns, matchedDays } = useMemo(() => {
     if (!patternFrom) return { patterns: [], matchedDays: 0 }

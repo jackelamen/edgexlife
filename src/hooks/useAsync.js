@@ -4,7 +4,12 @@ import { useCallback, useEffect, useRef, useState } from 'react'
  * Minimal async-state hook. `deps` controls refetch; `fn` is expected to be a
  * cachedQuery-backed loader from lib/data.js, so re-running it is usually free.
  */
-export function useAsync(fn, deps = [], { enabled = true } = {}) {
+/* `keepPrevious`: on a deps change, keep showing the old data (no loading
+   state) until the new query answers. Opt-in, not the default: the log
+   editors seed their forms from `data`, and pre-filling one day's editor
+   with another day's values would be worse than a brief loading line. Use
+   it for read-only sections whose deps shift as a side effect of a save. */
+export function useAsync(fn, deps = [], { enabled = true, keepPrevious = false } = {}) {
   const [state, setState] = useState({ data: null, loading: enabled, error: null })
   const alive = useRef(true)
   const fnRef = useRef(fn)
@@ -32,6 +37,8 @@ export function useAsync(fn, deps = [], { enabled = true } = {}) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled])
 
+  const hasData = state.data != null
+
   // `enabled` is appended here regardless of what deps the caller passed —
   // three separate call sites (GoalPhotoPicker, IntentionCard, Review's
   // History tab) shipped with `enabled: someState` but someState missing
@@ -41,7 +48,7 @@ export function useAsync(fn, deps = [], { enabled = true } = {}) {
   // to include it themselves, is what actually closes off the bug class.
   useEffect(() => {
     alive.current = true
-    run()
+    run(false, keepPrevious && hasData)
     return () => { alive.current = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [...deps, enabled])
