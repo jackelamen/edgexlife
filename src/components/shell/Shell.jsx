@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import Icon from '../ui/Icon'
 import BrandMark from './BrandMark'
+import Wordmark from './Wordmark'
 import { useAuth } from '../../store/authStore'
 
 /*
@@ -68,9 +69,7 @@ export default function Shell({ children }) {
       <div style={{ marginBottom: 32 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
           <BrandMark size={30} />
-          <span style={{ color: '#fff', fontWeight: 800, fontSize: 17, letterSpacing: '-.01em' }}>
-            xLife
-          </span>
+          <Wordmark size={19} color="#fff" />
         </div>
         <div style={{ color: 'rgba(255,255,255,.35)', fontSize: 11.5, fontWeight: 600, marginTop: 3, marginLeft: 39 }}>
           Goals · Health · Wellness
@@ -132,7 +131,7 @@ export default function Shell({ children }) {
         </button>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <BrandMark size={22} />
-          <span style={{ color: '#fff', fontWeight: 800, fontSize: 16, letterSpacing: '-.01em' }}>xLife</span>
+          <Wordmark size={17} color="#fff" />
         </div>
       </div>
 

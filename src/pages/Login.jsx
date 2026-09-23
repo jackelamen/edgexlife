@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import toast from 'react-hot-toast'
+import Wordmark from '../components/shell/Wordmark'
 import BrandMark from '../components/shell/BrandMark'
 import { Field } from '../components/ui/Kit'
 import { useAuth } from '../store/authStore'
@@ -31,7 +32,7 @@ export default function Login() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 26 }}>
           <BrandMark size={40} />
           <div>
-            <h1 className="page-title" style={{ fontSize: 20 }}>xLife</h1>
+            <h1 className="page-title" style={{ fontSize: 20 }}><Wordmark size={22} /></h1>
             <p style={{ fontSize: 13, color: 'var(--text-3)', fontWeight: 600 }}>
               Sign in with your Pulse account
             </p>
