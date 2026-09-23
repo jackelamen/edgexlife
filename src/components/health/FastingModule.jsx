@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
 import Icon from '../ui/Icon'
 import { Card, CardHead, Badge, Empty, Loading, Modal, Field, useConfirm } from '../ui/Kit'
@@ -10,6 +10,7 @@ import {
   targetHoursFor,
 } from '../../lib/fasting'
 import { pretty } from '../../lib/dates'
+import { FAST_STAGES, EVIDENCE, stageIndexAt, hoursToNextStage, stageRangeLabel } from '../../lib/fastingStages'
 import { metric } from '../../lib/design'
 
 /*
@@ -114,6 +115,8 @@ export default function FastingModule() {
       {activeSession
         ? <ActiveFastCard session={activeSession} onEnd={endFast} onEditStart={openEditActiveStart} />
         : <StartFastCard onStart={startFast} />}
+
+      <FastingStages session={activeSession} />
 
       <WeeklyStats sessions={list} />
 
@@ -340,6 +343,17 @@ function ActiveFastCard({ session, onEnd, onEditStart }) {
                 ? `Started ${new Date(session.startedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}. Aiming for ${target}h.`
                 : `Started ${new Date(session.startedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}.`}
           </p>
+          {(() => {
+            const h = ms / 3600000
+            const next = hoursToNextStage(h)
+            const cur = FAST_STAGES[stageIndexAt(h)]
+            return (
+              <p className="hero-copy" style={{ marginTop: 6, fontWeight: 700 }}>
+                {cur.name}
+                {next != null && ` · ${FAST_STAGES[stageIndexAt(h) + 1].name.toLowerCase()} in ${formatDuration(next * 3600000)}`}
+              </p>
+            )
+          })()}
         </div>
         <div style={{ position: 'relative', width: 84, height: 84, marginLeft: 'auto' }}>
           <svg width="100%" height="100%" viewBox="0 0 84 84" style={{ transform: 'rotate(-90deg)', display: 'block' }}>
@@ -373,6 +387,92 @@ function ActiveFastCard({ session, onEnd, onEditStart }) {
         </div>
       </div>
     </div>
+  )
+}
+
+/* ── What's happening: stage timeline ─────────────────────
+   A tappable strip of fasting stages plus the detail for whichever one
+   is selected (the current stage by default while a fast is running).
+   Also shown with no fast running, so it can be read ahead of time.
+   Content and the evidence caveats live in lib/fastingStages.js. */
+function FastingStages({ session }) {
+  const [, setTick] = useState(0)
+  useEffect(() => {
+    if (!session) return
+    const id = setInterval(() => setTick((t) => t + 1), 60000)
+    return () => clearInterval(id)
+  }, [session])
+
+  const hours = session ? elapsedMs(session) / 3600000 : null
+  const current = hours == null ? null : stageIndexAt(hours)
+  const [picked, setPicked] = useState(null)
+  const sel = picked ?? current ?? 0
+  // On a phone only the first two or three chips fit, so a fast that's a
+  // day in would open with its current stage scrolled out of sight.
+  // Bring it into view once, on open, without moving the page itself.
+  const stripRef = useRef(null)
+  useEffect(() => {
+    const strip = stripRef.current
+    const chip = strip?.children[current ?? 0]
+    if (strip && chip) strip.scrollLeft = chip.offsetLeft - strip.offsetLeft - 8
+  }, [current])
+  const stage = FAST_STAGES[sel]
+  const ev = EVIDENCE[stage.evidence]
+
+  let status = null
+  if (current != null) {
+    if (sel < current) status = 'You passed this stage'
+    else if (sel === current) status = 'You are here'
+    else status = `Starts in ${formatDuration((stage.from - hours) * 3600000)}`
+  }
+
+  return (
+    <Card style={{ marginBottom: 14 }}>
+      <CardHead title={session ? "What's happening now" : 'Stages of a fast'}
+        sub={session ? 'Tap any stage to read ahead or look back.' : 'What your body does as a fast goes on. Tap a stage to read about it.'} />
+
+      <div className="fs-strip" role="tablist" ref={stripRef}>
+        {FAST_STAGES.map((st, i) => {
+          const state = current == null ? 'idle' : i < current ? 'done' : i === current ? 'now' : 'next'
+          const fill = i === current && st.to != null
+            ? Math.min(100, ((hours - st.from) / (st.to - st.from)) * 100) : null
+          return (
+            <button key={st.id} type="button" role="tab" aria-selected={i === sel}
+              className={`fs-chip is-${state}${i === sel ? ' is-sel' : ''}`}
+              onClick={() => setPicked(i)}>
+              <span className="fs-chip-ic">
+                <Icon name={state === 'done' ? 'check' : st.icon} size={18} />
+              </span>
+              <span className="fs-chip-name">{st.name}</span>
+              <span className="fs-chip-hrs">{stageRangeLabel(st)}</span>
+              {fill != null && <span className="fs-chip-bar"><i style={{ width: `${fill}%` }} /></span>}
+            </button>
+          )
+        })}
+      </div>
+
+      <div className="fs-detail" key={stage.id}>
+        <div className="fs-detail-head">
+          <div>
+            <div className="fs-detail-name">{stage.name}</div>
+            <div className="fs-detail-hrs">
+              {stage.to == null ? `${stage.from} hours and beyond` : `${stage.from} to ${stage.to} hours`}
+              {status && <> · <strong>{status}</strong></>}
+            </div>
+          </div>
+          <Badge tone={ev.tone}>{ev.label}</Badge>
+        </div>
+        <p className="fs-body">{stage.body}</p>
+        <div className="fs-section">You may feel</div>
+        <ul className="fs-list">{stage.feel.map((f) => <li key={f}>{f}</li>)}</ul>
+        <div className="fs-tip"><Icon name="lightbulb" size={16} /><span>{stage.tip}</span></div>
+      </div>
+
+      <p className="fs-note">
+        Timings are rough and vary with your last meal, activity and metabolism. General information, not
+        medical advice. Talk to a doctor before long fasts, especially if you have a health condition or take medication.
+      </p>
+    </Card>
   )
 }
 

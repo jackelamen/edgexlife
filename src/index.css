@@ -2145,3 +2145,37 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
   .rv-score-btn { min-height: 44px; }
   .rv-weeknav .btn { padding: 8px 10px; }
 }
+
+/* ── Fasting stages (FastingModule FastingStages) ─────────── */
+.fs-strip { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 16px; scrollbar-width: none; }
+.fs-strip::-webkit-scrollbar { display: none; }
+.fs-chip {
+  flex: 0 0 auto; width: 118px; display: flex; flex-direction: column; align-items: flex-start; gap: 4px;
+  padding: 10px 11px; border-radius: 14px; border: 1.5px solid var(--border); background: var(--white-soft);
+  font-family: inherit; text-align: left; cursor: pointer; color: var(--text); transition: border-color .15s, background .15s;
+}
+.fs-chip:hover { border-color: var(--border-med); }
+.fs-chip-ic { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; background: var(--white); color: var(--text-2); }
+.fs-chip-name { font-size: 12.5px; font-weight: 800; line-height: 1.25; }
+.fs-chip-hrs { font-size: 12px; font-weight: 600; color: var(--text-3); }
+.fs-chip-bar { display: block; width: 100%; height: 4px; border-radius: 99px; background: var(--border); overflow: hidden; margin-top: 2px; }
+.fs-chip-bar i { display: block; height: 100%; background: var(--accent); border-radius: 99px; }
+.fs-chip.is-done .fs-chip-ic { background: var(--s-good-bg); color: var(--s-good); }
+.fs-chip.is-now .fs-chip-ic { background: var(--accent); color: #fff; }
+.fs-chip.is-next { opacity: .72; }
+.fs-chip.is-sel { border-color: var(--accent); background: var(--white); opacity: 1; box-shadow: 0 0 0 3px var(--accent-dim); }
+.fs-detail { animation: allClearIn .25s ease both; }
+.fs-detail-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.fs-detail-name { font-size: 18px; font-weight: 800; letter-spacing: -.01em; }
+.fs-detail-hrs { font-size: 12.5px; color: var(--text-3); font-weight: 600; margin-top: 2px; }
+.fs-detail-hrs strong { color: var(--accent); font-weight: 800; }
+.fs-body { font-size: 14px; line-height: 1.6; color: var(--text); }
+.fs-section { font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); margin: 14px 0 6px; }
+.fs-list { margin: 0; padding-left: 18px; font-size: 13.5px; line-height: 1.6; color: var(--text-2); }
+.fs-tip {
+  display: flex; gap: 8px; align-items: flex-start; margin-top: 14px; padding: 11px 13px;
+  border-radius: 12px; background: var(--accent-dim); font-size: 13px; line-height: 1.5; color: var(--text);
+}
+.fs-tip .icon { color: var(--accent); flex-shrink: 0; margin-top: 1px; }
+.fs-note { font-size: 12px; color: var(--text-3); line-height: 1.5; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
+@media (prefers-reduced-motion: reduce) { .fs-detail { animation: none; } }
