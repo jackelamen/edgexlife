@@ -542,20 +542,19 @@ export default function TodayPage() {
       {/* ── Three systems, each in its own module hue ── */}
       <div className="system-row">
         <SystemPanel
-          module="health" to="/health" score={healthScore}
+          module="health" to="/health"
           lastLabel={lastHealthDate ? `Logged ${pretty(lastHealthDate)}` : 'Never logged'}
           age={healthAge}
           foot={healthScore != null ? healthLabel(healthScore)[0] : 'Log a day to start'}
         />
         <SystemPanel
-          module="wellness" to="/wellness" score={clarity}
+          module="wellness" to="/wellness"
           lastLabel={lastCheckinDate ? `Checked in ${pretty(lastCheckinDate)}` : 'No check-in'}
           age={checkinAge}
           foot={lastCheckin?.state ? `Felt ${String(lastCheckin.state).toLowerCase()}` : 'Log how you are'}
         />
         <SystemPanel
           module="goals" to="/goals"
-          score={dueActions.length ? Math.round((dueDone / dueActions.length) * 100) : null}
           lastLabel={`${liveCycles.length} live cycle${liveCycles.length === 1 ? '' : 's'}`}
           age={null}
           foot={dueActions.length ? `${dueDone} of ${dueActions.length} done today` : `${activeGoals.length} active goals`}
@@ -698,7 +697,7 @@ export default function TodayPage() {
  * colour as that module's own hero and nav item) and, where the data can go
  * stale, a freshness dot in the reserved status ramp.
  */
-function SystemPanel({ module, to, score, lastLabel, age, foot }) {
+function SystemPanel({ module, to, lastLabel, age, foot }) {
   const m = MODULES[module]
   const fresh = age == null ? null : age <= 1 ? STATUS.good : age <= 4 ? STATUS.short : STATUS.risk
   return (
@@ -707,8 +706,12 @@ function SystemPanel({ module, to, score, lastLabel, age, foot }) {
         <span className="system-name">{m.label}</span>
         {fresh && <span className="system-fresh" style={{ background: fresh.color }} />}
       </div>
-      <div className="system-score tnum">{score == null ? '--' : Math.round(score)}</div>
-      <div className="system-last">{lastLabel}</div>
+      {/* The big score number that used to sit here was the same number
+          the hero rings above already show — and the ring version comes
+          with a trend delta, which this bare figure never had. Dropped
+          rather than duplicated; this panel's job is navigation and
+          freshness, not being a second scoreboard. */}
+      <div className="system-last" style={{ marginTop: 8 }}>{lastLabel}</div>
       <div className="system-foot">
         {foot}
         <Icon name="arrow_forward" size={15} />
