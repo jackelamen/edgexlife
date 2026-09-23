@@ -32,7 +32,7 @@ const LINKS = NAV.filter((n) => n.to)
 const APPS = [
   { label: 'Pulse', desc: 'Tasks & habits', icon: 'task_alt', href: 'https://lightskyblue-wolverine-166414.hostingersite.com/today' },
   { label: 'xFocus', desc: 'Deep work', icon: 'center_focus_strong', href: 'https://xfocus-snowy.vercel.app' },
-  { label: 'xCompass', icon: 'explore', href: 'https://xcompass.vercel.app' },
+  { label: 'xCompass', desc: 'Time across projects', icon: 'explore', href: 'https://xcompass.vercel.app' },
 ]
 
 const openApp = (app) => window.open(app.href, '_blank', 'noopener')
