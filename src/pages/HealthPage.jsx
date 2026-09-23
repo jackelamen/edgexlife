@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
 import Icon from '../components/ui/Icon'
 import { View } from '../components/shell/Shell'
@@ -432,13 +432,29 @@ function SleepHoursField({ value, onChange }) {
 
 function LogEditor({ date, settings, onClose, onSaved, onBodyweightSynced }) {
   const open = Boolean(date)
-  const existing = useAsync((f) => fetchHealthLogs(date, date, { force: f }), [date], { enabled: open })
+  // `d` (not `date`, the prop) is the fetch key and what the "Logging
+  // for" input edits — same pattern WellnessPage's CheckinView already
+  // uses for exactly the same reason. Before this, changing the date
+  // field only wrote `form.date` in memory: the fetch and the seed
+  // effect below both stayed keyed to the ORIGINAL date, so retargeting
+  // to a day that already had a log silently kept showing whatever was
+  // loaded for the day you opened the editor on, one save away from
+  // overwriting that day's real data with it.
+  const [d, setD] = useState(date)
+  useEffect(() => { setD(date) }, [date]) // editor reopened on a different row
+  const existing = useAsync((f) => fetchHealthLogs(d, d, { force: f }), [d], { enabled: open })
   const [form, setForm] = useState(null)
   const [saving, setSaving] = useState(false)
+  // Whether the day the editor was OPENED on already had a log — captured
+  // once, the moment `d` matches the original `date`, so save() still
+  // knows whether to clean up the old row after the user retargets `d`
+  // elsewhere (existing.data itself has since moved on to describing `d`).
+  const openedWithLogRef = useRef(false)
 
   useEffect(() => {
     if (!open) { setForm(null); return }
     const l = (existing.data || [])[0]
+    if (d === date) openedWithLogRef.current = Boolean(l)
     // Stays blank, not pre-filled — an earlier version defaulted this to
     // the bodyweight setting, which meant every saved day (even ones you
     // never touched the field on) got stamped with that same number,
@@ -447,12 +463,12 @@ function LogEditor({ date, settings, onClose, onSaved, onBodyweightSynced }) {
     // real logged value, and only then syncs back to the setting, if you
     // actually type something.
     setForm(l ? { ...l } : {
-      date, sleepHours: null, sleepQuality: null, steps: null, water: null,
+      date: d, sleepHours: null, sleepQuality: null, steps: null, water: null,
       weight: null, energy: null, pain: null, exerciseMins: null,
       exerciseTypes: [], exercisedToday: false, nutritionScore: null,
       nutritionNotes: '', isFastingDay: false, notes: '',
     })
-  }, [open, existing.data, date]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open, existing.data, d]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const f = form
   const set = (k, v) => setForm({ ...f, [k]: v })
@@ -461,7 +477,7 @@ function LogEditor({ date, settings, onClose, onSaved, onBodyweightSynced }) {
   async function save() {
     setSaving(true)
     try {
-      const targetDate = f.date || date
+      const targetDate = d
       await saveHealthLog(targetDate, {
         sleepHours: f.sleepHours, sleepQuality: f.sleepQuality, steps: f.steps,
         water: f.water, weight: f.weight, energy: f.energy, pain: f.pain,
@@ -475,7 +491,7 @@ function LogEditor({ date, settings, onClose, onSaved, onBodyweightSynced }) {
       // real row) moves it rather than duplicating it — the just-saved copy
       // lives under targetDate now, so the old date's row would otherwise
       // stick around as an orphan with the same content.
-      if (targetDate !== date && (existing.data || []).length) {
+      if (targetDate !== date && openedWithLogRef.current) {
         await deleteHealthLog(date)
       }
       // Bodyweight logged here IS the bodyweight setting — keep them as one
@@ -498,14 +514,19 @@ function LogEditor({ date, settings, onClose, onSaved, onBodyweightSynced }) {
   }
 
   return (
-    <Modal open={open} onClose={onClose} title={f?.date ? pretty(f.date) : (date ? pretty(date) : '')} sub="Log your day" maxWidth={620}>
+    <Modal open={open} onClose={onClose} title={d ? pretty(d) : ''} sub="Log your day" maxWidth={620}>
       {!f ? <Loading /> : (
         <>
           <SectionLabel>The basics</SectionLabel>
           <div style={{ marginBottom: 14 }}>
             <Field label="Logging for" hint="Past midnight? Point this at yesterday instead of today.">
-              <input type="date" value={f.date || ''} max={today()}
-                onChange={(e) => e.target.value && set('date', e.target.value)} />
+              {/* Changes `d`, the actual fetch key — not just form.date —
+                  so retargeting this loads whatever's really saved on
+                  that day (or a blank form if nothing is) instead of
+                  silently carrying over the day you opened the editor
+                  on. */}
+              <input type="date" value={d || ''} max={today()}
+                onChange={(e) => e.target.value && setD(e.target.value)} />
             </Field>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14 }}>
