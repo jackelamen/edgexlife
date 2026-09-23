@@ -332,7 +332,7 @@ function ActiveFastCard({ session, onEnd, onEditStart }) {
       <div className="hero-content">
         <div>
           <div className="hero-eyebrow">Fasting now &middot; {methodLabel(session.method)}</div>
-          <div className="hero-h">{formatDuration(ms)}</div>
+          <div className="hero-h fast-live-h">{formatDuration(ms)}</div>
           <p className="hero-copy">
             {overTarget
               ? `Past your ${target}h target. End whenever feels right.`

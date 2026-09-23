@@ -373,11 +373,60 @@ export function CoachCard({ kicker = 'Takeaway', title, children, tone = 'soft',
  * fight the hero. Anywhere else it uses the reserved status ramp — the
  * third and last place status colour is allowed.
  */
+export const prefersReducedMotion = () =>
+  typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+
+/**
+ * Animates a numeric display from its previous value to a new one instead
+ * of popping straight to it — used for the ring's own number and for
+ * HeroStat's streak counts, the two places a value changing is meant to
+ * feel like something just happened, not just be re-rendered. Skips the
+ * animation (jumps straight to `value`) under prefers-reduced-motion, and
+ * on the very first render (nothing to count FROM yet).
+ */
+export function CountUp({ value, duration = 600 }) {
+  const [display, setDisplay] = useState(value)
+  const prevRef = useRef(value)
+  const firstRef = useRef(true)
+
+  useEffect(() => {
+    const from = prevRef.current
+    const to = value
+    if (firstRef.current) { firstRef.current = false; prevRef.current = to; return }
+    if (from === to || prefersReducedMotion()) { setDisplay(to); prevRef.current = to; return }
+    let raf
+    const start = performance.now()
+    const tick = (now) => {
+      const p = Math.min(1, (now - start) / duration)
+      const eased = 1 - (1 - p) ** 3
+      setDisplay(Math.round(from + (to - from) * eased))
+      if (p < 1) raf = requestAnimationFrame(tick)
+      else prevRef.current = to
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [value, duration])
+
+  return display
+}
+
 export function Ring({ score, size = 150, stroke = 13, sub, onAccent = true }) {
   const r = (size - stroke) / 2
   const c = 2 * Math.PI * r
   const val = score == null ? 0 : Math.max(0, Math.min(100, score))
   const color = onAccent ? '#fff' : statusColor(val)
+
+  // Starts empty and fills in on mount/reduced-motion-safe — otherwise a
+  // ring that was always going to land at, say, 65% just appeared already
+  // there, with none of the "your score" feeling the fill sells everywhere
+  // else it's used (the transition below already existed for score
+  // CHANGES post-mount; this is what makes the very first paint animate
+  // too).
+  const [filled, setFilled] = useState(prefersReducedMotion())
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => setFilled(true))
+    return () => cancelAnimationFrame(raf)
+  }, [])
 
   /* viewBox + 100% svg means the whole ring scales to whatever the wrapper
      is, so the narrow-phone CSS can shrink it (see .ring in index.css)
@@ -388,12 +437,12 @@ export function Ring({ score, size = 150, stroke = 13, sub, onAccent = true }) {
         <circle cx={size / 2} cy={size / 2} r={r} fill="none"
           stroke={onAccent ? 'rgba(255,255,255,.24)' : 'var(--white-soft)'} strokeWidth={stroke} />
         <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={stroke}
-          strokeLinecap="round" strokeDasharray={c} strokeDashoffset={c * (1 - val / 100)}
+          strokeLinecap="round" strokeDasharray={c} strokeDashoffset={filled ? c * (1 - val / 100) : c}
           style={{ transition: 'stroke-dashoffset 1s cubic-bezier(.4,0,.2,1), stroke .4s' }} />
       </svg>
       <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column' }}>
         <div className="tnum score-ring-num" style={{ fontSize: size * 0.3, fontWeight: 800, letterSpacing: '-.03em', lineHeight: 1 }}>
-          {score == null ? '--' : Math.round(score)}
+          {score == null ? '--' : <CountUp value={Math.round(score)} />}
         </div>
         {sub && <div className="score-ring-sub" style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.09em', textTransform: 'uppercase', opacity: .72, marginTop: 4 }}>{sub}</div>}
       </div>
@@ -457,26 +506,45 @@ export function DriverRow({ label, detail, score, hitRate }) {
  * this only handles the toast, the timing, and the error toast if the
  * restore itself fails.
  */
+/**
+ * A streak milestone (see milestoneHit in lib/streaks.js) used to fire
+ * the exact same plain toast as any other success message — the one
+ * moment in the app that's purely a small win read identically to
+ * "Log saved". This wraps the text in `.milestone-toast`, which gets its
+ * own short scale-pop (see index.css), independent of react-hot-toast's
+ * own enter animation on the toast shell.
+ */
+export function milestoneToast(text) {
+  toast.success(<span className="milestone-toast">{text}</span>, { duration: 4500 })
+}
+
 export function undoToast(message, onUndo) {
+  const duration = 5000
   toast((t) => (
-    <span style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-      {message}
-      {/* Not .btn-ghost — that class's hover state is tuned for a light
-          card background, not this toast's dark one. Bare + underlined
-          instead, so the affordance reads on either theme. */}
-      <button type="button" style={{
-        background: 'none', border: 'none', padding: 0, cursor: 'pointer',
-        color: 'inherit', font: 'inherit', fontWeight: 800,
-        textDecoration: 'underline', textUnderlineOffset: 2, flexShrink: 0,
-      }}
-        onClick={async () => {
-          toast.dismiss(t.id)
-          try { await onUndo() } catch (e) { toast.error(e.message) }
-        }}>
-        Undo
-      </button>
-    </span>
-  ), { duration: 5000 })
+    <div style={{ position: 'relative' }}>
+      <span style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        {message}
+        {/* Not .btn-ghost — that class's hover state is tuned for a light
+            card background, not this toast's dark one. Bare + underlined
+            instead, so the affordance reads on either theme. */}
+        <button type="button" style={{
+          background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+          color: 'inherit', font: 'inherit', fontWeight: 800,
+          textDecoration: 'underline', textUnderlineOffset: 2, flexShrink: 0,
+        }}
+          onClick={async () => {
+            toast.dismiss(t.id)
+            try { await onUndo() } catch (e) { toast.error(e.message) }
+          }}>
+          Undo
+        </button>
+      </span>
+      {/* Gives "Undo" something to react against instead of just vanishing
+          at an unmarked moment — a plain CSS width animation timed to
+          `duration`, not a JS interval. */}
+      <span className="undo-toast-bar" style={{ animationDuration: `${duration}ms` }} />
+    </div>
+  ), { duration })
 }
 
 export function useConfirm() {

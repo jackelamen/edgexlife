@@ -4,7 +4,7 @@ import toast from 'react-hot-toast'
 import Icon from '../components/ui/Icon'
 import { View } from '../components/shell/Shell'
 import {
-  Card, CardHead, PageHeader, Ring, Empty, Loading, Badge, Field, ScaleField, ErrorNote,
+  Card, CardHead, PageHeader, Ring, Empty, Loading, Badge, Field, ScaleField, ErrorNote, CountUp,
 } from '../components/ui/Kit'
 import { useAsync } from '../hooks/useAsync'
 import {
@@ -878,7 +878,9 @@ function HeroStat({ mod, value, unit, label }) {
   return (
     <div className="hero-stat" data-mod={mod}>
       <div className="hero-stat-v">
-        <span className="tnum">{value}</span> <small>{unit}</small>
+        {/* CountUp ticks toward a streak/open-count when it changes,
+            instead of popping straight to the new number. */}
+        <span className="tnum"><CountUp value={value} /></span> <small>{unit}</small>
       </div>
       <div className="hero-stat-l">{label}</div>
     </div>

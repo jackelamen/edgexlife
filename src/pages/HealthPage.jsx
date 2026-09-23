@@ -5,7 +5,7 @@ import { View } from '../components/shell/Shell'
 import {
   Card, CardHead, PageHeader, StatCard, Badge, Tabs, Modal, Field, SectionLabel,
   Empty, Loading, ErrorNote, CoachCard, Ring, ScoreRow, DriverRow, useConfirm,
-  MetricLegend, StatusDots, DesignLegend, undoToast, ScaleField,
+  MetricLegend, StatusDots, DesignLegend, undoToast, ScaleField, milestoneToast,
 } from '../components/ui/Kit'
 import { useAsync } from '../hooks/useAsync'
 import { useViewParam } from '../hooks/useViewParam'
@@ -491,7 +491,7 @@ function LogEditor({ date, settings, onClose, onSaved, onBodyweightSynced }) {
       // page opens on a streak that happens to equal a milestone.
       const dates = await fetchHealthIndex({ force: true })
       const hit = milestoneHit(currentStreak(dates))
-      if (hit) toast.success(`🔥 ${hit}-day logging streak!`, { duration: 4500 })
+      if (hit) milestoneToast(`🔥 ${hit}-day logging streak!`)
       else toast.success('Log saved')
       onSaved?.(); onClose()
     } catch (e) { toast.error(e.message) } finally { setSaving(false) }

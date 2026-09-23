@@ -4,7 +4,7 @@ import Icon from '../components/ui/Icon'
 import { View } from '../components/shell/Shell'
 import {
   PageHeader, Card, CardHead, StatCard, Badge, Tabs, Field, Empty, Loading,
-  ErrorNote, Modal, CoachCard, Ring, ScoreRow, useConfirm, undoToast, ScaleField,
+  ErrorNote, Modal, CoachCard, Ring, ScoreRow, useConfirm, undoToast, ScaleField, milestoneToast,
 } from '../components/ui/Kit'
 import { useAsync } from '../hooks/useAsync'
 import { useViewParam } from '../hooks/useViewParam'
@@ -418,7 +418,7 @@ function CheckinView({ date, entryId, onSaved, onDeleted, onNav }) {
       if (isNew) {
         const rows = await fetchWellnessIndex({ force: true })
         const hit = milestoneHit(currentStreak(rows.map((r) => r.date)))
-        if (hit) toast.success(`🔥 ${hit}-day check-in streak!`, { duration: 4500 })
+        if (hit) milestoneToast(`🔥 ${hit}-day check-in streak!`)
         else toast.success('Wellness check-in saved')
       } else {
         toast.success('Wellness check-in updated')

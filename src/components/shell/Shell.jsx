@@ -196,11 +196,11 @@ function CommandPalette({ onClose }) {
   }, [items, sel, nav, onClose])
 
   return (
-    <div onClick={onClose} style={{
+    <div onClick={onClose} className="cmdk-backdrop" style={{
       position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
       zIndex: 9999, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: '14vh',
     }}>
-      <div onClick={(e) => e.stopPropagation()} style={{
+      <div onClick={(e) => e.stopPropagation()} className="cmdk-panel" style={{
         width: '100%', maxWidth: 520, background: 'var(--sidebar-bg)',
         border: '1px solid rgba(255,255,255,0.1)', borderRadius: 16, overflow: 'hidden',
         boxShadow: '0 24px 80px rgba(0,0,0,0.6)',
@@ -215,6 +215,7 @@ function CommandPalette({ onClose }) {
           {items.map((it, i) => (
             <button key={it.to} onClick={() => { nav(it.to); onClose() }}
               onMouseEnter={() => setSel(i)}
+              className="cmdk-item"
               style={{
                 display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px',
                 borderRadius: 10, width: '100%', textAlign: 'left', border: 'none', cursor: 'pointer',

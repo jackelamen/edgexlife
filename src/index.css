@@ -607,7 +607,12 @@ h1, h2, h3, h4, .page-title {
 }
 .badge-blue { background: var(--accent-light); color: var(--accent-dark); }
 .badge-purple { background: var(--purple-light); color: var(--purple); }
-.badge-green { background: var(--s-good-bg); color: var(--s-good); }
+/* A small pulse for the one badge tone that means "you just finished" —
+   Due today / Habits flip orange or blue to green on the last tick. Not
+   on the other tones, which don't mark a completed moment. */
+.badge-green { background: var(--s-good-bg); color: var(--s-good); animation: badgePop .35s cubic-bezier(.34,1.56,.64,1) both; }
+@keyframes badgePop { 0% { transform: scale(.7); } 60% { transform: scale(1.12); } 100% { transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .badge-green { animation: none; } }
 .badge-orange { background: var(--s-short-bg); color: var(--s-short); }
 .badge-red { background: var(--s-risk-bg); color: var(--s-risk); }
 .badge-muted { background: var(--white-soft); color: var(--text-3); }
@@ -792,6 +797,18 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
 }
 @keyframes sheet-up { from { transform: translateY(40px); opacity: 0 } to { transform: none; opacity: 1 } }
 .modal-sheet h3 { font-size: 19px; font-weight: 600; margin-bottom: 4px; }
+
+/* ── Command palette (⌘K) ──────────────────────────────────── */
+/* Was a hard cut — backdrop and panel both appeared at full opacity in
+   the same frame. Same idea as the modal sheet above: a fade for the
+   backdrop, a short scale+fade for the panel, so opening it reads as one
+   motion instead of a fade plus a snap. */
+.cmdk-backdrop { animation: cmdkFade .15s ease both; }
+.cmdk-panel { animation: cmdkIn .16s cubic-bezier(.2,.9,.3,1) both; }
+@keyframes cmdkFade { from { opacity: 0 } to { opacity: 1 } }
+@keyframes cmdkIn { from { opacity: 0; transform: scale(.96) translateY(-6px) } to { opacity: 1; transform: none } }
+@media (prefers-reduced-motion: reduce) { .cmdk-backdrop, .cmdk-panel { animation: none; } }
+.cmdk-item { transition: background .12s ease; }
 .modal-sheet .sub { font-size: 13px; color: var(--text-2); margin-bottom: 18px; }
 
 /* ── Workout planner ───────────────────────────────────────── */
@@ -1012,6 +1029,12 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
    fourth visual language for "here's a status", just recolors it into
    the reserved status ramp's good end. */
 .all-clear-row .alert-text { color: var(--text-2); }
+/* Settles in rather than just appearing when the alert list empties out —
+   the one moment on Today that's purely good news deserves a beat more
+   than a section silently swapping. */
+.all-clear-row { animation: allClearIn .4s cubic-bezier(.16,1,.3,1) both; }
+@keyframes allClearIn { from { opacity: 0; transform: translateY(-4px) scale(.98); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .all-clear-row { animation: none; } }
 
 .mob-fab {
   display: none; position: fixed; bottom: 24px; right: 20px;
@@ -1095,6 +1118,7 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
        above the label (icon is 21px), and even the longest label here
        ("Wellness") fits its ~90px column comfortably at this size. */
     font-size: 11px; font-weight: 700; height: 60px; justify-content: center;
+    transition: color .18s;
   }
   .botnav-item .icon { font-size: 21px; color: inherit; }
   /* Active tab wears the module's own hue, same answer to "where am I"
@@ -1103,7 +1127,14 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
   .botnav-ind {
     position: absolute; top: 0; width: 26px; height: 3px;
     border-radius: 0 0 3px 3px; background: var(--accent);
+    /* The indicator mounts/unmounts with each tab switch (see Shell.jsx),
+       so a scale-in on mount is free — no cross-fade needed, just enough
+       motion that switching modules reads as one deliberate move instead
+       of a hard cut. */
+    animation: botnavIndIn .22s cubic-bezier(.34,1.56,.64,1) both;
   }
+  @keyframes botnavIndIn { from { transform: scaleX(.3); opacity: 0; } to { transform: none; opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { .botnav-ind { animation: none; } }
   /* Clear the bar (and keep the FAB above it). */
   .view { padding-bottom: 96px; }
   .mob-fab { bottom: 78px; }
@@ -1364,6 +1395,13 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
 .breath-visual { width: 190px; height: 190px; position: relative; display: flex; align-items: center; justify-content: center; margin-bottom: 2px; }
 .breath-visual svg { position: absolute; inset: 0; transform: rotate(-90deg); }
 .breath-ring { opacity: .42; transition: stroke .6s ease, opacity .6s ease; }
+/* A slow breathing pulse on the live fast duration — the same unhurried
+   rhythm the breath timer's own aura uses, borrowed for the one other
+   screen in the app with a number that's quietly counting up in real
+   time while you're not looking at it. */
+.fast-live-h { animation: fastBreathe 3.6s ease-in-out infinite; }
+@keyframes fastBreathe { 0%, 100% { opacity: 1; } 50% { opacity: .82; } }
+@media (prefers-reduced-motion: reduce) { .fast-live-h { animation: none; } }
 .breath-orb { width: 146px; height: 146px; border-radius: 50%; background: rgba(123,92,214,.24); box-shadow: 0 0 30px rgba(123,92,214,.18), inset 0 0 28px rgba(255,255,255,.10); will-change: transform; }
 /* Halo rings trail the orb outward; sized to the orb so scale() matches it. */
 .breath-halo { position: absolute; inset: 12%; border-radius: 50%; border: 1.5px solid rgba(123,92,214,.28); pointer-events: none; will-change: transform; }
@@ -1545,9 +1583,34 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
   display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-radius: var(--radius-lg);
   background: rgba(249,115,22,.1); border: 1px solid rgba(249,115,22,.28); color: #ea580c;
   margin-bottom: 16px;
+  /* Fires once, the exact day it appears (see GoalsPage.jsx) — the same
+     beat as .milestone-toast below, so a streak milestone reads as one
+     kind of moment everywhere it's marked, not a plain panel here and a
+     small flourish there. */
+  animation: milestonePop .4s cubic-bezier(.34,1.56,.64,1) both;
 }
 .streak-milestone-title { font-size: 14px; font-weight: 800; color: #c2410c; }
 .streak-milestone-sub { font-size: 12.5px; font-weight: 600; color: #ea580c; opacity: .85; margin-top: 1px; }
+@keyframes milestonePop { 0% { opacity: 0; transform: scale(.92) translateY(-4px); } 100% { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .streak-milestone { animation: none; } }
+
+/* Toast milestone flourish — see milestoneToast in Kit.jsx. The toast
+   shell itself already has react-hot-toast's own enter transition; this
+   is an extra small pop on the text so a milestone still stands out from
+   an ordinary "Saved" toast riding the same shell. */
+.milestone-toast { display: inline-block; animation: milestonePop .4s cubic-bezier(.34,1.56,.64,1) .05s both; }
+@media (prefers-reduced-motion: reduce) { .milestone-toast { animation: none; } }
+
+/* Undo-toast countdown — see undoToast in Kit.jsx. `animation-duration`
+   is set inline to match the toast's own `duration`, so the two can't
+   drift out of sync. */
+.undo-toast-bar {
+  display: block; height: 2px; margin-top: 9px; border-radius: 99px;
+  background: rgba(255,255,255,.35); transform-origin: left;
+  animation-name: undoShrink; animation-timing-function: linear; animation-fill-mode: forwards;
+}
+@keyframes undoShrink { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+@media (prefers-reduced-motion: reduce) { .undo-toast-bar { animation: none; opacity: .5; } }
 
 /* ── Daily Intention card (Today, above the hero) ────────────────
    Deliberately its own accent (--id-accent/--id-tint, MODULES.identity's
@@ -1698,6 +1761,18 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
   display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all .18s;
 }
 .check-row.done .check-box { background: var(--accent); border-color: var(--accent); }
+/* The checkmark itself gets a small spring-pop rather than just appearing
+   — the one animation most people on this app will trigger the most
+   (ticking a habit or cycle action). Material Symbols are a font glyph,
+   not a path, so a stroke draw-in isn't available; scale+fade reads as
+   the same "just landed" feeling. Plays whenever `.done` is newly present
+   on the box, which covers both an actual tap and the row mounting
+   already-done (a small synchronized flourish across the list on load,
+   not wrong, just also nice). */
+.check-row.done .check-box .icon { animation: checkPop .32s cubic-bezier(.34,1.56,.64,1) both; }
+@keyframes checkPop { from { transform: scale(.3); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .check-row.done .check-box .icon { animation: none; } }
+.check-row:active .check-box { transform: scale(.88); }
 .check-text { font-size: 14px; font-weight: 600; color: var(--text); flex: 1; line-height: 1.4; }
 .check-row.done .check-text { text-decoration: line-through; color: var(--text-3); }
 
@@ -1859,6 +1934,11 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
 .vphoto-item { break-inside: avoid; margin-bottom: 12px; position: relative; border-radius: 14px; overflow: hidden; cursor: pointer; background: var(--bg); display: block; }
 .vphoto-item img { width: 100%; height: auto; display: block; transition: transform .5s ease; border-radius: 14px; }
 .vphoto-item:hover img { transform: scale(1.04); }
+/* :hover never fires on a tap, so touch devices got none of the zoom —
+   this is the one part of the app that's meant to be looked at, not just
+   acted on quickly, so it's worth the same small life on a phone. */
+.vphoto-item:active img { transform: scale(1.04); }
+.vphoto-item:active .vphoto-item-overlay, .vphoto-item:active .vphoto-caption { opacity: 1; }
 .vphoto-item-overlay { position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,.5) 0%, transparent 50%); pointer-events: none; opacity: 0; transition: opacity .25s; border-radius: 14px; }
 .vphoto-item:hover .vphoto-item-overlay { opacity: 1; }
 .vphoto-caption { position: absolute; bottom: 0; left: 0; right: 0; padding: 14px 12px 10px; color: #fff; font-size: 11px; font-weight: 600; line-height: 1.3; opacity: 0; transition: opacity .25s; }
