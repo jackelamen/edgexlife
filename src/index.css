@@ -16,6 +16,15 @@
   v1 was a faithful port of the old HTML modules; v2 muted everything and
   said nothing. Both were rejected, correctly — colour has to carry
   information or it's decoration.
+
+  Type floor: about 40 labels across the app sat at 10-11.5px, several
+  uppercase with letter-spacing on top of that. Anything that states a
+  fact — a stat label, a field label, a timestamp, a count — is now 12px
+  minimum. Left below 12px on purpose: SVG chart tick labels (fitted to
+  fixed pixel geometry, not reflowable), the already-cramped sub-1024px
+  workout-planner and phone breakpoints, and single-glyph counters inside
+  fixed-diameter circles — bumping those risks clipping/overlap that
+  can't be checked without a live layout pass.
 */
 
 :root {
@@ -224,7 +233,7 @@ h1, h2, h3, h4, .page-title {
 .view { padding: 30px 34px 80px; max-width: 1180px; }
 .page-header { margin-bottom: 22px; }
 .page-date {
-  font-size: 11.5px; font-weight: 700; color: var(--text-3); margin-bottom: 3px;
+  font-size: 12px; font-weight: 700; color: var(--text-3); margin-bottom: 3px;
   text-transform: uppercase; letter-spacing: .07em;
 }
 .page-title { font-size: 34px; font-weight: 800; }
@@ -280,19 +289,19 @@ h1, h2, h3, h4, .page-title {
 .thread-gap-row .icon { flex-shrink: 0; }
 .thread-gap-row .btn { margin-left: auto; }
 .tile-bot { position: relative; z-index: 1; }
-.stat-label { font-size: 11px; font-weight: 700; color: var(--text-2); text-transform: uppercase; letter-spacing: .06em; }
+.stat-label { font-size: 12px; font-weight: 700; color: var(--text-2); text-transform: uppercase; letter-spacing: .06em; }
 .stat-value { font-size: 26px; font-weight: 800; letter-spacing: -.02em; margin-top: 1px; }
-.stat-sub { font-size: 11px; color: var(--text-3); font-weight: 600; }
+.stat-sub { font-size: 12px; color: var(--text-3); font-weight: 600; }
 
 /* Status pill — one of only three places green/amber/red are allowed. */
-.status-pill { font-size: 11px; font-weight: 800; padding: 3px 9px; border-radius: 99px; color: #fff; }
+.status-pill { font-size: 12px; font-weight: 800; padding: 3px 9px; border-radius: 99px; color: #fff; }
 
 /* Legend strip: makes the colour system legible instead of decorative. */
 .legend {
   display: flex; gap: 15px; flex-wrap: wrap; align-items: center; margin-bottom: 14px;
   padding: 11px 17px; background: var(--white); border-radius: 99px; box-shadow: var(--shadow);
 }
-.legend-lbl { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--text-3); }
+.legend-lbl { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--text-3); }
 .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: var(--text-2); }
 .legend-swatch { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
 
@@ -310,7 +319,7 @@ h1, h2, h3, h4, .page-title {
   position: relative; z-index: 1; padding: 28px 30px;
   display: grid; grid-template-columns: 1.35fr .65fr; gap: 20px; align-items: center;
 }
-.hero-eyebrow { font-size: 11.5px; font-weight: 700; letter-spacing: .09em; opacity: .78; text-transform: uppercase; margin-bottom: 9px; }
+.hero-eyebrow { font-size: 12px; font-weight: 700; letter-spacing: .09em; opacity: .78; text-transform: uppercase; margin-bottom: 9px; }
 .hero-h { font-size: 38px; font-weight: 800; letter-spacing: -.025em; line-height: 1.06; margin-bottom: 12px; }
 .hero-h em { font-style: normal; opacity: .62; }
 .hero-copy { font-size: 13.5px; opacity: .9; max-width: 42ch; line-height: 1.55; }
@@ -414,7 +423,7 @@ h1, h2, h3, h4, .page-title {
 .hero-delta.is-down { background: rgba(0,0,0,.22); }
 /* Padded to the delta pill's own height so a captioned ring (Goals) and a
    pilled ring (Health, Clarity) sit on the same baseline. */
-.hero-ring-caption { font-size: 10.5px; font-weight: 700; letter-spacing: .04em; opacity: .55; white-space: nowrap; padding: 3px 0; }
+.hero-ring-caption { font-size: 12px; font-weight: 700; letter-spacing: .04em; opacity: .55; white-space: nowrap; padding: 3px 0; }
 
 /* Streak strip. Spans both columns so it reads as a footer to the whole
    banner rather than a fourth thing competing with the rings. */
@@ -430,7 +439,7 @@ h1, h2, h3, h4, .page-title {
 .hero-stat[data-mod="goals"] { border-left-color: #d76d24; }
 .hero-stat-v { font-size: 24px; font-weight: 800; letter-spacing: -.02em; line-height: 1.05; }
 .hero-stat-v small { font-size: 12px; font-weight: 700; opacity: .68; letter-spacing: 0; }
-.hero-stat-l { font-size: 10.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; opacity: .62; margin-top: 4px; }
+.hero-stat-l { font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; opacity: .62; margin-top: 4px; }
 
 /* Practice row — deliberately not a metric tile. Meditation minutes are an
    activity with no target, so there's nothing honest to fill; giving it a
@@ -446,8 +455,8 @@ h1, h2, h3, h4, .page-title {
   display: grid; place-items: center;
   background: var(--accent-light); color: var(--accent);
 }
-.practice-lbl { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--text-2); }
-.practice-sub { font-size: 11.5px; color: var(--text-3); font-weight: 600; }
+.practice-lbl { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--text-2); }
+.practice-sub { font-size: 12px; color: var(--text-3); font-weight: 600; }
 .practice-val { font-size: 22px; font-weight: 800; letter-spacing: -.02em; }
 
 /* ── Buttons ───────────────────────────────────────────────── */
@@ -466,8 +475,12 @@ h1, h2, h3, h4, .page-title {
 .btn-ghost { background: transparent; color: var(--text-2); }
 .btn-ghost:hover:not(:disabled) { background: var(--white-soft); color: var(--text); }
 .btn-danger { background: var(--s-risk-bg); color: var(--s-risk); }
-.btn-sm { padding: 9px 15px; font-size: 12.5px; }
-.btn-xs { padding: 6px 12px; font-size: 11.5px; }
+/* min-height, not just padding, so the hit area hits 36px (WCAG's
+   comfortable touch-target floor) even where a short-baseline font makes
+   the padding alone come up short — the "Log"/"Open" buttons on Today's
+   alert rows, tapped constantly, were previously landing around 26px. */
+.btn-sm { padding: 9px 15px; font-size: 12.5px; min-height: 36px; }
+.btn-xs { padding: 7px 13px; font-size: 12px; min-height: 36px; }
 .btn-icon {
   width: 36px; height: 36px; padding: 0; border-radius: 50%;
   background: var(--white); color: var(--text-2); box-shadow: var(--shadow-sm);
@@ -477,7 +490,7 @@ h1, h2, h3, h4, .page-title {
 /* ── Badges, tabs, forms ───────────────────────────────────── */
 .badge {
   display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px;
-  border-radius: 99px; font-size: 11px; font-weight: 800;
+  border-radius: 99px; font-size: 12px; font-weight: 800;
 }
 .badge-blue { background: var(--accent-light); color: var(--accent-dark); }
 .badge-purple { background: var(--purple-light); color: var(--purple); }
@@ -487,10 +500,26 @@ h1, h2, h3, h4, .page-title {
 .badge-muted { background: var(--white-soft); color: var(--text-3); }
 
 .tabs {
-  display: inline-flex; gap: 3px; flex-wrap: nowrap; background: var(--white);
+  display: inline-flex; gap: 3px; flex-wrap: nowrap;
   border-radius: 99px; padding: 4px;
   width: max-content; max-width: 100%; box-shadow: var(--shadow); margin-bottom: 20px;
   overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch;
+  /* Scroll-shadow trick (no JS): a soft edge shadow that only shows when
+     there's actually more to scroll to. The two "local" white layers
+     travel with the scrolled content and cover the "scroll" shadow layers
+     except at the true start/end of the range — so a tab strip that
+     already fits shows no shadow at all, and one that overflows gets a
+     visible hint that Trends/Settings etc. sit past the edge. */
+  background-image:
+    linear-gradient(to right, var(--white) 50%, transparent),
+    linear-gradient(to left, var(--white) 50%, transparent),
+    linear-gradient(to right, rgba(20,20,15,.16), transparent),
+    linear-gradient(to left, rgba(20,20,15,.16), transparent);
+  background-position: left, right, left, right;
+  background-size: 22px 100%, 22px 100%, 10px 100%, 10px 100%;
+  background-repeat: no-repeat;
+  background-color: var(--white);
+  background-attachment: local, local, scroll, scroll;
 }
 .tabs::-webkit-scrollbar { display: none; }
 .tab {
@@ -501,14 +530,14 @@ h1, h2, h3, h4, .page-title {
 .tab.active { background: var(--text); color: #fff; }
 
 .form-section-label {
-  font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
   color: var(--text-3); margin-bottom: 10px; display: flex; align-items: center; gap: 8px;
 }
 .form-section-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
 
 .field { display: flex; flex-direction: column; gap: 6px; }
 .field > label {
-  font-size: 11px; font-weight: 700; letter-spacing: .06em;
+  font-size: 12px; font-weight: 700; letter-spacing: .06em;
   text-transform: uppercase; color: var(--text-2);
 }
 input, select, textarea {
@@ -572,7 +601,7 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
 }
 .coach-card.soft, .coach-card.green, .coach-card.blue { background: var(--text); }
 .coach-kicker {
-  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em;
+  font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em;
   opacity: .5; margin-bottom: 7px; position: relative; z-index: 1;
 }
 .coach-title { font-size: 20px; font-weight: 800; margin-bottom: 9px; position: relative; z-index: 1; }
@@ -593,7 +622,7 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
 .log-chip {
   display: inline-flex; align-items: center; gap: 5px; padding: 5px 8px;
   border-radius: var(--radius-sm); background: var(--white-soft); border: 1px solid var(--border);
-  font-size: 11px; font-weight: 700; color: var(--text-2);
+  font-size: 12px; font-weight: 700; color: var(--text-2);
 }
 
 .empty {
@@ -828,7 +857,7 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
 
 .insight-card { padding: 14px; border: 1px solid var(--border); border-radius: 14px; background: var(--white); }
 .insight-card strong { display: block; font-size: 20px; font-weight: 800; letter-spacing: -.03em; }
-.insight-card > span { display: block; font-size: 11px; font-weight: 800; color: var(--text-3); letter-spacing: .06em; text-transform: uppercase; margin-bottom: 2px; }
+.insight-card > span { display: block; font-size: 12px; font-weight: 800; color: var(--text-3); letter-spacing: .06em; text-transform: uppercase; margin-bottom: 2px; }
 .insight-card small { display: block; font-size: 12px; color: var(--text-2); margin-top: 2px; }
 
 .mob-fab {
@@ -1086,10 +1115,10 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
 }
 .system-panel:hover { transform: translateY(-2px); box-shadow: 0 12px 28px rgba(20,20,15,.16); }
 .system-top { display: flex; align-items: center; justify-content: space-between; position: relative; z-index: 1; }
-.system-name { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .09em; opacity: .8; }
+.system-name { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .09em; opacity: .8; }
 .system-fresh { width: 9px; height: 9px; border-radius: 50%; box-shadow: 0 0 0 3px rgba(255,255,255,.18); }
 .system-score { font-size: 40px; font-weight: 800; letter-spacing: -.03em; line-height: 1.05; margin-top: 8px; position: relative; z-index: 1; }
-.system-last { font-size: 11.5px; font-weight: 600; opacity: .72; position: relative; z-index: 1; }
+.system-last { font-size: 12px; font-weight: 600; opacity: .72; position: relative; z-index: 1; }
 .system-foot {
   display: flex; align-items: center; justify-content: space-between; gap: 8;
   margin-top: 14px; padding-top: 11px; border-top: 1px solid rgba(255,255,255,.18);
@@ -1129,10 +1158,10 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
 .entry-card { border: 1px solid var(--border); border-radius: 14px; background: var(--white); padding: 15px; box-shadow: var(--shadow-sm); }
 .entry-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
 .entry-title { font-size: 14px; font-weight: 800; color: var(--text); }
-.entry-meta { font-size: 11px; font-weight: 800; color: var(--text-3); text-transform: uppercase; letter-spacing: .06em; margin-top: 2px; }
+.entry-meta { font-size: 12px; font-weight: 800; color: var(--text-3); text-transform: uppercase; letter-spacing: .06em; margin-top: 2px; }
 .entry-body { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .entry-field { border-radius: 12px; background: var(--white-soft); border: 1px solid var(--border); padding: 10px; }
-.entry-field strong { display: block; font-size: 11px; font-weight: 800; color: var(--text-3); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 5px; }
+.entry-field strong { display: block; font-size: 12px; font-weight: 800; color: var(--text-3); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 5px; }
 .entry-field p { font-size: 13px; color: var(--text-2); white-space: pre-wrap; }
 .entry-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
 
@@ -1167,7 +1196,7 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
 .breath-preset:hover { border-color: rgba(var(--accent-rgb), .35); box-shadow: 0 8px 20px rgba(17,24,39,.08); transform: translateY(-1px); }
 .breath-preset.active { border-color: rgba(var(--accent-rgb), .55); background: var(--accent-light); box-shadow: 0 0 0 3px var(--accent-dim); }
 .breath-preset strong { display: block; font-size: 13px; font-weight: 800; color: var(--text); }
-.breath-preset span { display: block; font-size: 11px; font-weight: 800; color: var(--text-3); margin-top: 3px; }
+.breath-preset span { display: block; font-size: 12px; font-weight: 800; color: var(--text-3); margin-top: 3px; }
 .breath-preset-tag { display: inline-block; margin-top: 6px; font-size: 9px; font-style: normal; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; color: var(--purple); background: var(--purple-light); border-radius: 999px; padding: 2px 7px; }
 
 /* State-routed suggestion. Wellness purple, matching the module hue this
@@ -1183,9 +1212,9 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
 .breath-info { margin-top: 12px; border: 1px solid var(--border); border-radius: 14px; padding: 13px 15px; background: var(--white); }
 .breath-info-hd { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 .breath-info-hd strong { font-size: 14px; font-weight: 800; color: var(--text); }
-.breath-info-hd span { font-size: 11px; font-weight: 800; letter-spacing: .04em; color: var(--text-3); }
+.breath-info-hd span { font-size: 12px; font-weight: 800; letter-spacing: .04em; color: var(--text-3); }
 .breath-use { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 0; padding: 0; list-style: none; }
-.breath-use li { font-size: 11px; font-weight: 800; color: var(--text-2); background: var(--white-soft); border: 1px solid var(--border); border-radius: 999px; padding: 3px 9px; }
+.breath-use li { font-size: 12px; font-weight: 800; color: var(--text-2); background: var(--white-soft); border: 1px solid var(--border); border-radius: 999px; padding: 3px 9px; }
 .breath-how { margin-top: 10px; font-size: 12.5px; line-height: 1.55; color: var(--text-2); }
 .breath-evidence, .breath-caution { display: flex; gap: 8px; margin-top: 10px; font-size: 12px; line-height: 1.5; }
 .breath-evidence { color: var(--text-3); }
@@ -1197,7 +1226,7 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
    from the icon, the left rule and the darker ink instead of from hue. */
 .breath-caution { color: var(--text); font-weight: 600; background: var(--white-soft); border-left: 3px solid var(--text); border-radius: 0 10px 10px 0; padding: 10px 12px; }
 .breath-caution .icon { flex: none; margin-top: 1px; }
-.breath-disclaimer { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); font-size: 11px; line-height: 1.5; color: var(--text-3); }
+.breath-disclaimer { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); font-size: 12px; line-height: 1.5; color: var(--text-3); }
 /* Full-screen meditation view.
    The inner timer keeps its .timer-face class for layout, but every trace of
    the CARD it is on the dashboard (gradient fill, rounded corners, fixed
@@ -1361,7 +1390,7 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
 .intention-card--prompt .thread-row { margin-top: 6px; }
 .intention-eyebrow { display: flex; align-items: center; gap: 8px; }
 .intention-eyebrow .icon { color: var(--id-accent); font-size: 15px; }
-.intention-eyebrow span { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); }
+.intention-eyebrow span { font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); }
 
 .thread-row { display: flex; flex-wrap: wrap; gap: 6px; }
 .thread-chip {
@@ -1388,9 +1417,9 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
   border: 1px solid var(--border); background: var(--white-soft); font-size: 12.5px; font-weight: 600; cursor: pointer;
 }
 .task-pick-row input { accent-color: var(--id-accent); width: 15px; height: 15px; }
-.task-pick-due { margin-left: auto; font-size: 10.5px; font-weight: 700; color: var(--text-3); }
+.task-pick-due { margin-left: auto; font-size: 12px; font-weight: 700; color: var(--text-3); }
 .picker-section-label {
-  font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text-3);
+  font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text-3);
   margin-bottom: 6px;
 }
 
@@ -1407,7 +1436,7 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
   background: var(--id-tint); color: var(--id-accent); font-size: 11px; font-weight: 700;
 }
 .set-quote { font-size: 15px; font-style: italic; font-weight: 700; line-height: 1.42; margin: 10px 20px 4px; color: var(--text); }
-.set-sub { font-size: 11.5px; font-weight: 700; color: var(--text-3); text-transform: uppercase; letter-spacing: .04em; margin: 0 20px 14px; }
+.set-sub { font-size: 12px; font-weight: 700; color: var(--text-3); text-transform: uppercase; letter-spacing: .04em; margin: 0 20px 14px; }
 
 .task-list { display: flex; flex-direction: column; gap: 6px; padding: 0 20px 16px; }
 .task-row { display: flex; align-items: center; gap: 10px; padding: 9px 11px; border-radius: 10px; background: var(--white-soft); }
@@ -1440,7 +1469,7 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
 .closed-text .quote { font-size: 14px; font-style: italic; font-weight: 700; color: var(--text); margin: 0 0 4px; }
 .closed-text .note { font-size: 12.5px; color: var(--text-2); margin: 0 0 6px; line-height: 1.5; }
 .closed-text .meta {
-  display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; color: var(--text-3);
+  display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: var(--text-3);
   text-transform: uppercase; letter-spacing: .03em;
 }
 /* Outcome tone, as a plain dot rather than a per-thread icon badge —
@@ -1466,9 +1495,14 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
 /* Fasting history row. Tightens .check-row's 13px gap on phones, where
    four gaps plus the icon and two buttons were most of the width. */
 .fast-row-ic { width: 34px; height: 34px; border-radius: 10px; flex-shrink: 0; display: grid; place-items: center; }
-.fast-row-meta { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; font-size: 11.5px; color: var(--text-3); font-weight: 600; margin-top: 1px; }
+.fast-row-meta { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; font-size: 12px; color: var(--text-3); font-weight: 600; margin-top: 1px; }
 @media (max-width: 480px) { .fast-row { gap: 9px; padding: 10px 11px; } }
-.check-row.done { opacity: .45; }
+/* Done state used to also drop the whole row to opacity .45, stacked on
+   top of the strikethrough and the --text-3 recolor below — three signals
+   at once, and the opacity made the text you just finished the hardest
+   thing on the row to read. Strikethrough + recolor already says "done"
+   on their own (same pair .task-row.done uses); the row now stays at full
+   opacity so you can still read what you ticked. */
 .check-box {
   width: 22px; height: 22px; border-radius: 7px; border: 1.5px solid var(--border-med); background: var(--white);
   display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all .18s;
@@ -1584,7 +1618,7 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
 
 .goal-cycle-strip-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 .goal-cycle-strip-text strong { font-size: 12.5px; font-weight: 800; color: var(--text); }
-.goal-cycle-strip-text small { font-size: 11px; font-weight: 600; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.goal-cycle-strip-text small { font-size: 12px; font-weight: 600; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .goal-cycle-strip > .icon:last-child { color: var(--text-3); flex-shrink: 0; }
 
 /* GoalDetail (metrics/tasks/habits), expanded under a Goal card. Used to
@@ -1608,7 +1642,7 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
 
 .roadmap-label { width: 160px; flex-shrink: 0; padding-top: 10px; }
 .roadmap-label-title { font-size: 13px; font-weight: 800; color: var(--text); line-height: 1.3; margin-bottom: 4px; }
-.roadmap-label-sub { font-size: 11px; color: var(--text-3); font-weight: 500; }
+.roadmap-label-sub { font-size: 12px; color: var(--text-3); font-weight: 500; }
 .roadmap-bar {
   height: 34px; border-radius: 10px; display: flex; align-items: center; padding: 0 12px; position: absolute;
   font-size: 12px; font-weight: 700; color: var(--white); white-space: nowrap; overflow: hidden;
@@ -1712,8 +1746,8 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
 
 .rv-weeknav { display: flex; gap: 6px; align-items: center; }
 .rv-status { display: flex; align-items: center; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
-.rv-unsaved { font-size: 11.5px; font-weight: 700; color: var(--text-3); }
-.rv-hint { font-size: 11.5px; color: var(--text-3); margin: 2px 0 6px; line-height: 1.45; }
+.rv-unsaved { font-size: 12px; font-weight: 700; color: var(--text-3); }
+.rv-hint { font-size: 12px; color: var(--text-3); margin: 2px 0 6px; line-height: 1.45; }
 
 /* The auto-gathered strip. Every tile carries its own coverage line,
    because an average over two logged days is a different claim from an
@@ -1722,8 +1756,8 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
 .rv-stat { padding: 11px 12px; border-radius: var(--radius-sm); background: var(--white-soft); border: 1px solid var(--border); }
 .rv-stat-v { font-size: 24px; font-weight: 800; letter-spacing: -.02em; line-height: 1.05; }
 .rv-stat-v small { font-size: 13px; font-weight: 700; opacity: .6; }
-.rv-stat-k { font-size: 11.5px; font-weight: 800; margin-top: 3px; }
-.rv-stat-s { font-size: 10.5px; font-weight: 600; color: var(--text-3); margin-top: 2px; line-height: 1.3; }
+.rv-stat-k { font-size: 12px; font-weight: 800; margin-top: 3px; }
+.rv-stat-s { font-size: 12px; font-weight: 600; color: var(--text-3); margin-top: 2px; line-height: 1.3; }
 
 /* Last week's commitments, read back. */
 .rv-carry { display: flex; flex-direction: column; gap: 8px; }
@@ -1742,7 +1776,7 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
 }
 .rv-tactic-bar { flex: none; width: 3px; align-self: stretch; border-radius: 99px; }
 .rv-tactic-txt { flex: 1; min-width: 0; font-size: 13px; font-weight: 700; }
-.rv-tactic-txt small { display: block; font-size: 11px; font-weight: 600; color: var(--text-3); margin-top: 1px; }
+.rv-tactic-txt small { display: block; font-size: 12px; font-weight: 600; color: var(--text-3); margin-top: 1px; }
 .rv-tactic-n { font-size: 12.5px; font-weight: 800; color: var(--text-2); white-space: nowrap; }
 
 /* 1-10, as buttons rather than a range input: a slider gives you a
@@ -1771,7 +1805,7 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
 .rv-hist-score { flex: none; width: 34px; font-size: 20px; font-weight: 800; text-align: center; }
 .rv-hist-txt { flex: 1; min-width: 0; }
 .rv-hist-txt strong { display: block; font-size: 13.5px; font-weight: 800; }
-.rv-hist-txt small { display: block; font-size: 11.5px; color: var(--text-3); font-weight: 600; margin-top: 2px;
+.rv-hist-txt small { display: block; font-size: 12px; color: var(--text-3); font-weight: 600; margin-top: 2px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Today's due prompt. Uses Review's own navy so it reads as a pointer to
