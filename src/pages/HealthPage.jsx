@@ -76,7 +76,22 @@ export default function HealthPage() {
       {view === 'routines' && <RoutinesView />}
       {view === 'trends' && <TrendsView settings={settings.data} index={index} />}
 
+      {/* key={editDate} forces a full remount every time this opens on a
+          new date, instead of the previous persistent instance syncing
+          its local `d` to the new `date` prop via an effect. That sync
+          effect ran one render AFTER `d` (and the fetch keyed on it) was
+          already used this render — so the very first fetch after
+          opening always queried the STALE previous `d` (often `null`,
+          since closing reset it), and only the fetch after THAT one
+          used the right date. Usually that second fetch still won the
+          race and the form quietly corrected itself a moment later, but
+          not reliably — this is what made "Edit log" on an already-
+          logged today sometimes open to a blank form. A fresh mount
+          means the first render's `useState(date)` already has the
+          right date, so there's no stale fetch to race in the first
+          place. */}
       <LogEditor
+        key={editDate}
         date={editDate}
         settings={settings.data}
         onClose={() => setEditDate(null)}
@@ -436,9 +451,13 @@ function LogEditor({ date, settings, onClose, onSaved, onBodyweightSynced }) {
   // effect below both stayed keyed to the ORIGINAL date, so retargeting
   // to a day that already had a log silently kept showing whatever was
   // loaded for the day you opened the editor on, one save away from
-  // overwriting that day's real data with it.
+  // overwriting that day's real data with it. No separate effect to
+  // keep `d` synced to a changed `date` prop — the parent now remounts
+  // this component on every new date (key={editDate} at the call site),
+  // so `useState(date)` here already has the right value from the first
+  // render, and a sync effect one render behind was exactly what made
+  // opening an already-logged day sometimes show a blank form.
   const [d, setD] = useState(date)
-  useEffect(() => { setD(date) }, [date]) // editor reopened on a different row
   const existing = useAsync((f) => fetchHealthLogs(d, d, { force: f }), [d], { enabled: open })
   const [form, setForm] = useState(null)
   const [saving, setSaving] = useState(false)
