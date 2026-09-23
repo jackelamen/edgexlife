@@ -328,7 +328,7 @@ function PlanTab({ plan, weekOffset, db, goals, sessions, onStart, bodyweightKg 
 
       <Card>
         <CardHead
-          title="Connected Health Goals"
+          title="Connected health goals"
           sub="Tag workouts to a goal. Sessions count toward your progress."
           right={<Badge tone="green">{goals.length} goal{goals.length === 1 ? '' : 's'}</Badge>}
         />
@@ -569,7 +569,7 @@ function DayModal({ date, plan, effectiveByDate, db, allDates, sessions = [], on
       </div>
       <button className="btn btn-secondary btn-sm"
         onClick={() => setExercises([...exercises, { name: '', sets: 3, reps: '', weight: '' }])}>
-        <Icon name="add" size={15} /> Add Exercise
+        <Icon name="add" size={15} /> Add exercise
       </button>
 
       <div style={{ marginTop: 14 }}>
@@ -613,7 +613,7 @@ function DayModal({ date, plan, effectiveByDate, db, allDates, sessions = [], on
           <Icon name="save" size={17} /> Save
         </button>
         <button className="btn btn-secondary btn-sm" onClick={() => onStart(date)}>
-          <Icon name="play_arrow" size={16} /> Start Session Now
+          <Icon name="play_arrow" size={16} /> Start session now
         </button>
         <button className="btn btn-danger btn-sm"
           onClick={async () => {
@@ -753,7 +753,7 @@ function SessionTab({ session, setSession, db, goals, plan, pastSessions, exerci
     return (
       <Empty icon="fitness_center" title="No active session"
         action={<button className="btn btn-primary" onClick={() => onStart(null, true)}>
-          <Icon name="play_arrow" size={17} /> Start Quick Session</button>}>
+          <Icon name="play_arrow" size={17} /> Start quick session</button>}>
         Choose a planned workout or start a quick session.
       </Empty>
     )
@@ -1677,7 +1677,7 @@ function ProgressTab({ sessions, exGoals, db, bodyweightKg = 70 }) {
           </p>
         </div>
         <button className="btn btn-primary btn-sm" onClick={() => { setPrefill(null); setNewGoalOpen(true) }}>
-          <Icon name="add" size={16} /> New Goal
+          <Icon name="add" size={16} /> New goal
         </button>
       </div>
 

@@ -328,7 +328,7 @@ function LogView({ settings, index, onEdit }) {
     <>
       <Card style={{ marginBottom: 16 }}>
         <CardHead
-          title="Log History"
+          title="Log history"
           sub="Every day you have recorded."
           right={<Tabs value={days} onChange={setDays} options={WINDOWS} />}
         />

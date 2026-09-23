@@ -550,7 +550,7 @@ export default function TodayPage() {
           />
           {sprints.loading ? <Loading /> : !dueActions.length ? (
             <Empty icon="flag" title="Nothing due from your cycles"
-              action={<Link to="/goals" className="btn btn-secondary btn-sm">Open Goals</Link>}>
+              action={<Link to="/goals" className="btn btn-secondary btn-sm">Open goals</Link>}>
               {liveCycles.length ? 'Nothing is scheduled for today.' : 'No live cycle is running right now.'}
             </Empty>
           ) : (

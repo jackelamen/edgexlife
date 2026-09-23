@@ -70,7 +70,7 @@ export default function GoalsPage() {
         sub={activeView?.sub}
         actions={
           <button className="btn btn-primary btn-sm" onClick={() => setEditGoal({})}>
-            <Icon name="add" size={15} /> New Goal
+            <Icon name="add" size={15} /> New goal
           </button>
         }
       />
@@ -1150,7 +1150,7 @@ function CyclesView({ goals, cycleData, cycleIntent }) {
           </button>
         </div>
         <button className="btn btn-primary btn-sm" onClick={() => setEditing({})}>
-          <Icon name="add" size={15} /> New Cycle
+          <Icon name="add" size={15} /> New cycle
         </button>
       </div>
 
@@ -1752,7 +1752,7 @@ function RetroEditor({ sprint, onClose, onSaved }) {
   const [saving, setSaving] = useState(false)
 
   return (
-    <Modal open={open} onClose={() => { setR(null); onClose() }} title="Cycle Retrospective" width={560}
+    <Modal open={open} onClose={() => { setR(null); onClose() }} title="Cycle retrospective" width={560}
       footer={
         <>
           <button className="btn btn-secondary" onClick={() => { setR(null); onClose() }}>Later</button>

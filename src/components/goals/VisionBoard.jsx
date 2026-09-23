@@ -67,7 +67,7 @@ export default function VisionBoard() {
             <Icon name="grid_view" size={14} /> Collage
           </button>
           <button className={`vview-tab${layout === 'area' ? ' active' : ''}`} onClick={() => setLayout('area')}>
-            <Icon name="category" size={14} /> By Area
+            <Icon name="category" size={14} /> By area
           </button>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>

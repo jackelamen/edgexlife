@@ -75,7 +75,7 @@ export default function WellnessPage() {
         sub="The clarity and nervous-system layer of your Life OS."
         actions={
           <button className="btn btn-primary btn-sm" onClick={() => openCheckin(t, null)}>
-            <Icon name="edit_note" size={15} /> Check In
+            <Icon name="edit_note" size={15} /> Check in
           </button>
         }
       />
@@ -141,7 +141,7 @@ function Dashboard({ latest, notes, todayCheckins, index, onCheckIn, onNav, onOp
 
   return (
     <>
-      <div className="hero-card" style={{ marginBottom: 18 }}>
+      <div className="hero-card" style={{ marginBottom: 14 }}>
         <div className="hero-content">
           <div>
             <Badge tone="purple"><Icon name="spa" size={14} /> Clarity</Badge>
@@ -159,7 +159,7 @@ function Dashboard({ latest, notes, todayCheckins, index, onCheckIn, onNav, onOp
               get crushed into a half-width column. */}
           <div className="hero-actions">
             <button className="btn btn-primary" onClick={onCheckIn}>
-              <Icon name="edit_note" size={17} /> {latest ? 'Update Check-In' : 'Check In'}
+              <Icon name="edit_note" size={17} /> {latest ? 'Update check-in' : 'Check in'}
             </button>
             <button className="btn btn-secondary" onClick={() => onNav('reset')}>
               <Icon name="restart_alt" size={17} /> Reset
@@ -256,7 +256,7 @@ function Dashboard({ latest, notes, todayCheckins, index, onCheckIn, onNav, onOp
                 </div>
               </div>
               <button className="btn btn-secondary btn-sm" onClick={(e) => { e.stopPropagation(); onNav('reset') }}>
-                <Icon name="restart_alt" size={15} /> All Tools
+                <Icon name="restart_alt" size={15} /> All tools
               </button>
             </div>
           </div>
@@ -284,7 +284,7 @@ function RecentCheckins({ onOpen }) {
     .sort((a, b) => new Date(b.savedAt || 0) - new Date(a.savedAt || 0)).slice(0, 7)
 
   if (recent.loading) return <Loading />
-  if (!entries.length) return <Empty icon="self_improvement" title="No check-ins yet">Hit Check In to record your first entry.</Empty>
+  if (!entries.length) return <Empty icon="self_improvement" title="No check-ins yet">Hit Check in to record your first entry.</Empty>
 
   return (
     <div className="mini-list">
@@ -506,7 +506,7 @@ function CheckinView({ date, entryId, onSaved, onDeleted, onNav }) {
             </Field>
             <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10 }}>
               <button className="btn btn-secondary" onClick={() => setSelectedId(null)}>
-                <Icon name="add" size={17} /> New Check-In
+                <Icon name="add" size={17} /> New check-in
               </button>
             </div>
           </div>
@@ -557,13 +557,13 @@ function CheckinView({ date, entryId, onSaved, onDeleted, onNav }) {
 
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 20 }}>
           <button className="btn btn-primary" disabled={saving} onClick={save}>
-            <Icon name="save" size={17} /> {saving ? 'Saving…' : form.id ? 'Update Check-In' : 'Save New Check-In'}
+            <Icon name="save" size={17} /> {saving ? 'Saving…' : form.id ? 'Update check-in' : 'Save new check-in'}
           </button>
           <button className="btn btn-secondary" onClick={sendLoop}>
-            <Icon name="move_to_inbox" size={17} /> Send Loop to Inbox
+            <Icon name="move_to_inbox" size={17} /> Send loop to inbox
           </button>
           <button className="btn btn-secondary" onClick={() => onNav('journal')}>
-            <Icon name="auto_stories" size={17} /> View Saved Writing
+            <Icon name="auto_stories" size={17} /> View saved writing
           </button>
           <button className="btn btn-danger" onClick={remove}>
             <Icon name={current && removeConfirm.isArmed(current.id) ? 'warning' : 'delete'} size={17} />
@@ -579,10 +579,10 @@ function CheckinView({ date, entryId, onSaved, onDeleted, onNav }) {
             </Field>
             <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
               <button className="btn btn-secondary" onClick={() => moveTo(moveDate)}>
-                <Icon name="drive_file_move" size={17} /> Move to Date
+                <Icon name="drive_file_move" size={17} /> Move to date
               </button>
               <button className="btn btn-secondary" onClick={() => moveTo(shiftDate(d, -1))}>
-                <Icon name="undo" size={17} /> Move to Previous Day
+                <Icon name="undo" size={17} /> Move to previous day
               </button>
             </div>
           </div>
@@ -637,7 +637,7 @@ function ResetView({ latest, onNav, onLogged }) {
             </div>
             {t.id === suggested.id && <div style={{ marginTop: 10 }}><Badge tone="purple">Suggested for you</Badge></div>}
             <button className="btn btn-secondary btn-sm" style={{ marginTop: 12 }}>
-              <Icon name="play_arrow" size={15} /> Use Reset
+              <Icon name="play_arrow" size={15} /> Use reset
             </button>
           </div>
         ))}
@@ -785,7 +785,7 @@ function MeditateView({ latest, onLogged }) {
           setNote(''); setAfter(''); setLast(null)
           onLogged()
         }}>
-          <Icon name="save" size={17} /> Save Session
+          <Icon name="save" size={17} /> Save session
         </button>
         {last && (
           <p style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 10 }}>
@@ -826,7 +826,7 @@ function InboxView({ notes }) {
           </Field>
         </div>
         <button className="btn btn-primary" style={{ marginTop: 14 }} onClick={add}>
-          <Icon name="add" size={17} /> Add Loop
+          <Icon name="add" size={17} /> Add loop
         </button>
       </Card>
 
@@ -1051,7 +1051,7 @@ export function SettingsView({ onSync }) {
           something on another device and want it here right away.
         </p>
         <button className="btn btn-primary" onClick={() => { onSync(); toast.success('Wellness synced') }}>
-          <Icon name="sync" size={17} /> Sync Now
+          <Icon name="sync" size={17} /> Sync now
         </button>
       </Card>
     </div>

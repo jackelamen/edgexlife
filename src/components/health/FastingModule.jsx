@@ -381,7 +381,7 @@ function ActiveFastCard({ session, onEnd, onEditStart }) {
             ragged stack, with the wider one overflowing its own pill. */}
         <div className="hero-actions">
           <button className="btn btn-primary" onClick={onEnd}>
-            <Icon name="stop_circle" size={17} /> End Fast
+            <Icon name="stop_circle" size={17} /> End fast
           </button>
           <button className="btn btn-secondary" onClick={onEditStart} title="Forgot to start the timer on time?">
             <Icon name="edit" size={17} /> Fix start time

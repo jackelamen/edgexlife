@@ -558,7 +558,7 @@ function HistoryView({ state, onOpen }) {
   const rows = state.data || []
   if (!rows.length) {
     return (
-      <Card style={{ marginTop: 12 }}>
+      <Card>
         <Empty icon="history" title="No reviews yet">
           Close out a week and it will show up here.
         </Empty>

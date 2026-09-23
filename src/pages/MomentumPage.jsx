@@ -100,7 +100,7 @@ export default function MomentumPage() {
 
       {loading ? <Loading /> : !rows.length ? (
         <Empty icon="bolt" title="No active career goals"
-          action={<Link to="/goals" className="btn btn-secondary btn-sm">Open Goals</Link>}>
+          action={<Link to="/goals" className="btn btn-secondary btn-sm">Open goals</Link>}>
           Momentum only tracks {areaLabel('work')}-area goals. Start one to see it here.
         </Empty>
       ) : (
