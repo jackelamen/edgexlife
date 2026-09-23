@@ -251,6 +251,7 @@ export function ReviewFlow({ step, setStep, draft, edit, dirty, busy, saved, onS
         ))}
       </ol>
 
+      <div className="rvf-body">
       <div className="rvf-card" key={cur.id}>
         <div className="rvf-kicker">{weekLabel} · Step {i + 1} of {steps.length}</div>
 
@@ -393,7 +394,63 @@ export function ReviewFlow({ step, setStep, draft, edit, dirty, busy, saved, onS
           )}
         </div>
       </div>
+      <ReviewSide draft={draft} summary={summary} promised={promised} showStats={cur.id !== 'look'} />
+      </div>
     </div>
+  )
+}
+
+/* Desktop side panel (hidden below 1100px, see .rvf-side). The flow card
+   alone left half a wide screen empty; this uses that room for things
+   worth glancing at while you write: the week's numbers (except on step
+   one, where they're already the main content), what you promised last
+   week, and your review filling in as you go. */
+function ReviewSide({ draft, summary, promised, showStats }) {
+  const prios = [draft.priority_1, draft.priority_2, draft.priority_3].filter((p) => String(p || '').trim())
+  const score = draft.score != null ? Number(draft.score) : null
+  const stats = [
+    ['Health', summary.health, `${summary.daysLogged}/7 days`, true],
+    ['Clarity', summary.clarity, `${summary.checkins} check-ins`, true],
+    ['Sleep', summary.sleepAvg != null ? `${summary.sleepAvg}h` : null, 'avg'],
+    ['Training', summary.workouts, summary.trainingMinutes ? `${summary.trainingMinutes} min` : 'sessions'],
+    ['Habits', summary.habitsDone, 'ticked'],
+  ]
+  return (
+    <aside className="rvf-side">
+      <div className="rvf-side-card">
+        <div className="rvf-label">Your review so far</div>
+        <div className="rvf-side-score">
+          <span className="tnum" style={score ? { color: statusFor(score * 10)?.color } : undefined}>{score ?? '–'}</span>
+          <small>/10</small>
+          <em>{draft.theme_word ? `"${draft.theme_word}"` : 'No word yet'}</em>
+        </div>
+        <div className="rvf-side-sub">Next week</div>
+        {prios.length ? prios.map((p, n) => (
+          <div key={n} className="rvf-side-row"><span className="rv-carry-n">{n + 1}</span><span>{p}</span></div>
+        )) : <div className="rvf-side-empty">Not set yet</div>}
+      </div>
+
+      {showStats && (
+        <div className="rvf-side-card">
+          <div className="rvf-label">The week at a glance</div>
+          {stats.map(([k, v, sub, isScore]) => (
+            <div key={k} className="rvf-side-stat">
+              <span>{k}<small>{sub}</small></span>
+              <b className="tnum" style={isScore && v != null ? { color: statusFor(v)?.color } : undefined}>{v ?? '—'}</b>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {promised && promised.length > 0 && (
+        <div className="rvf-side-card">
+          <div className="rvf-label">Last week you said</div>
+          {promised.map((p, n) => (
+            <div key={n} className="rvf-side-row"><span className="rv-carry-n">{n + 1}</span><span>{p}</span></div>
+          ))}
+        </div>
+      )}
+    </aside>
   )
 }
 
