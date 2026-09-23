@@ -3,7 +3,23 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#f6f4ef" />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f6f4ef" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#16150f" />
+    <!-- Applies a manually-chosen theme (see src/lib/theme.js) before the
+         stylesheet or any React code runs, so switching themes — or a
+         page load on a device with one already set — never flashes the
+         other theme first. Keep the localStorage key ('xlife-theme') and
+         the values ('light'/'dark') in sync with theme.js by hand; this
+         has to stay a plain inline script, not an import, to run this
+         early. -->
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem('xlife-theme')
+          if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t
+        } catch (e) { /* private mode / storage disabled */ }
+      })()
+    </script>
     <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
     <link rel="apple-touch-icon" href="/icons/icon-192.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />

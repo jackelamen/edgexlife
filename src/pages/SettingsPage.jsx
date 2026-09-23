@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
 import { ModuleHeader, ModuleBody } from '../components/shell/Shell'
-import { Panel, Loading, Field } from '../components/ui/Kit'
+import { Panel, Loading, Field, Tabs } from '../components/ui/Kit'
+import Icon from '../components/ui/Icon'
 import { formatBytes, getLedger, resetLedger, subscribeLedger } from '../lib/egress'
 import { clearVisionCache, getVisionImage } from '../lib/imageCache'
 import {
@@ -12,6 +13,7 @@ import {
 import { useAuth } from '../store/authStore'
 import { useAsync } from '../hooks/useAsync'
 import { pushSupported, notificationPermission, subscribeToPush, unsubscribeFromPush, subscriptionToRow } from '../lib/push'
+import { getTheme, setTheme } from '../lib/theme'
 // Health and Wellness's own Settings tabs moved here (see the VIEWS
 // comment in each of those files) — 7 and 8 tabs respectively left most
 // of the tab strip off a phone's screen. Reusing the components rather
@@ -20,77 +22,132 @@ import { pushSupported, notificationPermission, subscribeToPush, unsubscribeFrom
 import { SettingsView as HealthSettingsView } from './HealthPage'
 import { SettingsView as WellnessSettingsView } from './WellnessPage'
 
+/* Ordered for what you'd actually open Settings to change day to day —
+   Appearance, Reminders, then each module's own settings — with your
+   account last. Egress/query breakdown/legacy migration/cache buttons
+   are all diagnostics you'd check once in a while, not on the way to
+   changing a reminder time, so they're collapsed under one disclosure at
+   the very bottom instead of being the first thing you scroll past. */
 export default function SettingsPage() {
-  const [ledger, setLedger] = useState(getLedger())
   const { user, signOut } = useAuth()
-  useEffect(() => subscribeLedger(setLedger), [])
-
-  const rows = Object.entries(ledger.byName).sort((a, b) => b[1] - a[1])
 
   return (
     <>
       <ModuleHeader title="Settings" views={[{ key: 's', label: 'Data & caching' }]}
         view="s" onView={() => {}} />
       <ModuleBody>
-        <div className="grid gap-3.5 lg:grid-cols-[1fr_360px]">
+        <div className="grid gap-3.5 lg:grid-cols-2">
           <div className="flex flex-col gap-3.5">
-            <Panel title={`Egress this month (${ledger.month})`}
-              actions={<span className="chip">{ledger.calls} reads</span>}>
-              <div className="lf-display tnum text-[30px]" style={{ color: 'var(--accent)' }}>
-                {formatBytes(ledger.bytes)}
-              </div>
-              <p className="text-[12.5px] mt-1" style={{ color: 'var(--text-3)' }}>
-                Counted client-side. Cached reads cost nothing and aren't double counted.
-                This project once blew its free-tier allowance, so the number is kept
-                visible rather than assumed.
-              </p>
-            </Panel>
-
-            {rows.length > 0 && (
-              <Panel title="By query" bodyClass="">
-                {rows.map(([name, bytes]) => (
-                  <div key={name} className="row">
-                    <span className="text-[13px] flex-1 min-w-0 truncate"
-                      style={{ color: 'var(--text-2)' }}>{name}</span>
-                    <span className="text-[13px] tnum">{formatBytes(bytes)}</span>
-                  </div>
-                ))}
-              </Panel>
-            )}
-
-            <LegacyMigration />
+            <AppearancePanel />
+            <ReminderPanel />
+          </div>
+          <div className="flex flex-col gap-3.5">
             <HealthSettings />
             <WellnessSettings />
           </div>
+        </div>
 
-          <div className="flex flex-col gap-3.5">
-            <ReminderPanel />
+        <div className="flex flex-col gap-3.5" style={{ marginTop: 14 }}>
+          <Panel title="Account">
+            <p className="text-[13px] mb-3" style={{ color: 'var(--text-2)' }}>{user?.email}</p>
+            <p className="text-[12px] mb-3" style={{ color: 'var(--text-3)' }}>
+              Shared with Pulse and xFocus, same Supabase project, same user id.
+            </p>
+            <button className="btn" onClick={signOut}>Sign out</button>
+          </Panel>
 
-            <Panel title="Caches">
-              <div className="flex flex-col gap-2">
-                <button className="btn" onClick={() => {
-                  refreshAll(); toast.success('Cleared. Next load refetches')
-                }}>Clear data cache</button>
-                <button className="btn" onClick={async () => {
-                  await clearVisionCache(); toast.success('Vision images cleared')
-                }}>Clear vision image cache</button>
-                <button className="btn" onClick={() => {
-                  resetLedger(); toast.success('Counter reset')
-                }}>Reset egress counter</button>
-              </div>
-            </Panel>
-
-            <Panel title="Account">
-              <p className="text-[13px] mb-3" style={{ color: 'var(--text-2)' }}>{user?.email}</p>
-              <p className="text-[12px] mb-3" style={{ color: 'var(--text-3)' }}>
-                Shared with Pulse and xFocus, same Supabase project, same user id.
-              </p>
-              <button className="btn" onClick={signOut}>Sign out</button>
-            </Panel>
-          </div>
+          <DataDiagnostics />
         </div>
       </ModuleBody>
     </>
+  )
+}
+
+/**
+ * Dark mode was follow-the-OS only at first — no in-app toggle, since
+ * there was no settings surface for one yet. This is that toggle: System
+ * defers to the OS/browser preference (the original behavior); Light and
+ * Dark pin it regardless. See lib/theme.js for how the choice survives a
+ * reload without a flash of the other theme.
+ */
+function AppearancePanel() {
+  const [theme, setThemeState] = useState(getTheme())
+  const OPTIONS = [
+    { value: 'system', label: 'System' },
+    { value: 'light', label: 'Light' },
+    { value: 'dark', label: 'Dark' },
+  ]
+  return (
+    <Panel title="Appearance">
+      <Tabs value={theme} onChange={(v) => { setTheme(v); setThemeState(v) }} options={OPTIONS} />
+      <p className="text-[12px] mt-2" style={{ color: 'var(--text-3)' }}>
+        System matches your device's own light/dark setting.
+      </p>
+    </Panel>
+  )
+}
+
+/**
+ * Egress this month, the by-query breakdown, the legacy vision-photo
+ * migration, and the cache-clearing buttons — four panels nobody opens
+ * Settings FOR, moved behind one disclosure so they're still one tap
+ * away without being the first thing between you and Reminders. Plain
+ * <details>/<summary> rather than more component state: it's free
+ * keyboard/screen-reader support and doesn't need a hook.
+ */
+function DataDiagnostics() {
+  const [ledger, setLedger] = useState(getLedger())
+  useEffect(() => subscribeLedger(setLedger), [])
+  const rows = Object.entries(ledger.byName).sort((a, b) => b[1] - a[1])
+
+  return (
+    <details className="card card-pad settings-diagnostics">
+      <summary>
+        <span>Data &amp; diagnostics</span>
+        <Icon name="expand_more" size={20} />
+      </summary>
+      <div className="flex flex-col gap-3.5" style={{ marginTop: 14 }}>
+        <Panel title={`Egress this month (${ledger.month})`}
+          actions={<span className="chip">{ledger.calls} reads</span>}>
+          <div className="lf-display tnum text-[30px]" style={{ color: 'var(--accent)' }}>
+            {formatBytes(ledger.bytes)}
+          </div>
+          <p className="text-[12.5px] mt-1" style={{ color: 'var(--text-3)' }}>
+            Counted client-side. Cached reads cost nothing and aren't double counted.
+            This project once blew its free-tier allowance, so the number is kept
+            visible rather than assumed.
+          </p>
+        </Panel>
+
+        {rows.length > 0 && (
+          <Panel title="By query" bodyClass="">
+            {rows.map(([name, bytes]) => (
+              <div key={name} className="row">
+                <span className="text-[13px] flex-1 min-w-0 truncate"
+                  style={{ color: 'var(--text-2)' }}>{name}</span>
+                <span className="text-[13px] tnum">{formatBytes(bytes)}</span>
+              </div>
+            ))}
+          </Panel>
+        )}
+
+        <LegacyMigration />
+
+        <Panel title="Caches">
+          <div className="flex flex-col gap-2">
+            <button className="btn" onClick={() => {
+              refreshAll(); toast.success('Cleared. Next load refetches')
+            }}>Clear data cache</button>
+            <button className="btn" onClick={async () => {
+              await clearVisionCache(); toast.success('Vision images cleared')
+            }}>Clear vision image cache</button>
+            <button className="btn" onClick={() => {
+              resetLedger(); toast.success('Counter reset')
+            }}>Reset egress counter</button>
+          </div>
+        </Panel>
+      </div>
+    </details>
   )
 }
 

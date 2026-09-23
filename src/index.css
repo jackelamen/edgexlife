@@ -83,9 +83,16 @@
 }
 
 /* ── Dark mode ─────────────────────────────────────────────────
-   Follows the OS/browser preference — no in-app toggle, since this app
-   has never had a settings surface for it and adding one is a separate
-   decision from having a dark palette at all.
+   Three states — System (the default), Light, Dark — picked in
+   Settings → Appearance (see src/lib/theme.js) and stored as
+   `data-theme="light"|"dark"` on <html>, or no attribute at all for
+   System. The `:not([data-theme="light"])` guard on the media-query
+   block is what lets an explicit Light choice override a dark OS
+   preference; the plain `[data-theme="dark"]` block below it is what
+   lets an explicit Dark choice apply regardless of the OS setting.
+   index.html applies the stored choice inline, before any stylesheet or
+   React code runs, so switching (or loading on a device with one
+   already set) never flashes the other theme first.
 
    Deliberately scoped to the NEUTRAL surface tokens only (page bg, card
    bg, borders, text) — not --accent/--s-good/--s-short/--s-risk or any
@@ -99,7 +106,7 @@
    untouched for the same reason: the sidebar has been dark in both
    themes since v3, this just brings the rest of the page to meet it. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #16150f;
     --white: #201f19;
     --white-soft: #2a281f;
@@ -111,6 +118,18 @@
     --shadow-sm: 0 2px 6px rgba(0,0,0,.28);
     --shadow: 0 8px 22px rgba(0,0,0,.4);
   }
+}
+:root[data-theme="dark"] {
+  --bg: #16150f;
+  --white: #201f19;
+  --white-soft: #2a281f;
+  --text: #f2efe6;
+  --text-2: #c2beb0;
+  --text-3: #8c8879;
+  --border: #35322a;
+  --border-med: #423e32;
+  --shadow-sm: 0 2px 6px rgba(0,0,0,.28);
+  --shadow: 0 8px 22px rgba(0,0,0,.4);
 }
 
 /* Today owns the graphite already declared as MODULES.today in
@@ -315,6 +334,17 @@ h1, h2, h3, h4, .page-title {
   border-radius: var(--radius-lg); box-shadow: var(--shadow);
 }
 .card-pad { padding: 22px; }
+
+/* Settings → Data & diagnostics disclosure. Plain <details>/<summary>
+   (see DataDiagnostics in SettingsPage.jsx) restyled to read as a card
+   row rather than the browser's default marker-and-indent look. */
+.settings-diagnostics > summary {
+  list-style: none; cursor: pointer; display: flex; align-items: center;
+  justify-content: space-between; font-size: 15px; font-weight: 800;
+}
+.settings-diagnostics > summary::-webkit-details-marker { display: none; }
+.settings-diagnostics > summary .icon { transition: transform .18s; color: var(--text-3); }
+.settings-diagnostics[open] > summary .icon { transform: rotate(180deg); }
 
 /* Metric tile. The hue comes from lib/design.js via inline style (identity);
    .tile-fill's HEIGHT is the actual percent of target (quantity); the pill
