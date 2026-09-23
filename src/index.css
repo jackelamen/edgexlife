@@ -1340,6 +1340,25 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
 .system-name { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .09em; opacity: .8; }
 .system-fresh { width: 9px; height: 9px; border-radius: 50%; box-shadow: 0 0 0 3px rgba(255,255,255,.18); }
 .system-last { font-size: 12px; font-weight: 600; opacity: .72; position: relative; z-index: 1; }
+
+/* "Where to focus" cards — a light card (unlike .system-panel's full
+   module-colour fill) since this is insight, not navigation chrome;
+   identity comes from a left accent bar and the label colour instead,
+   same restraint as .goal-line. */
+.focus-lever {
+  display: block; text-decoration: none; color: var(--text);
+  background: var(--white-soft); border: 1px solid var(--border); border-left: 3px solid var(--accent-lever, var(--border));
+  border-radius: var(--radius-sm); padding: 14px 16px; transition: border-color .15s, background .15s;
+}
+.focus-lever[data-mod="health"] { --accent-lever: #11ae95; }
+.focus-lever[data-mod="wellness"] { --accent-lever: #953ca4; }
+.focus-lever:hover { background: var(--white); border-color: var(--border-med); }
+.focus-lever-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+.focus-lever-label { font-size: 11.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .07em; }
+.focus-lever-title { font-size: 15px; font-weight: 800; }
+.focus-lever-detail { font-size: 12.5px; color: var(--text-3); font-weight: 600; margin-top: 2px; }
+.focus-lever-go { display: inline-flex; align-items: center; gap: 3px; font-size: 12px; font-weight: 700; color: var(--text-2); margin-top: 10px; }
+.focus-spark { flex-shrink: 0; display: block; }
 .system-foot {
   display: flex; align-items: center; justify-content: space-between; gap: 8;
   margin-top: 14px; padding-top: 11px; border-top: 1px solid rgba(255,255,255,.18);

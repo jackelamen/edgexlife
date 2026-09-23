@@ -70,9 +70,15 @@ export default function TodayPage() {
   const lastHealth = (health.data || [])[0]
   const lastCheckin = (wellness.data || [])[0]
   const healthDet = lastHealth ? healthDetails(lastHealth, settings.data) : null
+  const clarityDet = lastCheckin ? clarityDetails(lastCheckin) : null
   const healthScore = healthDet?.score ?? null
-  const clarity = lastCheckin ? clarityDetails(lastCheckin)?.score : null
+  const clarity = clarityDet?.score ?? null
   const weakest = weakestComponent(healthDet)
+  // Wellness's own weakest driver, same idea as Health's — both feed the
+  // "Where to focus" card that replaced "What connects" (see below):
+  // useful the moment you've logged once, unlike a cross-system pattern,
+  // which needs ~200 days of overlap before it can say anything at all.
+  const weakestWellness = weakestComponent(clarityDet)
 
   const daysSince = (d) => (d ? Math.round((new Date(`${t}T12:00`) - new Date(`${d}T12:00`)) / 86400000) : null)
   const healthAge = daysSince(lastHealthDate)
@@ -350,6 +356,18 @@ export default function TodayPage() {
     () => trendOf(patternWellness.data, (c) => clarityDetails(c)?.score),
     [patternWellness.data])
   const goalsPct = dueActions.length ? Math.round((dueDone / dueActions.length) * 100) : null
+
+  // Sparkline point series for the "Where to focus" card below — same
+  // 200-day pull as the trends above, just kept as a plain sorted array
+  // instead of collapsed into a single delta.
+  const healthPoints = useMemo(() => (patternHealth.data || [])
+    .filter((r) => r?.date).slice().sort((a, b) => (a.date < b.date ? -1 : 1))
+    .map((h) => ({ date: h.date, score: healthDetails(h, settings.data)?.score ?? null })),
+  [patternHealth.data, settings.data])
+  const wellnessPoints = useMemo(() => (patternWellness.data || [])
+    .filter((r) => r?.date).slice().sort((a, b) => (a.date < b.date ? -1 : 1))
+    .map((c) => ({ date: c.date, score: clarityDetails(c)?.score ?? null })),
+  [patternWellness.data])
 
   /* Direction wording, shared by both trended systems. The 3-point dead
      band is deliberate: day-to-day scores wobble by a couple of points on
@@ -693,27 +711,42 @@ export default function TodayPage() {
         />
       </div>
 
-      {/* ── What connects: the one thing three separate trackers couldn't
-             show you, because their data never lived in the same place. ── */}
+      {/* ── Where to focus: replaced "What connects" as the lead card here.
+             That card needed ~200 days of Health+Wellness overlap before it
+             could say anything at all — this says something useful from the
+             first log in either system, and the trend lines are free
+             (same 200-day pull, just kept as a series instead of collapsed
+             to a delta). What connects itself isn't gone — it folds in
+             below once it actually has a pattern to report, and stays a
+             one-line teaser rather than a full empty card while it doesn't. ── */}
       <Card style={{ marginTop: 14 }} className="today-order-connects">
-        <CardHead title="What connects" sub="Plain comparisons across your last 200 days of overlapping health and wellness logs." />
-        {(patternHealth.loading || patternWellness.loading) ? <Loading /> : !patterns.length ? (
-          <Empty icon="hub" title={matchedDays < 3 ? 'Not enough overlapping days yet' : 'No strong pattern yet'}>
-            {matchedDays < 3
-              ? 'Log both Health and Wellness on the same days a few more times and a pattern can surface here.'
-              : `Checked ${matchedDays} days with both a health log and a check-in; nothing crossed the bar to report yet.`}
-          </Empty>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-            {patterns.map((p) => (
-              <div key={p.key} className="alert-row">
-                <div className="alert-ic" style={{ background: p.up ? STATUS.good.bg : STATUS.short.bg }}>
-                  <Icon name={p.icon} size={17} style={{ color: p.up ? STATUS.good.color : STATUS.short.color }} />
+        <CardHead title="Where to focus" sub="The one lever worth pulling in each system right now." />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5">
+          <FocusLever mod="health" label="Health" to="/health"
+            weakest={weakest} points={healthPoints} dir={healthDir} />
+          <FocusLever mod="wellness" label="Wellness" to="/wellness"
+            weakest={weakestWellness} points={wellnessPoints} dir={wellnessDir} />
+        </div>
+
+        {patterns.length > 0 ? (
+          <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
+            <div className="form-section-label">What connects</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+              {patterns.map((p) => (
+                <div key={p.key} className="alert-row">
+                  <div className="alert-ic" style={{ background: p.up ? STATUS.good.bg : STATUS.short.bg }}>
+                    <Icon name={p.icon} size={17} style={{ color: p.up ? STATUS.good.color : STATUS.short.color }} />
+                  </div>
+                  <span className="alert-text">{p.text}</span>
                 </div>
-                <span className="alert-text">{p.text}</span>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
+        ) : !(patternHealth.loading || patternWellness.loading) && matchedDays >= 3 && (
+          <p style={{ marginTop: 14, fontSize: 12, color: 'var(--text-3)' }}>
+            {matchedDays} days logged in both Health and Wellness so far — cross-system patterns will
+            show up here once one crosses the bar to report.
+          </p>
         )}
       </Card>
 
@@ -847,6 +880,57 @@ function QuickWellnessForm({ busy, onCancel, onSave }) {
         </button>
       </div>
     </div>
+  )
+}
+
+/**
+ * One system's card in "Where to focus" — its weakest driver plus a
+ * small sparkline of the last 30 days, so the card says something useful
+ * from the first log ever ("here's your weakest driver") and gets more
+ * informative once there's history (the line), rather than needing
+ * months of data before it can say anything at all.
+ */
+function FocusLever({ mod, label, to, weakest, points, dir }) {
+  const m = MODULES[mod]
+  return (
+    <Link to={to} className="focus-lever" data-mod={mod}>
+      <div className="focus-lever-top">
+        <span className="focus-lever-label" style={{ color: m.color }}>{label}</span>
+        <Sparkline points={points} tone={dir?.tone} />
+      </div>
+      {weakest ? (
+        <>
+          <div className="focus-lever-title">{weakest.label}</div>
+          <div className="focus-lever-detail">{weakest.detail}</div>
+        </>
+      ) : (
+        <div className="focus-lever-detail">Log {label.toLowerCase()} once to see your weakest lever here.</div>
+      )}
+      <span className="focus-lever-go">Open <Icon name="arrow_forward" size={13} /></span>
+    </Link>
+  )
+}
+
+/** Last-30-day line, no axes or labels — just shape. Deliberately not the
+    full TrendChart component (a whole different weight of visual for a
+    card whose job is "one glance"), and colored by the same up/down/flat
+    tone the hero's own delta pill already uses, so green/red here means
+    the same thing it does everywhere else on this page. */
+function Sparkline({ points, tone }) {
+  const pts = (points || []).filter((p) => p.score != null).slice(-30)
+  if (pts.length < 2) return null
+  const w = 84, h = 26
+  const scores = pts.map((p) => p.score)
+  const min = Math.min(...scores), max = Math.max(...scores)
+  const range = Math.max(1, max - min)
+  const step = w / (pts.length - 1)
+  const path = pts.map((p, i) =>
+    `${i === 0 ? 'M' : 'L'} ${(i * step).toFixed(1)} ${(h - ((p.score - min) / range) * h).toFixed(1)}`).join(' ')
+  const color = tone === 'up' ? 'var(--s-good)' : tone === 'down' ? 'var(--s-risk)' : 'var(--text-3)'
+  return (
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="focus-spark" aria-hidden="true">
+      <path d={path} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   )
 }
 
