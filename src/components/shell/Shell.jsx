@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { NavLink, useLocation, useNavigate } from 'react-router-dom'
+import { NavLink, useLocation } from 'react-router-dom'
 import Icon from '../ui/Icon'
 import BrandMark from './BrandMark'
 import Wordmark from './Wordmark'
@@ -27,6 +27,16 @@ const NAV = [
 
 const LINKS = NAV.filter((n) => n.to)
 
+/* Sibling apps on the same Supabase account. The sidebar already lists every
+   Life module, so Cmd+K jumps out to these instead of duplicating the nav. */
+const APPS = [
+  { label: 'Pulse', desc: 'Tasks & habits', icon: 'task_alt', href: 'https://lightskyblue-wolverine-166414.hostingersite.com/today' },
+  { label: 'xFocus', desc: 'Deep work', icon: 'center_focus_strong', href: 'https://xfocus-snowy.vercel.app' },
+  { label: 'xCompass', icon: 'explore', href: 'https://xcompass.vercel.app' },
+]
+
+const openApp = (app) => window.open(app.href, '_blank', 'noopener')
+
 /* Phone bottom bar: the four daily modules only. Today leads because it's
    the home surface; Settings stays in the drawer with sign-out rather than
    spending a quarter of the bar on something opened once a month. Review,
@@ -52,7 +62,7 @@ export default function Shell({ children }) {
 
   useEffect(() => { setOpen(false) }, [location.pathname])
 
-  // Cmd+K module switcher, same affordance as the originals.
+  // Cmd+K opens the connected-apps launcher.
   useEffect(() => {
     const onKey = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
@@ -101,8 +111,8 @@ export default function Shell({ children }) {
         borderTop: '1px solid rgba(255,255,255,0.07)', paddingTop: 16,
       }}>
         <button className="nav-item" onClick={() => setCmd(true)}>
-          <Icon name="search" size={19} />
-          Switch module
+          <Icon name="apps" size={19} />
+          Connected apps
           <kbd style={{
             marginLeft: 'auto', fontSize: 10, background: 'rgba(255,255,255,.08)',
             borderRadius: 4, padding: '2px 5px', color: 'rgba(255,255,255,.45)',
@@ -177,22 +187,21 @@ export default function Shell({ children }) {
 }
 
 function CommandPalette({ onClose }) {
-  const nav = useNavigate()
   const [q, setQ] = useState('')
   const [sel, setSel] = useState(0)
 
-  const items = LINKS.filter((l) => l.label.toLowerCase().includes(q.toLowerCase()))
+  const items = APPS.filter((a) => a.label.toLowerCase().includes(q.toLowerCase()))
 
   useEffect(() => {
     const onKey = (e) => {
       if (e.key === 'Escape') return onClose()
       if (e.key === 'ArrowDown') { e.preventDefault(); setSel((s) => Math.min(s + 1, items.length - 1)) }
       if (e.key === 'ArrowUp') { e.preventDefault(); setSel((s) => Math.max(s - 1, 0)) }
-      if (e.key === 'Enter' && items[sel]) { nav(items[sel].to); onClose() }
+      if (e.key === 'Enter' && items[sel]) { openApp(items[sel]); onClose() }
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [items, sel, nav, onClose])
+  }, [items, sel, onClose])
 
   return (
     <div onClick={onClose} className="cmdk-backdrop" style={{
@@ -207,12 +216,12 @@ function CommandPalette({ onClose }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 18px', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
           <Icon name="search" size={18} style={{ color: 'rgba(255,255,255,.45)' }} />
           <input autoFocus value={q} onChange={(e) => { setQ(e.target.value); setSel(0) }}
-            placeholder="Jump to…"
+            placeholder="Open app…"
             style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: '#fff', fontSize: 15, fontWeight: 500, padding: 0 }} />
         </div>
         <div style={{ maxHeight: 320, overflowY: 'auto', padding: 8 }}>
           {items.map((it, i) => (
-            <button key={it.to} onClick={() => { nav(it.to); onClose() }}
+            <button key={it.label} onClick={() => { openApp(it); onClose() }}
               onMouseEnter={() => setSel(i)}
               className="cmdk-item"
               style={{
@@ -224,7 +233,11 @@ function CommandPalette({ onClose }) {
               <span style={{ width: 36, height: 36, borderRadius: 8, display: 'grid', placeItems: 'center', background: 'rgba(255,255,255,.06)' }}>
                 <Icon name={it.icon} size={18} />
               </span>
-              <span style={{ fontSize: 13.5, fontWeight: 600 }}>{it.label}</span>
+              <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <span style={{ fontSize: 13.5, fontWeight: 600 }}>{it.label}</span>
+                {it.desc && <span style={{ fontSize: 12, color: 'rgba(255,255,255,.45)' }}>{it.desc}</span>}
+              </span>
+              <Icon name="open_in_new" size={16} style={{ marginLeft: 'auto', color: 'rgba(255,255,255,.35)' }} />
             </button>
           ))}
         </div>
