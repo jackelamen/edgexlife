@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
 import Icon from '../components/ui/Icon'
 import { View } from '../components/shell/Shell'
@@ -69,7 +69,7 @@ export default function HealthPage() {
 
       <Tabs value={view} onChange={setView} options={VIEWS} />
 
-      {view === 'today' && <TodayView settings={settings.data} index={index} onEdit={setEditDate} onNavFasting={() => setView('fasting')} />}
+      {view === 'today' && <TodayView settings={settings.data} index={index} onNavFasting={() => setView('fasting')} />}
       {view === 'log' && <LogView settings={settings.data} index={index} onEdit={setEditDate} />}
       {view === 'workout' && <WorkoutModule />}
       {view === 'fasting' && <FastingModule />}
@@ -89,7 +89,7 @@ export default function HealthPage() {
 
 /* ═══════════════ Today ═══════════════ */
 
-function TodayView({ settings, index, onEdit, onNavFasting }) {
+function TodayView({ settings, index, onNavFasting }) {
   const t = today()
   const logs = useAsync((f) => fetchHealthLogs(t, t, { force: f }), [t])
   const routines = useAsync((f) => fetchRoutines({ force: f }))
@@ -163,11 +163,6 @@ function TodayView({ settings, index, onEdit, onNavFasting }) {
               <span className="badge badge-orange" style={{ marginTop: 10, width: 'fit-content' }}>
                 🔥 {streak} day logging streak
               </span>
-            )}
-            {!log && (
-              <button className="btn btn-secondary" style={{ marginTop: 16 }} onClick={() => onEdit(t)}>
-                <Icon name="edit_note" size={17} /> Log today
-              </button>
             )}
           </div>
           <Ring score={details?.score ?? null} sub="today" />
@@ -447,16 +442,10 @@ function LogEditor({ date, settings, onClose, onSaved, onBodyweightSynced }) {
   const existing = useAsync((f) => fetchHealthLogs(d, d, { force: f }), [d], { enabled: open })
   const [form, setForm] = useState(null)
   const [saving, setSaving] = useState(false)
-  // Whether the day the editor was OPENED on already had a log — captured
-  // once, the moment `d` matches the original `date`, so save() still
-  // knows whether to clean up the old row after the user retargets `d`
-  // elsewhere (existing.data itself has since moved on to describing `d`).
-  const openedWithLogRef = useRef(false)
 
   useEffect(() => {
     if (!open) { setForm(null); return }
     const l = (existing.data || [])[0]
-    if (d === date) openedWithLogRef.current = Boolean(l)
     // Stays blank, not pre-filled — an earlier version defaulted this to
     // the bodyweight setting, which meant every saved day (even ones you
     // never touched the field on) got stamped with that same number,
@@ -479,8 +468,19 @@ function LogEditor({ date, settings, onClose, onSaved, onBodyweightSynced }) {
   async function save() {
     setSaving(true)
     try {
-      const targetDate = d
-      await saveHealthLog(targetDate, {
+      // Used to also delete `date` (the day the editor opened on) here
+      // whenever `d` had been retargeted elsewhere, on the theory that
+      // changing the date field was "moving" one entry. That stopped
+      // being true once retargeting started reloading the TARGET day's
+      // own real data (the previous fix): `f` at this point holds that
+      // day's own content, not a relabeled copy of whatever `date` had —
+      // so this was deleting a real, unrelated day's log any time
+      // someone opened the editor on an already-logged today and then
+      // used "Logging for" to go edit a different day instead, which is
+      // exactly what happened. Saving here only ever writes `d`; nothing
+      // else is touched. An actual delete is the trash icon on a Daily
+      // Log row, not this field.
+      await saveHealthLog(d, {
         sleepHours: f.sleepHours, sleepQuality: f.sleepQuality, steps: f.steps,
         water: f.water, weight: f.weight, energy: f.energy, pain: f.pain,
         exerciseMins: f.exerciseMins, exerciseTypes: f.exerciseTypes || [],
@@ -489,13 +489,6 @@ function LogEditor({ date, settings, onClose, onSaved, onBodyweightSynced }) {
         isFastingDay: Boolean(f.isFastingDay),
         notes: f.notes || '',
       })
-      // Reassigning the date on an EXISTING log (opened via the pencil on a
-      // real row) moves it rather than duplicating it — the just-saved copy
-      // lives under targetDate now, so the old date's row would otherwise
-      // stick around as an orphan with the same content.
-      if (targetDate !== date && openedWithLogRef.current) {
-        await deleteHealthLog(date)
-      }
       // Bodyweight logged here IS the bodyweight setting — keep them as one
       // number instead of two that can quietly drift apart. Only writes
       // through when a real value was entered and it actually changed, so
