@@ -600,7 +600,15 @@ h1, h2, h3, h4, .page-title {
   background-position: left, right, left, right;
   background-size: 22px 100%, 22px 100%, 10px 100%, 10px 100%;
   background-repeat: no-repeat;
-  background-color: #fff;
+  /* Was a literal #fff — the actual bug behind "menus are hard to read /
+     cut off in dark mode": the four gradient layers above only paint
+     narrow strips at each edge (22px/10px), so the bar's whole middle
+     was always just this background-color showing through underneath.
+     Forced-white regardless of theme, so in dark mode the inactive tab
+     labels (which correctly use --text-2, now light) sat on a white bar
+     — exactly backwards, and unreadable either way. var(--white) is the
+     token this was always supposed to be. */
+  background-color: var(--white);
   background-attachment: local, local, scroll, scroll;
 }
 .tabs::-webkit-scrollbar { display: none; }
