@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import toast from 'react-hot-toast'
 import Icon from './Icon'
 import { metric, statusFor, statusColor, METRICS, STATUS, DESIGN_RULES } from '../../lib/design'
 
@@ -419,6 +420,38 @@ export function DriverRow({ label, detail, score, hitRate }) {
 }
 
 /** Two-press confirm for destructive row actions. */
+/**
+ * Success toast with an Undo action, for a delete that can genuinely be
+ * put back exactly as it was — a single row restored via the same save
+ * call that would normally edit it, not a multi-row delete with children
+ * that a bare re-insert can't reconstruct (a deleted goal's cascaded
+ * cycles, for instance — that stays a plain confirm-then-delete, since a
+ * half-working Undo would be worse than none). `onUndo` does the restore;
+ * this only handles the toast, the timing, and the error toast if the
+ * restore itself fails.
+ */
+export function undoToast(message, onUndo) {
+  toast((t) => (
+    <span style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+      {message}
+      {/* Not .btn-ghost — that class's hover state is tuned for a light
+          card background, not this toast's dark one. Bare + underlined
+          instead, so the affordance reads on either theme. */}
+      <button type="button" style={{
+        background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+        color: 'inherit', font: 'inherit', fontWeight: 800,
+        textDecoration: 'underline', textUnderlineOffset: 2, flexShrink: 0,
+      }}
+        onClick={async () => {
+          toast.dismiss(t.id)
+          try { await onUndo() } catch (e) { toast.error(e.message) }
+        }}>
+        Undo
+      </button>
+    </span>
+  ), { duration: 5000 })
+}
+
 export function useConfirm() {
   const [pending, setPending] = useState(null)
   const timer = useRef(null)

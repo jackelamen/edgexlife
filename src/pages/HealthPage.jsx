@@ -5,7 +5,7 @@ import { View } from '../components/shell/Shell'
 import {
   Card, CardHead, PageHeader, StatCard, Badge, Tabs, Modal, Field, SectionLabel,
   Empty, Loading, ErrorNote, CoachCard, Ring, ScoreRow, DriverRow, useConfirm,
-  MetricLegend, StatusDots, DesignLegend,
+  MetricLegend, StatusDots, DesignLegend, undoToast,
 } from '../components/ui/Kit'
 import { useAsync } from '../hooks/useAsync'
 import { useViewParam } from '../hooks/useViewParam'
@@ -362,7 +362,14 @@ function LogView({ settings, index, onEdit }) {
                       onClick={async () => {
                         if (!confirm.isArmed(l.date)) return confirm.arm(l.date)
                         await deleteHealthLog(l.date)
-                        toast.success('Log deleted'); logs.reload(); index.reload()
+                        logs.reload(); index.reload()
+                        // `l` is the full log row, already in scope — a
+                        // complete, faithful undo, since a health log is a
+                        // single row keyed by date with no children to lose.
+                        undoToast('Log deleted', async () => {
+                          await saveHealthLog(l.date, l)
+                          logs.reload(); index.reload()
+                        })
                       }} aria-label="Delete">
                       <Icon name="delete" size={15} />
                     </button>

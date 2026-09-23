@@ -4,7 +4,7 @@ import Icon from '../components/ui/Icon'
 import { View } from '../components/shell/Shell'
 import {
   PageHeader, Card, CardHead, StatCard, Badge, Tabs, Field, Empty, Loading,
-  ErrorNote, Modal, CoachCard, Ring, ScoreRow, useConfirm,
+  ErrorNote, Modal, CoachCard, Ring, ScoreRow, useConfirm, undoToast,
 } from '../components/ui/Kit'
 import { useAsync } from '../hooks/useAsync'
 import { useViewParam } from '../hooks/useViewParam'
@@ -376,6 +376,7 @@ function CheckinView({ date, entryId, onSaved, onDeleted, onNav }) {
   const list = entries.data || []
   const [selectedId, setSelectedId] = useState(entryId || null)
   const current = selectedId ? list.find((c) => c.id === selectedId) : null
+  const removeConfirm = useConfirm()
 
   const blank = () => ({
     id: null, date: d, mood: null, state: null, sleepImpact: null,
@@ -427,12 +428,23 @@ function CheckinView({ date, entryId, onSaved, onDeleted, onNav }) {
     } catch (e) { toast.error(e.message) } finally { setSaving(false) }
   }
 
+  // Was window.confirm() — the one delete in the app still using a
+  // browser pop-up instead of the tap-twice pattern Goals and Health use
+  // (see useConfirm in Kit.jsx). Same arm-then-confirm mechanism here,
+  // adapted to a labeled button instead of an icon toggle: the button
+  // itself becomes the "are you sure" by relabeling on the first tap.
   async function remove() {
     if (!current) { toast.error('No check-in for this date'); return }
-    if (!confirm(`Delete this wellness check-in for ${d}?`)) return
-    await deleteCheckin(d, current.id)
-    toast.success('Check-in deleted')
+    if (!removeConfirm.isArmed(current.id)) { removeConfirm.arm(current.id); return }
+    const deleted = current
+    await deleteCheckin(d, deleted.id)
     onDeleted()
+    // `deleted` is the full checkin row — a complete undo, since a
+    // check-in is a single row keyed by id with no children to lose.
+    undoToast('Check-in deleted', async () => {
+      await saveCheckin(deleted.date, deleted)
+      entries.reload()
+    })
   }
 
   async function sendLoop() {
@@ -552,7 +564,8 @@ function CheckinView({ date, entryId, onSaved, onDeleted, onNav }) {
             <Icon name="auto_stories" size={17} /> View Saved Writing
           </button>
           <button className="btn btn-danger" onClick={remove}>
-            <Icon name="delete" size={17} /> Delete This Entry
+            <Icon name={current && removeConfirm.isArmed(current.id) ? 'warning' : 'delete'} size={17} />
+            {current && removeConfirm.isArmed(current.id) ? 'Tap again to delete' : 'Delete This Entry'}
           </button>
         </div>
 
@@ -834,6 +847,7 @@ function InboxView({ notes }) {
                   onClick={async () => {
                     if (!confirm.isArmed(t.id)) return confirm.arm(t.id)
                     await deleteThought(t.id); notes.reload()
+                    undoToast('Thought deleted', async () => { await saveThought(t); notes.reload() })
                   }}>
                   <Icon name="close" size={17} />
                 </button>
