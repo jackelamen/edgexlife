@@ -4,7 +4,7 @@ import toast from 'react-hot-toast'
 import Icon from '../components/ui/Icon'
 import { View } from '../components/shell/Shell'
 import {
-  Card, CardHead, PageHeader, Ring, Empty, Loading, Badge, Field, RangeScale, ErrorNote,
+  Card, CardHead, PageHeader, Ring, Empty, Loading, Badge, Field, ScaleField, ErrorNote,
 } from '../components/ui/Kit'
 import { useAsync } from '../hooks/useAsync'
 import {
@@ -412,27 +412,56 @@ export default function TodayPage() {
   const greeting = hour < 5 ? 'Still up' : hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
   const allClear = !alerts.length
   const totalOpen = (dueActions.length - dueDone) + (habitList.length - habitsDone)
+  const checklistClear = totalOpen === 0
+
+  // Pulled out so it can render in two places without copying the four
+  // HeroStat lines: inside the hero on desktop, and again — hidden via
+  // CSS on desktop, shown via CSS on mobile — right after the checklist,
+  // once the hero itself collapses to just its rings on a phone. See
+  // .hero-mc-strip-mobile in index.css.
+  const streakRow = (
+    <>
+      <HeroStat mod="health" value={healthStreak} unit={healthStreak === 1 ? 'day' : 'days'} label="Health streak" />
+      <HeroStat mod="wellness" value={checkinStreak} unit={checkinStreak === 1 ? 'day' : 'days'} label="Check-in streak" />
+      <HeroStat value={bestStreak} unit={bestStreak === 1 ? 'day' : 'days'} label="Best run" />
+      <HeroStat mod="goals" value={totalOpen} unit={totalOpen === 1 ? 'item' : 'items'}
+        label={allClear ? 'Open · all systems current' : 'Open today'} />
+    </>
+  )
 
   return (
     <View>
-      <PageHeader
-        kicker={new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-        title="Mission control"
-        sub="Everything that wants you today, and the state of all three systems."
-      />
+      {/* Wrapper scoped to this page only — the mobile reorder below
+          (see .today-flow in index.css) uses flex `order` on these
+          direct children, and needs a dedicated flex container rather
+          than the shared `.view` page padding every other page also
+          uses, so this doesn't touch layout anywhere else. */}
+      <div className="today-flow">
+      <div className="today-order-header">
+        {/* Title used to be the fixed word "Mission control" every day —
+            the largest text on the page saying nothing about today. It
+            now reports the one thing this whole page exists to answer:
+            is anything still open. The hero card just below still carries
+            the fuller trajectory line (traj.word/em); this is the
+            one-glance version above it. */}
+        <PageHeader
+          kicker={new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+          title={checklistClear ? 'All clear today' : `${totalOpen} open today`}
+        />
 
-      {/* The reason any of the rest of this page exists. See lib/identity.js. */}
-      <div className="north-star">
-        <Icon name="star" size={13} />
-        <span>{IDENTITY_STATEMENT}</span>
+        {/* The reason any of the rest of this page exists. See lib/identity.js. */}
+        <div className="north-star">
+          <Icon name="star" size={13} />
+          <span>{IDENTITY_STATEMENT}</span>
+        </div>
+
+        {/* Every other page has this; Today was the one page without it,
+            which meant a network failure here rendered indistinguishable
+            from "you have never logged anything" — an empty state with the
+            same visual weight as a real one, on the one page most likely to
+            get checked first thing in the morning on a flaky connection. */}
+        <ErrorNote error={healthIdx.error || wellnessIdx.error || sprints.error || habits.error} />
       </div>
-
-      {/* Every other page has this; Today was the one page without it,
-          which meant a network failure here rendered indistinguishable
-          from "you have never logged anything" — an empty state with the
-          same visual weight as a real one, on the one page most likely to
-          get checked first thing in the morning on a flaky connection. */}
-      <ErrorNote error={healthIdx.error || wellnessIdx.error || sprints.error || habits.error} />
 
       {/* ── Command banner ──────────────────────────────────────────────
              Rebuilt 2026-08-19. Three panes instead of copy-plus-ring:
@@ -440,8 +469,14 @@ export default function TodayPage() {
              (right), and the streaks that were previously computed
              nowhere on this page (strip). The open-item and alert counts
              are gone on purpose — both were restating the list rendered
-             directly beneath this card. */}
-      <div className="hero-card hero-mc-card" style={{ marginBottom: 14 }}>
+             directly beneath this card.
+
+             On a phone (see .hero-mc-main/.hero-mc-strip in index.css)
+             this collapses to just the rings row — the copy and streak
+             strip move out, so the card that used to be the first thing
+             below the header isn't also the thing standing between you
+             and today's checklist. */}
+      <div className="hero-card hero-mc-card today-order-hero" style={{ marginBottom: 14 }}>
         <HeroEdge />
         <div className="hero-mc">
           <div className="hero-mc-main">
@@ -463,106 +498,32 @@ export default function TodayPage() {
               caption={dueActions.length ? `${dueDone}/${dueActions.length} today` : `${activeGoals.length} active`} />
           </div>
 
-          <div className="hero-mc-strip">
-            <HeroStat mod="health" value={healthStreak} unit={healthStreak === 1 ? 'day' : 'days'} label="Health streak" />
-            <HeroStat mod="wellness" value={checkinStreak} unit={checkinStreak === 1 ? 'day' : 'days'} label="Check-in streak" />
-            <HeroStat value={bestStreak} unit={bestStreak === 1 ? 'day' : 'days'} label="Best run" />
-            <HeroStat mod="goals" value={totalOpen} unit={totalOpen === 1 ? 'item' : 'items'}
-              label={allClear ? 'Open · all systems current' : 'Open today'} />
+          <div className="hero-mc-strip hero-mc-strip-desktop">
+            {streakRow}
           </div>
         </div>
       </div>
 
-      {/* Turns the statement up top into today, specifically — see
-          components/today/IntentionCard.jsx. Below the hero, not above
-          it: "Mission control" opening the page is the whole point of
-          this being the first thing on screen every morning, and this
-          card demoted it when it sat above. Secondary follow-up, not a
-          replacement for it. */}
-      <div id="today-intention" style={{ scrollMarginTop: 16 }}>
-        <IntentionCard intention={intentionRow.data} loading={intentionRow.loading}
-          onChanged={() => intentionRow.reload()} />
-      </div>
-
-      {reviewDue && (
-        <Link to="/review" className="rv-due">
-          <span className="rv-due-ic"><Icon name="event_note" size={20} /></span>
-          <span className="rv-due-txt">
-            <strong>Close out {prettyWeek(dueWeekId)}</strong>
-            <small>Your weekly review is ready. The numbers are already gathered.</small>
-          </span>
-          <Icon name="arrow_forward" size={18} />
-        </Link>
-      )}
-
-      {/* ── Attention queue ── */}
-      {!allClear && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
-          {alerts.map((al, i) => {
-            const s = STATUS[al.sev]
-            const quickable = al.kind === 'health' || al.kind === 'wellness'
-            const open = quickable && quickOpen === al.kind
-            return (
-              <div key={i}>
-                <div className="alert-row">
-                  <span className="alert-dot" style={{ background: s.color }} />
-                  <div className="alert-ic" style={{ background: s.bg }}>
-                    <Icon name={al.icon} size={17} style={{ color: s.color }} />
-                  </div>
-                  <span className="alert-text">{al.text}</span>
-                  {quickable && (
-                    <button type="button" className="btn btn-secondary btn-xs"
-                      onClick={() => setQuickOpen(open ? null : al.kind)}>
-                      {open ? 'Cancel' : al.cta} <Icon name={open ? 'close' : 'bolt'} size={14} />
-                    </button>
-                  )}
-                  {al.scrollTo ? (
-                    <button type="button" className="btn btn-ghost btn-xs"
-                      onClick={() => document.getElementById(al.scrollTo)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
-                      Set it <Icon name="arrow_upward" size={14} />
-                    </button>
-                  ) : (
-                    <Link to={al.to} className="btn btn-ghost btn-xs">
-                      Open <Icon name="arrow_forward" size={14} />
-                    </Link>
-                  )}
-                </div>
-                {open && al.kind === 'health' && (
-                  <QuickHealthForm busy={quickBusy} onCancel={() => setQuickOpen(null)} onSave={quickSaveHealth} />
-                )}
-                {open && al.kind === 'wellness' && (
-                  <QuickWellnessForm busy={quickBusy} onCancel={() => setQuickOpen(null)} onSave={quickSaveWellness} />
-                )}
-              </div>
-            )
-          })}
+      {/* Mobile-only twin of the strip above — same content, rendered a
+          second time so it can sit below the checklist instead of inside
+          the now-collapsed hero. Wears the hero's own dark card treatment
+          (not a plain white .card) because .hero-stat's white/opacity
+          styling assumes that background. The two strips are mutually
+          exclusive by media query — see .hero-mc-strip-mobile in
+          index.css — never both visible at once. */}
+      <div className="hero-card hero-mc-card hero-mc-strip-mobile today-order-streaks">
+        <div className="hero-mc-strip">
+          {streakRow}
         </div>
-      )}
-
-      {/* ── Three systems, each in its own module hue ── */}
-      <div className="system-row">
-        <SystemPanel
-          module="health" to="/health"
-          lastLabel={lastHealthDate ? `Logged ${pretty(lastHealthDate)}` : 'Never logged'}
-          age={healthAge}
-          foot={healthScore != null ? healthLabel(healthScore)[0] : 'Log a day to start'}
-        />
-        <SystemPanel
-          module="wellness" to="/wellness"
-          lastLabel={lastCheckinDate ? `Checked in ${pretty(lastCheckinDate)}` : 'No check-in'}
-          age={checkinAge}
-          foot={lastCheckin?.state ? `Felt ${String(lastCheckin.state).toLowerCase()}` : 'Log how you are'}
-        />
-        <SystemPanel
-          module="goals" to="/goals"
-          lastLabel={`${liveCycles.length} live cycle${liveCycles.length === 1 ? '' : 's'}`}
-          age={null}
-          foot={dueActions.length ? `${dueDone} of ${dueActions.length} done today` : `${activeGoals.length} active goals`}
-        />
       </div>
 
-      {/* ── Due today: the actionable middle ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5" style={{ marginTop: 14 }}>
+      {/* ── Due today: the actionable middle, moved up so it's the first
+             thing you can act on after the hero on a phone, not five
+             sections down. Merging Due-today and Habits into one list was
+             considered and set aside — the two carry different fields and
+             toggle handlers, and a wrong merge is worse than the distance
+             this reorder alone already fixes. */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5 today-order-checklist">
         <Card>
           <CardHead
             title="Due today"
@@ -639,9 +600,102 @@ export default function TodayPage() {
         </Card>
       </div>
 
+      {/* Turns the statement up top into today, specifically — see
+          components/today/IntentionCard.jsx. */}
+      <div id="today-intention" className="today-order-intention" style={{ scrollMarginTop: 16 }}>
+        <IntentionCard intention={intentionRow.data} loading={intentionRow.loading}
+          onChanged={() => intentionRow.reload()} />
+      </div>
+
+      {reviewDue && (
+        <Link to="/review" className="rv-due today-order-review">
+          <span className="rv-due-ic"><Icon name="event_note" size={20} /></span>
+          <span className="rv-due-txt">
+            <strong>Close out {prettyWeek(dueWeekId)}</strong>
+            <small>Your weekly review is ready. The numbers are already gathered.</small>
+          </span>
+          <Icon name="arrow_forward" size={18} />
+        </Link>
+      )}
+
+      {/* ── Attention queue — an explicit "all caught up" state instead
+             of just rendering nothing, so finishing everything gets some
+             acknowledgement instead of the page silently going quiet. */}
+      {allClear ? (
+        <div className="alert-row all-clear-row today-order-alerts">
+          <div className="alert-ic" style={{ background: STATUS.good.bg }}>
+            <Icon name="check_circle" size={17} style={{ color: STATUS.good.color }} />
+          </div>
+          <span className="alert-text">All caught up — nothing needs your attention right now.</span>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }} className="today-order-alerts">
+          {alerts.map((al, i) => {
+            const s = STATUS[al.sev]
+            const quickable = al.kind === 'health' || al.kind === 'wellness'
+            const open = quickable && quickOpen === al.kind
+            return (
+              <div key={i}>
+                <div className="alert-row">
+                  <span className="alert-dot" style={{ background: s.color }} />
+                  <div className="alert-ic" style={{ background: s.bg }}>
+                    <Icon name={al.icon} size={17} style={{ color: s.color }} />
+                  </div>
+                  <span className="alert-text">{al.text}</span>
+                  {quickable && (
+                    <button type="button" className="btn btn-secondary btn-xs"
+                      onClick={() => setQuickOpen(open ? null : al.kind)}>
+                      {open ? 'Cancel' : al.cta} <Icon name={open ? 'close' : 'bolt'} size={14} />
+                    </button>
+                  )}
+                  {al.scrollTo ? (
+                    <button type="button" className="btn btn-ghost btn-xs"
+                      onClick={() => document.getElementById(al.scrollTo)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
+                      Set it <Icon name="arrow_upward" size={14} />
+                    </button>
+                  ) : (
+                    <Link to={al.to} className="btn btn-ghost btn-xs">
+                      Open <Icon name="arrow_forward" size={14} />
+                    </Link>
+                  )}
+                </div>
+                {open && al.kind === 'health' && (
+                  <QuickHealthForm busy={quickBusy} onCancel={() => setQuickOpen(null)} onSave={quickSaveHealth} />
+                )}
+                {open && al.kind === 'wellness' && (
+                  <QuickWellnessForm busy={quickBusy} onCancel={() => setQuickOpen(null)} onSave={quickSaveWellness} />
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* ── Three systems, each in its own module hue ── */}
+      <div className="system-row today-order-systems">
+        <SystemPanel
+          module="health" to="/health"
+          lastLabel={lastHealthDate ? `Logged ${pretty(lastHealthDate)}` : 'Never logged'}
+          age={healthAge}
+          foot={healthScore != null ? healthLabel(healthScore)[0] : 'Log a day to start'}
+        />
+        <SystemPanel
+          module="wellness" to="/wellness"
+          lastLabel={lastCheckinDate ? `Checked in ${pretty(lastCheckinDate)}` : 'No check-in'}
+          age={checkinAge}
+          foot={lastCheckin?.state ? `Felt ${String(lastCheckin.state).toLowerCase()}` : 'Log how you are'}
+        />
+        <SystemPanel
+          module="goals" to="/goals"
+          lastLabel={`${liveCycles.length} live cycle${liveCycles.length === 1 ? '' : 's'}`}
+          age={null}
+          foot={dueActions.length ? `${dueDone} of ${dueActions.length} done today` : `${activeGoals.length} active goals`}
+        />
+      </div>
+
       {/* ── What connects: the one thing three separate trackers couldn't
              show you, because their data never lived in the same place. ── */}
-      <Card style={{ marginTop: 14 }}>
+      <Card style={{ marginTop: 14 }} className="today-order-connects">
         <CardHead title="What connects" sub="Plain comparisons across your last 200 days of overlapping health and wellness logs." />
         {(patternHealth.loading || patternWellness.loading) ? <Loading /> : !patterns.length ? (
           <Empty icon="hub" title={matchedDays < 3 ? 'Not enough overlapping days yet' : 'No strong pattern yet'}>
@@ -664,7 +718,7 @@ export default function TodayPage() {
       </Card>
 
       {/* ── Standing goals state ── */}
-      <Card style={{ marginTop: 14 }}>
+      <Card style={{ marginTop: 14 }} className="today-order-goals">
         <CardHead title="Goals in play" sub="Active goals and what's attached to them."
           right={<Link to="/goals" className="btn btn-ghost btn-sm">Open <Icon name="arrow_forward" size={15} /></Link>} />
         {!activeGoals.length ? (
@@ -688,6 +742,7 @@ export default function TodayPage() {
           </div>
         )}
       </Card>
+      </div>
     </View>
   )
 }
@@ -750,7 +805,7 @@ function QuickHealthForm({ busy, onCancel, onSave }) {
           <input type="number" min="0" max="8" step="0.25" value={water}
             onChange={(e) => setWater(e.target.value)} placeholder="2" />
         </Field>
-        <RangeScale label="Energy" value={energy} onChange={setEnergy} low="Low" high="High" />
+        <ScaleField label="Energy" value={energy} onChange={setEnergy} low="Low" high="High" />
       </div>
       <div style={{ display: 'flex', gap: 8, marginTop: 12, justifyContent: 'flex-end' }}>
         <button type="button" className="btn btn-ghost btn-sm" onClick={onCancel}>Cancel</button>
@@ -779,10 +834,10 @@ function QuickWellnessForm({ busy, onCancel, onSave }) {
   return (
     <div className="card card-pad" style={{ marginTop: 6, marginLeft: 40 }}>
       <div className="grid grid-cols-2 gap-3">
-        <RangeScale label="Mood" value={mood} onChange={setMood} low="Heavy" high="Bright" />
-        <RangeScale label="Stress" value={stress} onChange={setStress} low="Easy" high="High" />
-        <RangeScale label="Clarity" value={clarity} onChange={setClarity} low="Foggy" high="Clear" />
-        <RangeScale label="Grounded" value={grounded} onChange={setGrounded} low="Adrift" high="Grounded" />
+        <ScaleField label="Mood" value={mood} onChange={setMood} low="Heavy" high="Bright" />
+        <ScaleField label="Stress" value={stress} onChange={setStress} low="Easy" high="High" invert />
+        <ScaleField label="Clarity" value={clarity} onChange={setClarity} low="Foggy" high="Clear" />
+        <ScaleField label="Grounded" value={grounded} onChange={setGrounded} low="Adrift" high="Grounded" />
       </div>
       <div style={{ display: 'flex', gap: 8, marginTop: 12, justifyContent: 'flex-end' }}>
         <button type="button" className="btn btn-ghost btn-sm" onClick={onCancel}>Cancel</button>
