@@ -4,7 +4,7 @@ import Icon from '../components/ui/Icon'
 import { View } from '../components/shell/Shell'
 import {
   PageHeader, Card, CardHead, StatCard, Badge, Tabs, Field, Empty, Loading,
-  ErrorNote, Modal, CoachCard, Ring, ScoreRow, useConfirm, undoToast,
+  ErrorNote, Modal, CoachCard, Ring, ScoreRow, useConfirm, undoToast, ScaleField,
 } from '../components/ui/Kit'
 import { useAsync } from '../hooks/useAsync'
 import { useViewParam } from '../hooks/useViewParam'
@@ -22,6 +22,9 @@ import { today, daysAgo, shiftDate, pretty } from '../lib/dates'
 import { STATUS } from '../lib/design'
 import BreathTimer from '../components/wellness/BreathTimer'
 
+// 'settings' used to be an 8th tab here — moved to the global Settings
+// page next to every other module's, same move as Health's (see the
+// VIEWS comment in HealthPage.jsx).
 const VIEWS = [
   { value: 'today', label: 'Today' },
   { value: 'checkin', label: 'Check In' },
@@ -30,7 +33,6 @@ const VIEWS = [
   { value: 'inbox', label: 'Mental Load' },
   { value: 'journal', label: 'Journal' },
   { value: 'trends', label: 'Trends' },
-  { value: 'settings', label: 'Settings' },
 ]
 
 const excerpt = (text, len = 130) => {
@@ -96,7 +98,6 @@ export default function WellnessPage() {
       {view === 'inbox' && <InboxView notes={notes} />}
       {view === 'journal' && <JournalView notes={notes} onEdit={openCheckin} />}
       {view === 'trends' && <TrendsView />}
-      {view === 'settings' && <SettingsView onSync={reloadAll} />}
     </View>
   )
 }
@@ -514,14 +515,15 @@ function CheckinView({ date, entryId, onSaved, onDeleted, onNav }) {
         <div className="form-section" style={{ marginTop: 20 }}>
           <div className="form-section-label">Scores</div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {[['stress', 'Stress'], ['clarity', 'Clarity'], ['grounded', 'Groundedness']].map(([k, label]) => (
-              <Field key={k} label={label}>
-                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                  <input type="range" min={0} max={5} value={form[k] ?? 3} onChange={(e) => set(k, Number(e.target.value))} />
-                  <div className="score-pill">{form[k] ?? 3}</div>
-                </div>
-              </Field>
-            ))}
+            {/* Stress is the one scale here where a HIGHER number is a
+                WORSE reading — invert so its green lands on "calm", not
+                on "5", matching Clarity/Groundedness where high is good. */}
+            <ScaleField label="Stress" value={form.stress ?? 3} onChange={(v) => set('stress', v)}
+              min={0} low="Calm" high="Stressed" invert />
+            <ScaleField label="Clarity" value={form.clarity ?? 3} onChange={(v) => set('clarity', v)}
+              min={0} low="Foggy" high="Clear" />
+            <ScaleField label="Groundedness" value={form.grounded ?? 3} onChange={(v) => set('grounded', v)}
+              min={0} low="Adrift" high="Grounded" />
           </div>
         </div>
 
@@ -1035,7 +1037,11 @@ function TrendsView() {
 
 /* ══════════════════ Settings ══════════════════ */
 
-function SettingsView({ onSync }) {
+// Exported: rendered from SettingsPage.jsx now (see the VIEWS comment
+// above), which passes its own onSync that force-refetches Wellness's
+// module-level caches — those are shared across every page that reads
+// them, not scoped to whichever page happened to trigger the refetch.
+export function SettingsView({ onSync }) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5">
       <Card>

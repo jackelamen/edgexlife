@@ -5,7 +5,7 @@ import { View } from '../components/shell/Shell'
 import {
   Card, CardHead, PageHeader, StatCard, Badge, Tabs, Modal, Field, SectionLabel,
   Empty, Loading, ErrorNote, CoachCard, Ring, ScoreRow, DriverRow, useConfirm,
-  MetricLegend, StatusDots, DesignLegend, undoToast,
+  MetricLegend, StatusDots, DesignLegend, undoToast, ScaleField,
 } from '../components/ui/Kit'
 import { useAsync } from '../hooks/useAsync'
 import { useViewParam } from '../hooks/useViewParam'
@@ -23,6 +23,12 @@ import WorkoutModule from '../components/health/WorkoutModule'
 import FastingModule, { FastingStatusCard } from '../components/health/FastingModule'
 import TrendChart from '../components/health/TrendChart'
 
+// 'settings' used to be a tab here too — 7 tabs on a phone means most of
+// them sit off-screen behind a scroll. Its content (score targets,
+// bodyweight) moved to the global Settings page instead, next to every
+// other module's settings; SettingsView itself just moved with it (still
+// defined in this file, exported, imported there) rather than being
+// rewritten.
 const VIEWS = [
   { value: 'today', label: 'Today' },
   { value: 'log', label: 'Daily Log' },
@@ -30,7 +36,6 @@ const VIEWS = [
   { value: 'fasting', label: 'Fasting' },
   { value: 'routines', label: 'Routines' },
   { value: 'trends', label: 'Trends' },
-  { value: 'settings', label: 'Settings' },
 ]
 
 export default function HealthPage() {
@@ -48,8 +53,13 @@ export default function HealthPage() {
           title="EDGE Health"
           sub="Build and protect a high Health Score."
           actions={
+            // "Log Today" used to say the same thing whether or not today
+            // was already logged — no way to tell at a glance. index is
+            // the dates-only index (see the egress note in README), so
+            // this costs nothing extra to check.
             <button className="btn btn-primary" onClick={() => setEditDate(today())}>
-              <Icon name="add" size={17} /> Log Today
+              <Icon name={index.data?.[0] === today() ? 'edit' : 'add'} size={17} />
+              {index.data?.[0] === today() ? 'Edit Today' : 'Log Today'}
             </button>
           }
         />
@@ -63,7 +73,6 @@ export default function HealthPage() {
       {view === 'fasting' && <FastingModule />}
       {view === 'routines' && <RoutinesView />}
       {view === 'trends' && <TrendsView settings={settings.data} index={index} />}
-      {view === 'settings' && <SettingsView settings={settings} />}
 
       <LogEditor
         date={editDate}
@@ -421,6 +430,10 @@ function SleepHoursField({ value, onChange }) {
   )
 }
 
+/* Kept only for the nutrition Rating field's 1-10 range — Kit's
+   ScaleField (tappable segments) covers every other scale in this editor
+   now, but ten segments in a row is more real estate than "a few
+   tappable buttons" can spend cleanly, so this one stays a slider. */
 function RangeField({ label, value, onChange, low, high, min = 1, max = 5 }) {
   const mid = Math.round((min + max) / 2)
   return (
@@ -559,9 +572,9 @@ function LogEditor({ date, settings, onClose, onSaved, onBodyweightSynced }) {
           <div style={{ marginTop: 20 }}>
             <SectionLabel>How it felt</SectionLabel>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
-              <RangeField label="Energy" value={f.energy} onChange={(v) => set('energy', v)} low="Depleted" high="Charged" />
-              <RangeField label="Sleep quality" value={f.sleepQuality} onChange={(v) => set('sleepQuality', v)} low="Broken" high="Deep" />
-              <RangeField label="Pain / strain" value={f.pain} onChange={(v) => set('pain', v)} low="None" high="Severe" min={0} />
+              <ScaleField label="Energy" value={f.energy} onChange={(v) => set('energy', v)} low="Depleted" high="Charged" />
+              <ScaleField label="Sleep quality" value={f.sleepQuality} onChange={(v) => set('sleepQuality', v)} low="Broken" high="Deep" />
+              <ScaleField label="Pain / strain" value={f.pain} onChange={(v) => set('pain', v)} low="None" high="Severe" min={0} invert />
             </div>
           </div>
 
@@ -788,7 +801,11 @@ function TrendsView({ settings, index }) {
 
 /* ═══════════════ Settings ═══════════════ */
 
-function SettingsView({ settings }) {
+// Exported: rendered from SettingsPage.jsx now, not from a tab on this
+// page (see the VIEWS comment above). Takes the same `settings` useAsync
+// object it always did — SettingsPage builds its own instance and passes
+// it in, so this component didn't need to change at all.
+export function SettingsView({ settings }) {
   const [form, setForm] = useState(null)
   const s = form ?? settings.data
   const [saving, setSaving] = useState(false)

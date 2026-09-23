@@ -7,10 +7,18 @@ import { clearVisionCache, getVisionImage } from '../lib/imageCache'
 import {
   refreshAll, fetchLegacyVision, dropLegacyVision, uploadVisionImage,
   fetchReminderPrefs, saveReminderPrefs, savePushSubscription, removePushSubscription,
+  fetchHealthSettings, fetchWellnessIndex, fetchWellnessNotes,
 } from '../lib/data'
 import { useAuth } from '../store/authStore'
 import { useAsync } from '../hooks/useAsync'
 import { pushSupported, notificationPermission, subscribeToPush, unsubscribeFromPush, subscriptionToRow } from '../lib/push'
+// Health and Wellness's own Settings tabs moved here (see the VIEWS
+// comment in each of those files) — 7 and 8 tabs respectively left most
+// of the tab strip off a phone's screen. Reusing the components rather
+// than rewriting them: same file they always lived in, same props, this
+// page just builds the instances they need and renders them.
+import { SettingsView as HealthSettingsView } from './HealthPage'
+import { SettingsView as WellnessSettingsView } from './WellnessPage'
 
 export default function SettingsPage() {
   const [ledger, setLedger] = useState(getLedger())
@@ -31,7 +39,7 @@ export default function SettingsPage() {
               <div className="lf-display tnum text-[30px]" style={{ color: 'var(--accent)' }}>
                 {formatBytes(ledger.bytes)}
               </div>
-              <p className="text-[12.5px] mt-1" style={{ color: 'var(--ink-3)' }}>
+              <p className="text-[12.5px] mt-1" style={{ color: 'var(--text-3)' }}>
                 Counted client-side. Cached reads cost nothing and aren't double counted.
                 This project once blew its free-tier allowance, so the number is kept
                 visible rather than assumed.
@@ -43,7 +51,7 @@ export default function SettingsPage() {
                 {rows.map(([name, bytes]) => (
                   <div key={name} className="row">
                     <span className="text-[13px] flex-1 min-w-0 truncate"
-                      style={{ color: 'var(--ink-2)' }}>{name}</span>
+                      style={{ color: 'var(--text-2)' }}>{name}</span>
                     <span className="text-[13px] tnum">{formatBytes(bytes)}</span>
                   </div>
                 ))}
@@ -51,6 +59,8 @@ export default function SettingsPage() {
             )}
 
             <LegacyMigration />
+            <HealthSettings />
+            <WellnessSettings />
           </div>
 
           <div className="flex flex-col gap-3.5">
@@ -71,8 +81,8 @@ export default function SettingsPage() {
             </Panel>
 
             <Panel title="Account">
-              <p className="text-[13px] mb-3" style={{ color: 'var(--ink-2)' }}>{user?.email}</p>
-              <p className="text-[12px] mb-3" style={{ color: 'var(--ink-4)' }}>
+              <p className="text-[13px] mb-3" style={{ color: 'var(--text-2)' }}>{user?.email}</p>
+              <p className="text-[12px] mb-3" style={{ color: 'var(--text-3)' }}>
                 Shared with Pulse and xFocus, same Supabase project, same user id.
               </p>
               <button className="btn" onClick={signOut}>Sign out</button>
@@ -138,7 +148,7 @@ function ReminderPanel() {
   return (
     <Panel title="Reminders" sub="A daily nudge to log, server-sent even if the app is closed.">
       {!supported ? (
-        <p className="text-[13px]" style={{ color: 'var(--ink-3)' }}>
+        <p className="text-[13px]" style={{ color: 'var(--text-3)' }}>
           This browser doesn't support push notifications.
         </p>
       ) : permission === 'granted' ? (
@@ -151,7 +161,7 @@ function ReminderPanel() {
           </button>
         </div>
       ) : permission === 'denied' ? (
-        <p className="text-[13px] mb-3" style={{ color: 'var(--ink-3)' }}>
+        <p className="text-[13px] mb-3" style={{ color: 'var(--text-3)' }}>
           Notifications are blocked for this site. Enable them in your browser's site settings, then reload.
         </p>
       ) : (
@@ -189,7 +199,7 @@ function ReminderPanel() {
             onChange={(e) => setForm({ ...p, intention_time: e.target.value })} />
         </div>
       </div>
-      <p className="text-[11.5px] mt-2" style={{ color: 'var(--ink-4)' }}>
+      <p className="text-[11.5px] mt-2" style={{ color: 'var(--text-3)' }}>
         Each one only fires if that day's entry isn't already done. Once you log or set it, it stays quiet.
       </p>
       <button className="btn btn-primary" style={{ marginTop: 14 }} disabled={!form || saving} onClick={save}>
@@ -218,7 +228,7 @@ function LegacyMigration() {
   if (!items.length) {
     return (
       <Panel title="Legacy vision photos">
-        <p className="text-[13px]" style={{ color: 'var(--ink-3)' }}>
+        <p className="text-[13px]" style={{ color: 'var(--text-3)' }}>
           All vision photos are in Storage. Nothing left in the JSONB blob.
         </p>
       </Panel>
@@ -251,11 +261,11 @@ function LegacyMigration() {
 
   return (
     <Panel title="Legacy vision photos">
-      <p className="text-[13px] mb-1" style={{ color: 'var(--ink-2)' }}>
+      <p className="text-[13px] mb-1" style={{ color: 'var(--text-2)' }}>
         {items.length} photos ({formatBytes(bytes)}) are still stored as base64 inside a
         single database row.
       </p>
-      <p className="text-[12.5px] mb-3.5" style={{ color: 'var(--ink-3)' }}>
+      <p className="text-[12.5px] mb-3.5" style={{ color: 'var(--text-3)' }}>
         Moving them into Storage lets Supabase's CDN serve them and removes the row that
         caused the original egress problem. This downloads each photo once, so expect
         roughly {formatBytes(bytes)} of traffic during the move.
@@ -265,4 +275,29 @@ function LegacyMigration() {
       </button>
     </Panel>
   )
+}
+
+/**
+ * Health's targets + bodyweight editor, moved here from Health's own
+ * "Settings" tab. SettingsView (defined in HealthPage.jsx, exported)
+ * takes the same `settings` useAsync object it always did — built fresh
+ * here rather than shared with HealthPage's own instance, since the two
+ * pages are never mounted at the same time.
+ */
+function HealthSettings() {
+  const settings = useAsync((f) => fetchHealthSettings({ force: f }))
+  return <HealthSettingsView settings={settings} />
+}
+
+/**
+ * Wellness's manual "Sync Now" button, moved here from Wellness's own
+ * "Settings" tab. `onSync` force-refetches the module-level caches
+ * (invalidated already by any save; this just re-primes them) so the
+ * next page that reads Wellness data gets it fresh — those caches are
+ * shared across every page, not scoped to whichever page triggered
+ * the refetch.
+ */
+function WellnessSettings() {
+  const onSync = () => { fetchWellnessIndex({ force: true }); fetchWellnessNotes({ force: true }) }
+  return <WellnessSettingsView onSync={onSync} />
 }
