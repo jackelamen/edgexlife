@@ -61,7 +61,7 @@ export const MODULES = {
      them. A muted olive-gold, picked deliberately far from every other
      hue already in this file (nothing else here reads as gold) so it
      never gets mistaken for STATUS.short's much brighter amber. */
-  identity: { label: 'Identity', color: '#6b5b1f', tint: '#efe9d0' },
+  identity: { label: 'Identity', color: '#a8781c', tint: '#f7ecd2' },
   /* Momentum is the same "sits above, not beside" move as Review and
      Identity, but for work (Pulse/xPM/xFocus) instead of the reflective
      three. A deep slate-blue, picked far enough from Review's navy and

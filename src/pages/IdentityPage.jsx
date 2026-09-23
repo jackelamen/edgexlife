@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import Icon from '../components/ui/Icon'
 import { View } from '../components/shell/Shell'
-import { Card, CardHead, PageHeader, Empty, Loading, ErrorNote, Ring } from '../components/ui/Kit'
+import { Card, CardHead, PageHeader, Empty, Loading, ErrorNote } from '../components/ui/Kit'
 import { useAsync } from '../hooks/useAsync'
 import {
   fetchGoals, fetchSprints, fetchSprintPhases, fetchSprintTactics, fetchWeeklyReviews,
@@ -133,7 +133,8 @@ export default function IdentityPage() {
   }
 
   const taggedCount = IDENTITY_THREADS.reduce((n, t) => n + (goalsByThread[t.key]?.length ? 1 : 0), 0)
-  const coveragePct = Math.round((taggedCount / IDENTITY_THREADS.length) * 100)
+  const covered = IDENTITY_THREADS.filter((t) => goalsByThread[t.key]?.length)
+  const gaps = IDENTITY_THREADS.filter((t) => !goalsByThread[t.key]?.length)
 
   return (
     <View>
@@ -143,80 +144,85 @@ export default function IdentityPage() {
         sub="Everything else in this app measures something. This is the standard the measuring is for."
       />
 
-      {/* Same .hero-card treatment Health and Wellness use for their own
-          headline number — this page's headline isn't a score (see the
-          no-Identity-Score note below), it's the statement itself, so the
-          quote takes the spot the big number usually sits in and the Ring
-          moves to showing thread COVERAGE instead of a score. A plain
-          bordered card here read as an afterthought next to how loud
-          every other module's hero is; this is the fix for that. */}
-      <div className="hero-card hero-identity" style={{ marginBottom: 14 }}>
-        <div className="hero-content">
-          <div>
-            <div className="hero-eyebrow">Your identity statement</div>
-            <p style={{ fontSize: 21, fontStyle: 'italic', fontWeight: 600, lineHeight: 1.45, margin: '0 0 12px' }}>
-              &ldquo;{IDENTITY_STATEMENT}&rdquo;
-            </p>
-            <p className="hero-copy">
-              {taggedCount} of {IDENTITY_THREADS.length} threads have an active goal behind them right now.
-              {taggedCount < IDENTITY_THREADS.length && ' The uncovered ones are below, named, not hidden.'}
-            </p>
+      {/* Rebuilt 2026-09-24. The olive .hero-card with a coverage Ring
+          read as a brown box with a meaningless "50" in it (the ring was
+          thread coverage, not a score). Now a real gold hero: the
+          statement is the centerpiece in dark ink, and coverage is six
+          thread icons that light up when a goal stands behind them. */}
+      <section className="id-hero">
+        <div className="id-eyebrow">Your identity statement</div>
+        <blockquote className="id-quote">{IDENTITY_STATEMENT}</blockquote>
+        <div className="id-coverage">
+          <div className="id-cov-dots">
+            {IDENTITY_THREADS.map((t) => (
+              <span key={t.key} className={goalsByThread[t.key]?.length ? 'on' : ''} title={t.label}>
+                <Icon name={t.icon} size={15} />
+              </span>
+            ))}
           </div>
-          <Ring score={coveragePct} sub={`${taggedCount} of ${IDENTITY_THREADS.length}`} />
+          <div className="id-cov-txt">
+            {taggedCount} of {IDENTITY_THREADS.length} threads have a goal behind them
+            {taggedCount < IDENTITY_THREADS.length && <small>The rest are listed below so they stay visible.</small>}
+          </div>
         </div>
-      </div>
+      </section>
 
-      {goals.error && <ErrorNote>{goals.error.message}</ErrorNote>}
+      {goals.error && <ErrorNote error={goals.error} />}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5">
-        {IDENTITY_THREADS.map((t) => {
-          const list = goalsByThread[t.key] || []
-          const signal = threadSignal(list)
-          const accent = threadAccent(signal)
-          return (
-            <Card key={t.key}
-              style={{ borderLeft: `3px ${accent.dashed ? 'dashed' : 'solid'} ${accent.border}` }}>
-              <CardHead
-                title={t.label}
-                sub={t.hint}
-                right={
-                  <div className="tile-ic" style={{ background: accent.chipBg, color: accent.chipColor }}>
-                    <Icon name={t.icon} size={17} />
-                  </div>
-                }
-              />
-              {loading ? <Loading /> : !list.length ? (
-                <div className="thread-gap-row">
-                  <Icon name={t.icon} size={15} />
-                  <span>No active goal yet</span>
-                  <Link to="/goals" className="btn btn-ghost btn-sm">Tag a goal</Link>
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {list.map((g) => {
-                    const exec = execForGoal(g.id)
-                    return (
-                      <div key={g.id}>
-                        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, marginBottom: 5 }}>
-                          <span style={{ fontSize: 13, fontWeight: 700 }}>{g.title}</span>
-                          {exec != null
-                            ? <span className="tnum" style={{ fontSize: 12.5, fontWeight: 800, color: scoreColor(exec), flexShrink: 0 }}>{exec}%</span>
-                            : <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text-3)', flexShrink: 0 }}>no live cycle</span>}
-                        </div>
-                        {exec != null && (
-                          <div className="score-meter" style={{ height: 6 }}>
-                            <span style={{ width: `${exec}%`, background: scoreColor(exec) }} />
+      {/* One list instead of six equal-weight cards with differently
+          coloured borders: covered threads first with their goals and a
+          thin bar each, uncovered ones gathered underneath as short lines.
+          The status colour now sits only on the icon chip and the bars. */}
+      <Card>
+        <CardHead title="Where it shows up" sub="Each thread of the statement and the goals behind it. Colour shows how the live cycle is going." />
+        {loading ? <Loading /> : (
+          <>
+            {covered.map((t) => {
+              const list = goalsByThread[t.key]
+              const accent = threadAccent(threadSignal(list))
+              return (
+                <div key={t.key} className="id-row">
+                  <span className="id-row-ic" style={{ background: accent.chipBg, color: accent.chipColor }}>
+                    <Icon name={t.icon} size={19} />
+                  </span>
+                  <div>
+                    <div className="id-row-title">{t.label}</div>
+                    <div className="id-row-hint">{t.hint}</div>
+                    <div className="id-goals">
+                      {list.map((g) => {
+                        const exec = execForGoal(g.id)
+                        return (
+                          <div key={g.id} className="id-goal">
+                            <span className="id-goal-title">{g.title}</span>
+                            {exec != null ? (
+                              <>
+                                <span className="id-goal-bar"><i style={{ width: `${exec}%`, background: scoreColor(exec) }} /></span>
+                                <span className="id-goal-pct tnum" style={{ color: scoreColor(exec) }}>{exec}%</span>
+                              </>
+                            ) : <span className="id-goal-none">No live cycle</span>}
                           </div>
-                        )}
-                      </div>
-                    )
-                  })}
+                        )
+                      })}
+                    </div>
+                  </div>
                 </div>
-              )}
-            </Card>
-          )
-        })}
-      </div>
+              )
+            })}
+            {gaps.length > 0 && (
+              <>
+                <div className="id-gap-hd">Not covered yet</div>
+                {gaps.map((t) => (
+                  <div key={t.key} className="id-gap">
+                    <Icon name={t.icon} size={18} />
+                    <span className="id-gap-txt">{t.label}<small>{t.hint}</small></span>
+                    <Link to="/goals" className="btn btn-ghost btn-sm">Tag a goal</Link>
+                  </div>
+                ))}
+              </>
+            )}
+          </>
+        )}
+      </Card>
 
       <Card style={{ marginTop: 14 }}>
         <CardHead title="Recent identity checks" sub="Your own weekly answers from Review, last 8 weeks." />
