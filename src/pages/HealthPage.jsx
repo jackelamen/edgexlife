@@ -53,13 +53,15 @@ export default function HealthPage() {
           title="EDGE Health"
           sub="Build and protect a high Health Score."
           actions={
-            // "Log Today" used to say the same thing whether or not today
-            // was already logged — no way to tell at a glance. index is
-            // the dates-only index (see the egress note in README), so
-            // this costs nothing extra to check.
+            // Opens the editor on today by default, but its own "Logging
+            // for" field can retarget any day — "Edit Today"/"Log Today"
+            // overclaimed that this was the only day reachable here. Same
+            // smart already-logged check as before (index is the
+            // dates-only index, so this costs nothing extra), wording
+            // just no longer names a specific day.
             <button className="btn btn-primary" onClick={() => setEditDate(today())}>
               <Icon name={index.data?.[0] === today() ? 'edit' : 'add'} size={17} />
-              {index.data?.[0] === today() ? 'Edit Today' : 'Log Today'}
+              {index.data?.[0] === today() ? 'Edit log' : 'Log a day'}
             </button>
           }
         />
