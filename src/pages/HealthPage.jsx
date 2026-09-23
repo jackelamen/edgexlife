@@ -268,10 +268,15 @@ function TodayView({ settings, index, onNavFasting }) {
 
         <Card>
           <CardHead
-            title="Today Routines"
+            title="Today's Routines"
             sub="The anchors you repeat."
             right={<Badge tone={done === list.length && list.length ? 'green' : 'blue'}>{done}/{list.length}</Badge>}
           />
+          {/* Was silently indistinguishable from "you have no routines" on
+              a real fetch failure — same class of bug Today's own top-level
+              ErrorNote was added to fix, just missed here since this card's
+              two queries (routines, checks) are scoped to this component. */}
+          <ErrorNote error={routines.error || checks.error} />
           {routines.loading ? (
             <Loading />
           ) : !list.length ? (
