@@ -10,14 +10,24 @@ export function useAsync(fn, deps = [], { enabled = true } = {}) {
   const fnRef = useRef(fn)
   fnRef.current = fn
 
-  const run = useCallback(async (force = false) => {
+  /* `background` is the reload() path: refetch the SAME query after a save.
+     It deliberately leaves `loading` false and keeps the current data on
+     screen. It used to flip `loading: true` like a first load, and nearly
+     every section renders `loading ? <Loading /> : content`, so every save
+     anywhere unmounted its section for a beat. The page got shorter,
+     the browser clamped the scroll position, and you landed back at the top
+     after ticking a single box. A deps change (new date window, new id)
+     is a different query, so that path still shows the loading state. */
+  const run = useCallback(async (force = false, background = false) => {
     if (!enabled) return
-    setState((s) => ({ ...s, loading: true, error: null }))
+    if (!background) setState((s) => ({ ...s, loading: true, error: null }))
     try {
       const data = await fnRef.current(force)
       if (alive.current) setState({ data, loading: false, error: null })
     } catch (error) {
-      if (alive.current) setState({ data: null, loading: false, error })
+      // A failed background refresh keeps what's on screen rather than
+      // blanking it; the error still surfaces through `error`.
+      if (alive.current) setState((s) => ({ data: background ? s.data : null, loading: false, error }))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled])
@@ -45,5 +55,5 @@ export function useAsync(fn, deps = [], { enabled = true } = {}) {
     setState((s) => ({ ...s, data: typeof next === 'function' ? next(s.data) : next }))
   }, [])
 
-  return { ...state, reload: () => run(true), setData }
+  return { ...state, reload: () => run(true, true), setData }
 }
