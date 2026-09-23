@@ -211,18 +211,45 @@ export function SectionLabel({ children }) {
   return <div className="form-section-label">{children}</div>
 }
 
-/** 1–5 slider with a score pill, matching the originals' .range-row. */
-export function RangeScale({ label, value, onChange, low, high }) {
+/**
+ * Was a native 1-5 (or 0-5, or 1-10) `<input type=range>` in three
+ * separate places (this file, HealthPage's RangeField, and a bare
+ * `<input type=range>` inline in WellnessPage) — a drag gesture for a
+ * handful of fixed values, fiddly on a phone, and it starts at the
+ * middle value with no way to tell "chose 3" from "never touched it".
+ * One tap on a segment instead, and the segment itself carries the
+ * value — no separate pill needed to read it back.
+ *
+ * `invert`: true when a HIGHER number is a WORSE reading (Stress, Pain)
+ * — every other scale in the app runs low-is-bad/high-is-good (Mood,
+ * Clarity, Energy…), so left uncorrected the "good" green would land on
+ * the high-stress end. This only recolors which end reads as healthy;
+ * the stored value's direction (and every score formula that already
+ * depends on it) is untouched.
+ */
+export function ScaleField({ label, value, onChange, low, high, min = 1, max = 5, invert = false }) {
+  const opts = []
+  for (let v = min; v <= max; v++) opts.push(v)
   return (
     <div className="field">
       {label && <label>{label}</label>}
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-        <input type="range" min={1} max={5} step={1} value={value ?? 3}
-          onChange={(e) => onChange(Number(e.target.value))} />
-        <span className="score-pill">{value ?? '–'}</span>
+      <div className="scale-field" role="radiogroup" aria-label={label}>
+        {opts.map((v) => {
+          const active = value === v
+          const frac = opts.length > 1 ? (v - min) / (max - min) : 0
+          const goodFrac = invert ? 1 - frac : frac
+          const bucket = goodFrac >= .66 ? 'good' : goodFrac <= .33 ? 'bad' : 'mid'
+          return (
+            <button type="button" key={v} role="radio" aria-checked={active}
+              className={`scale-seg${active ? ` active seg-${bucket}` : ''}`}
+              onClick={() => onChange(v)}>
+              {v}
+            </button>
+          )
+        })}
       </div>
       {(low || high) && (
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-3)', fontWeight: 600 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-3)', fontWeight: 600, marginTop: 2 }}>
           <span>{low}</span><span>{high}</span>
         </div>
       )}
