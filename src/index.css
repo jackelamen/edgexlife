@@ -2146,36 +2146,82 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
   .rv-weeknav .btn { padding: 8px 10px; }
 }
 
-/* ── Fasting stages (FastingModule FastingStages) ─────────── */
-.fs-strip { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 16px; scrollbar-width: none; }
-.fs-strip::-webkit-scrollbar { display: none; }
-.fs-chip {
-  flex: 0 0 auto; width: 118px; display: flex; flex-direction: column; align-items: flex-start; gap: 4px;
-  padding: 10px 11px; border-radius: 14px; border: 1.5px solid var(--border); background: var(--white-soft);
-  font-family: inherit; text-align: left; cursor: pointer; color: var(--text); transition: border-color .15s, background .15s;
+/* ── Fasting stages (FastingModule FastingStages / StageTrack) ──
+   One continuous track rather than a row of chip boxes: equal-width
+   segments, filled as you pass them, with a "now" marker and a target
+   flag positioned along it (see trackPos). */
+.fs-track { position: relative; padding-top: 30px; margin-bottom: 22px; }
+.fs-track-segs { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+.fs-seg {
+  display: flex; flex-direction: column; align-items: center; gap: 7px; min-width: 0;
+  background: none; border: none; padding: 4px 2px 6px; border-radius: 10px;
+  font-family: inherit; color: var(--text); cursor: pointer; transition: background .15s;
 }
-.fs-chip:hover { border-color: var(--border-med); }
-.fs-chip-ic { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; background: var(--white); color: var(--text-2); }
-.fs-chip-name { font-size: 12.5px; font-weight: 800; line-height: 1.25; }
-.fs-chip-hrs { font-size: 12px; font-weight: 600; color: var(--text-3); }
-.fs-chip-bar { display: block; width: 100%; height: 4px; border-radius: 99px; background: var(--border); overflow: hidden; margin-top: 2px; }
-.fs-chip-bar i { display: block; height: 100%; background: var(--accent); border-radius: 99px; }
-.fs-chip.is-done .fs-chip-ic { background: var(--s-good-bg); color: var(--s-good); }
-.fs-chip.is-now .fs-chip-ic { background: var(--accent); color: #fff; }
-.fs-chip.is-next { opacity: .72; }
-.fs-chip.is-sel { border-color: var(--accent); background: var(--white); opacity: 1; box-shadow: 0 0 0 3px var(--accent-dim); }
-.fs-detail { animation: allClearIn .25s ease both; }
-.fs-detail-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
-.fs-detail-name { font-size: 18px; font-weight: 800; letter-spacing: -.01em; }
-.fs-detail-hrs { font-size: 12.5px; color: var(--text-3); font-weight: 600; margin-top: 2px; }
-.fs-detail-hrs strong { color: var(--accent); font-weight: 800; }
-.fs-body { font-size: 14px; line-height: 1.6; color: var(--text); }
-.fs-section { font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); margin: 14px 0 6px; }
-.fs-list { margin: 0; padding-left: 18px; font-size: 13.5px; line-height: 1.6; color: var(--text-2); }
-.fs-tip {
-  display: flex; gap: 8px; align-items: flex-start; margin-top: 14px; padding: 11px 13px;
-  border-radius: 12px; background: var(--accent-dim); font-size: 13px; line-height: 1.5; color: var(--text);
+.fs-seg:hover { background: var(--white-soft); }
+.fs-seg-ic {
+  width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--white-soft); color: var(--text-3); border: 2px solid transparent; transition: all .15s;
 }
-.fs-tip .icon { color: var(--accent); flex-shrink: 0; margin-top: 1px; }
-.fs-note { font-size: 12px; color: var(--text-3); line-height: 1.5; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
+.fs-seg.is-done .fs-seg-ic { background: var(--s-good-bg); color: var(--s-good); }
+.fs-seg.is-now .fs-seg-ic { background: var(--accent); color: #fff; }
+.fs-seg.is-sel .fs-seg-ic { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
+.fs-seg-bar { display: block; width: 100%; height: 8px; background: var(--border); overflow: hidden; }
+.fs-seg:first-child .fs-seg-bar { border-radius: 99px 0 0 99px; }
+.fs-seg:last-child .fs-seg-bar { border-radius: 0 99px 99px 0; }
+.fs-seg-bar i { display: block; height: 100%; background: var(--accent); }
+.fs-seg.is-done .fs-seg-bar i { opacity: .55; }
+.fs-seg-name { font-size: 12px; font-weight: 700; line-height: 1.25; text-align: center; color: var(--text-2); }
+.fs-seg.is-sel .fs-seg-name, .fs-seg.is-now .fs-seg-name { color: var(--text); font-weight: 800; }
+.fs-seg.is-next .fs-seg-name { color: var(--text-3); }
+.fs-seg-hrs { font-size: 12px; font-weight: 600; color: var(--text-3); margin-top: -3px; }
+/* Markers sit over the bar row: 30px top pad + 4px + 34px icon + 7px gap. */
+.fs-now { position: absolute; top: 75px; width: 0; pointer-events: none; }
+.fs-now::before {
+  content: ''; position: absolute; left: -7px; top: -3px; width: 14px; height: 14px; border-radius: 50%;
+  background: #fff; border: 3px solid var(--accent); box-shadow: var(--shadow-sm);
+}
+.fs-now-lbl {
+  position: absolute; bottom: 52px; transform: translateX(-50%); white-space: nowrap;
+  font-size: 12px; font-weight: 800; color: #fff; background: var(--accent);
+  padding: 3px 8px; border-radius: 99px;
+}
+.fs-now-lbl::after {
+  content: ''; position: absolute; left: 50%; bottom: -4px; margin-left: -4px;
+  border: 4px solid transparent; border-bottom: 0; border-top-color: var(--accent);
+}
+.fs-target {
+  position: absolute; top: 72px; width: 3px; height: 14px; margin-left: -1.5px;
+  background: var(--text); border-radius: 2px; pointer-events: none; box-shadow: 0 0 0 2px var(--white);
+}
+.fs-target-lbl { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 800; white-space: nowrap; }
+.fs-target-lbl small { font-size: 12.5px; font-weight: 600; color: var(--text-3); margin-left: -4px; }
+.fs-target-key { width: 3px; height: 13px; border-radius: 2px; background: var(--text); }
+
+.fs-detail { display: grid; grid-template-columns: 1fr 300px; gap: 28px; animation: allClearIn .25s ease both; }
+.fs-detail-main { min-width: 0; max-width: 68ch; }
+.fs-detail-name { font-size: 20px; font-weight: 800; letter-spacing: -.01em; }
+.fs-detail-hrs { font-size: 13px; color: var(--text-3); font-weight: 600; margin-top: 2px; }
+.fs-detail-hrs strong { color: var(--text-2); font-weight: 800; }
+.fs-detail-hrs strong.is-now { color: var(--accent); }
+.fs-body { font-size: 14.5px; line-height: 1.65; color: var(--text); margin-top: 12px; }
+.fs-section { font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); margin: 16px 0 6px; display: block; }
+.fs-list { margin: 0; padding-left: 20px; list-style: disc; font-size: 14px; line-height: 1.7; color: var(--text-2); }
+.fs-list li::marker { color: var(--accent); }
+.fs-detail-side { display: flex; flex-direction: column; gap: 12px; }
+.fs-tip { padding: 14px 16px; border-radius: 14px; background: var(--accent-dim); }
+.fs-tip-hd { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--accent); margin-bottom: 6px; }
+.fs-tip p { font-size: 13.5px; line-height: 1.55; color: var(--text); }
+.fs-evidence { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 4px; }
+.fs-note { font-size: 12px; color: var(--text-3); line-height: 1.5; margin-top: 18px; padding-top: 12px; border-top: 1px solid var(--border); }
+.fast-stage-line { display: flex; flex-direction: column; gap: 2px; margin-top: 10px; }
+.fast-stage-line span { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 800; }
+.fast-stage-line small { font-size: 12.5px; font-weight: 600; opacity: .8; }
+@media (max-width: 900px) { .fs-detail { grid-template-columns: 1fr; gap: 16px; } }
+@media (max-width: 640px) {
+  .fs-seg-name { display: none; }
+  .fs-seg-ic { width: 30px; height: 30px; }
+  .fs-now { top: 71px; }
+  .fs-now-lbl { bottom: 48px; }
+  .fs-target { top: 68px; }
+}
 @media (prefers-reduced-motion: reduce) { .fs-detail { animation: none; } }

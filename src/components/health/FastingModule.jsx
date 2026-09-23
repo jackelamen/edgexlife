@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
 import Icon from '../ui/Icon'
 import { Card, CardHead, Badge, Empty, Loading, Modal, Field, useConfirm } from '../ui/Kit'
@@ -345,13 +345,13 @@ function ActiveFastCard({ session, onEnd, onEditStart }) {
           </p>
           {(() => {
             const h = ms / 3600000
+            const i = stageIndexAt(h)
             const next = hoursToNextStage(h)
-            const cur = FAST_STAGES[stageIndexAt(h)]
             return (
-              <p className="hero-copy" style={{ marginTop: 6, fontWeight: 700 }}>
-                {cur.name}
-                {next != null && ` · ${FAST_STAGES[stageIndexAt(h) + 1].name.toLowerCase()} in ${formatDuration(next * 3600000)}`}
-              </p>
+              <div className="fast-stage-line">
+                <span><Icon name={FAST_STAGES[i].icon} size={15} /> {FAST_STAGES[i].name}</span>
+                {next != null && <small>Next: {FAST_STAGES[i + 1].name.toLowerCase()} in {formatDuration(next * 3600000)}</small>}
+              </div>
             )
           })()}
         </div>
@@ -363,11 +363,13 @@ function ActiveFastCard({ session, onEnd, onEditStart }) {
               strokeDashoffset={2 * Math.PI * 34 * (1 - Math.min(100, pct ?? 0) / 100)} />
           </svg>
           <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column' }}>
-            <div style={{ fontSize: 20, fontWeight: 800, letterSpacing: '-.02em', color: '#fff' }}>
+            <div style={{ fontSize: 17, fontWeight: 800, letterSpacing: '-.02em', color: '#fff' }}>
               {pct != null ? `${Math.round(Math.min(100, pct))}%` : '--'}
             </div>
-            <div style={{ fontSize: 8, fontWeight: 800, letterSpacing: '.09em', textTransform: 'uppercase', opacity: .8, marginTop: 2, color: '#fff' }}>
-              of target
+            {/* "of target" in 8px caps clipped against the ring edge; the
+                actual target in hours is shorter and says more. */}
+            <div style={{ fontSize: 10, fontWeight: 700, opacity: .8, marginTop: 1, color: '#fff' }}>
+              {target ? `of ${target}h` : 'no target'}
             </div>
           </div>
         </div>
@@ -395,7 +397,7 @@ function ActiveFastCard({ session, onEnd, onEditStart }) {
    is selected (the current stage by default while a fast is running).
    Also shown with no fast running, so it can be read ahead of time.
    Content and the evidence caveats live in lib/fastingStages.js. */
-function FastingStages({ session }) {
+export function FastingStages({ session }) {
   const [, setTick] = useState(0)
   useEffect(() => {
     if (!session) return
@@ -404,24 +406,16 @@ function FastingStages({ session }) {
   }, [session])
 
   const hours = session ? elapsedMs(session) / 3600000 : null
+  const target = session ? targetHoursFor(session) : null
   const current = hours == null ? null : stageIndexAt(hours)
   const [picked, setPicked] = useState(null)
   const sel = picked ?? current ?? 0
-  // On a phone only the first two or three chips fit, so a fast that's a
-  // day in would open with its current stage scrolled out of sight.
-  // Bring it into view once, on open, without moving the page itself.
-  const stripRef = useRef(null)
-  useEffect(() => {
-    const strip = stripRef.current
-    const chip = strip?.children[current ?? 0]
-    if (strip && chip) strip.scrollLeft = chip.offsetLeft - strip.offsetLeft - 8
-  }, [current])
   const stage = FAST_STAGES[sel]
   const ev = EVIDENCE[stage.evidence]
 
   let status = null
   if (current != null) {
-    if (sel < current) status = 'You passed this stage'
+    if (sel < current) status = 'Passed'
     else if (sel === current) status = 'You are here'
     else status = `Starts in ${formatDuration((stage.from - hours) * 3600000)}`
   }
@@ -429,43 +423,37 @@ function FastingStages({ session }) {
   return (
     <Card style={{ marginBottom: 14 }}>
       <CardHead title={session ? "What's happening now" : 'Stages of a fast'}
-        sub={session ? 'Tap any stage to read ahead or look back.' : 'What your body does as a fast goes on. Tap a stage to read about it.'} />
+        sub={session ? 'Tap any stage to read ahead or look back.' : 'What your body does as a fast goes on. Tap a stage to read about it.'}
+        right={target ? (
+          <span className="fs-target-lbl">
+            <span className="fs-target-key" />{target}h target
+            <small>{hours >= target ? ' · reached' : ` · ${formatDuration((target - hours) * 3600000)} to go`}</small>
+          </span>
+        ) : null} />
 
-      <div className="fs-strip" role="tablist" ref={stripRef}>
-        {FAST_STAGES.map((st, i) => {
-          const state = current == null ? 'idle' : i < current ? 'done' : i === current ? 'now' : 'next'
-          const fill = i === current && st.to != null
-            ? Math.min(100, ((hours - st.from) / (st.to - st.from)) * 100) : null
-          return (
-            <button key={st.id} type="button" role="tab" aria-selected={i === sel}
-              className={`fs-chip is-${state}${i === sel ? ' is-sel' : ''}`}
-              onClick={() => setPicked(i)}>
-              <span className="fs-chip-ic">
-                <Icon name={state === 'done' ? 'check' : st.icon} size={18} />
-              </span>
-              <span className="fs-chip-name">{st.name}</span>
-              <span className="fs-chip-hrs">{stageRangeLabel(st)}</span>
-              {fill != null && <span className="fs-chip-bar"><i style={{ width: `${fill}%` }} /></span>}
-            </button>
-          )
-        })}
-      </div>
+      <StageTrack hours={hours} target={target} current={current} sel={sel} onPick={setPicked} />
 
       <div className="fs-detail" key={stage.id}>
-        <div className="fs-detail-head">
-          <div>
-            <div className="fs-detail-name">{stage.name}</div>
-            <div className="fs-detail-hrs">
-              {stage.to == null ? `${stage.from} hours and beyond` : `${stage.from} to ${stage.to} hours`}
-              {status && <> · <strong>{status}</strong></>}
-            </div>
+        <div className="fs-detail-main">
+          <div className="fs-detail-name">{stage.name}</div>
+          <div className="fs-detail-hrs">
+            {stage.to == null ? `${stage.from} hours and beyond` : `${stage.from} to ${stage.to} hours`}
+            {status && <> · <strong className={sel === current ? 'is-now' : ''}>{status}</strong></>}
           </div>
-          <Badge tone={ev.tone}>{ev.label}</Badge>
+          <p className="fs-body">{stage.body}</p>
+          <div className="fs-section">You may feel</div>
+          <ul className="fs-list">{stage.feel.map((f) => <li key={f}>{f}</li>)}</ul>
         </div>
-        <p className="fs-body">{stage.body}</p>
-        <div className="fs-section">You may feel</div>
-        <ul className="fs-list">{stage.feel.map((f) => <li key={f}>{f}</li>)}</ul>
-        <div className="fs-tip"><Icon name="lightbulb" size={16} /><span>{stage.tip}</span></div>
+        <aside className="fs-detail-side">
+          <div className="fs-tip">
+            <div className="fs-tip-hd"><Icon name="lightbulb" size={16} /> Tip</div>
+            <p>{stage.tip}</p>
+          </div>
+          <div className="fs-evidence">
+            <span className="fs-section" style={{ margin: 0 }}>Evidence</span>
+            <Badge tone={ev.tone}>{ev.label}</Badge>
+          </div>
+        </aside>
       </div>
 
       <p className="fs-note">
@@ -473,6 +461,65 @@ function FastingStages({ session }) {
         medical advice. Talk to a doctor before long fasts, especially if you have a health condition or take medication.
       </p>
     </Card>
+  )
+}
+
+/* The open-ended last stage is drawn as if it ran to this hour, so the
+   track has somewhere to put a marker past 72h. */
+const TRACK_END = 96
+
+/** 0-100 position of an hour along the track. Stages get equal widths
+    (a 4h stage and a 24h stage side by side would be unreadable at true
+    scale), so position is stage index plus progress through that stage. */
+function trackPos(h) {
+  const n = FAST_STAGES.length
+  const i = stageIndexAt(h)
+  const s = FAST_STAGES[i]
+  const to = s.to ?? TRACK_END
+  const frac = Math.max(0, Math.min(1, (h - s.from) / (to - s.from)))
+  return ((i + frac) / n) * 100
+}
+
+/**
+ * The whole fast as one continuous line, instead of the separate chip
+ * boxes it replaced: each stage is an equal-width segment (filled once
+ * passed, part-filled while you're in it), with a "now" marker at the
+ * elapsed time and a flag at the fast's target. Icons sit above, hour
+ * marks below; stage names only show where there's room for them.
+ */
+function StageTrack({ hours, target, current, sel, onPick }) {
+  const nowPos = hours == null ? null : trackPos(hours)
+  const targetPos = target ? trackPos(target) : null
+  return (
+    <div className="fs-track" role="tablist" aria-label="Fasting stages">
+      <div className="fs-track-segs">
+        {FAST_STAGES.map((st, i) => {
+          const state = current == null ? 'idle' : i < current ? 'done' : i === current ? 'now' : 'next'
+          const to = st.to ?? TRACK_END
+          const fill = state === 'done' ? 100
+            : state === 'now' ? Math.max(0, Math.min(100, ((hours - st.from) / (to - st.from)) * 100)) : 0
+          return (
+            <button key={st.id} type="button" role="tab" aria-selected={i === sel}
+              className={`fs-seg is-${state}${i === sel ? ' is-sel' : ''}`} onClick={() => onPick(i)}
+              title={`${st.name} · ${stageRangeLabel(st)}`}>
+              <span className="fs-seg-ic"><Icon name={state === 'done' ? 'check' : st.icon} size={17} /></span>
+              <span className="fs-seg-bar"><i style={{ width: `${fill}%` }} /></span>
+              <span className="fs-seg-name">{st.name}</span>
+              <span className="fs-seg-hrs">{st.from}h</span>
+            </button>
+          )
+        })}
+      </div>
+      {/* Just a notch on the bar; the target itself is spelled out in the
+          card header. A labelled flag up here collided with the "now" pill
+          whenever both fell in the same stage, which is most fasts. */}
+      {targetPos != null && <span className="fs-target" style={{ left: `${targetPos}%` }} title={`${target}h target`} />}
+      {nowPos != null && (
+        <span className="fs-now" style={{ left: `${nowPos}%` }}>
+          <span className="fs-now-lbl">{formatDuration(hours * 3600000)}</span>
+        </span>
+      )}
+    </div>
   )
 }
 
