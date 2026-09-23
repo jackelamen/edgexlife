@@ -412,7 +412,7 @@ function CycleCard({ sprint, phases, tactics, goal, compact, sprintsAsync, onDel
             {rate.total > 0 && ` · ${rate.done} of ${rate.total} commitments met`}
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
+        <div className="cycle-actions">
           {onDuplicate && <button className="btn btn-icon btn-sm btn-ghost" onClick={onDuplicate} title="Duplicate cycle">
             <Icon name="content_copy" size={15} /></button>}
           {onArchive && <button className="btn btn-icon btn-sm btn-ghost" onClick={onArchive} title={sprint.archived ? 'Unarchive' : 'Archive'}>
