@@ -41,16 +41,33 @@ export const bodypartLabel = (k) => (k === 'FullBody' ? 'Full Body' : k)
 // bodypart categories needs to skip it, or "Quick template" would show
 // up as a fake bodypart in the picker.
 export const WORKOUT_TEMPLATES_KEY = '__workoutTemplates'
-export const bodypartKeys = (db) => Object.keys(db).filter((k) => k !== WORKOUT_TEMPLATES_KEY)
+// Same trick for which exercises are bodyweight: a list of names under a
+// second reserved key, toggled per exercise in the Database tab. Absent
+// until first toggled, in which case the curated defaults below apply.
+export const BODYWEIGHT_KEY = '__bodyweight'
+export const bodypartKeys = (db) => Object.keys(db).filter((k) => !k.startsWith('__'))
 
 /* Exercises where the meaningful "getting stronger" signal is reps, not
    load — curated from DEFAULT_EXERCISE_DB's own bodyweight movements.
    Matched by exact name so a session's exercise entries (free-typed or
-   picked from the DB) line up without a schema change to the DB itself. */
-export const BODYWEIGHT_EXERCISES = new Set([
+   picked from the DB) line up without a schema change to the DB itself.
+   These are only the defaults; the saved DB's BODYWEIGHT_KEY list wins. */
+export const BODYWEIGHT_EXERCISES = [
   'Push-Up', 'Pull-Up', 'Dips', 'Plank', 'Side Plank', 'Dead Bug',
   'Hanging Knee Raise', 'Burpee', 'Bear Crawl', 'Chin-Up', 'Air Squat',
-])
+]
+
+export const bodyweightList = (db) => db?.[BODYWEIGHT_KEY] || BODYWEIGHT_EXERCISES
+
+/* The active set, synced from the loaded DB by WorkoutModule on every
+   render. Module-level so setLoadKg/sessionVolume keep their signatures
+   and every caller (heatmap, history, progress) agrees without threading
+   the DB through each one. */
+let activeBodyweight = new Set(BODYWEIGHT_EXERCISES)
+export function syncBodyweightExercises(db) {
+  activeBodyweight = new Set(bodyweightList(db))
+}
+export const isBodyweight = (name) => activeBodyweight.has(name)
 
 /** True if an exercise's progress should be tracked by reps rather than
     weight — either it's a known bodyweight movement, or every logged set
@@ -60,7 +77,7 @@ export const BODYWEIGHT_EXERCISES = new Set([
     since some moves (weighted pull-ups, a loaded plank) are genuinely
     tracked either way depending on how they were logged. */
 export function isBodyweightExercise(name, sessions) {
-  if (BODYWEIGHT_EXERCISES.has(name)) return true
+  if (isBodyweight(name)) return true
   let sawAnySet = false
   for (const s of sessions) {
     const ex = (s.exercises || []).find((e) => e.name === name)
@@ -95,14 +112,14 @@ export function weekDates(weeks = 0) {
 }
 
 /** The actual load moved on one set. For bodyweight exercises (Push-Up,
-    Pull-Up, Dips, etc. — see BODYWEIGHT_EXERCISES) any weight entered is
+    Pull-Up, Dips, etc. — whatever's toggled on in the Database tab) any weight entered is
     ADDED weight on top of bodyweight, e.g. a weighted dip with "20" logged
     is bodyweightKg + 20, not just 20 — leaving it as just 20 undercounts
     every unweighted rep of a hard bodyweight move. Everything else is
     unaffected: the entered weight is the load, same as always. */
 export function setLoadKg(exerciseName, weightInput, bodyweightKg = 70) {
   const w = parseFloat(weightInput) || 0
-  return BODYWEIGHT_EXERCISES.has(exerciseName) ? bodyweightKg + w : w
+  return isBodyweight(exerciseName) ? bodyweightKg + w : w
 }
 
 /** Total volume (reps × load) for a session — drives the heatmap shading.

@@ -13,6 +13,7 @@ import {
 } from '../../lib/data'
 import {
   WK_TYPES, DEFAULT_EXERCISE_DB, WK_TEMPLATES, bodypartLabel, bodypartKeys, WORKOUT_TEMPLATES_KEY,
+  BODYWEIGHT_KEY, bodyweightList, syncBodyweightExercises, isBodyweight,
   DAY_SHORT, weekDates, sessionVolume, sessionSetCount, fmtDuration,
   parseWorkoutCSV, WORKOUT_CSV_TEMPLATE, isBodyweightExercise, setLoadKg,
 } from '../../lib/workout'
@@ -80,6 +81,7 @@ export default function WorkoutModule() {
   const healthSettings = useAsync((f) => fetchHealthSettings({ force: f }))
 
   const db = dbRaw.data || DEFAULT_EXERCISE_DB
+  syncBodyweightExercises(db)
   const healthGoals = (goals.data || []).filter((g) => g.area === 'health' && g.status === 'active')
   const bodyweightKg = healthSettings.data?.bodyweightKg ?? 70
 
@@ -972,7 +974,7 @@ function SessionTab({ session, setSession, db, goals, plan, pastSessions, exerci
                   <div className="sets-grid">
                     <span className="set-label">#</span>
                     <span className="set-label">Reps</span>
-                    <span className="set-label">Weight</span>
+                    <span className="set-label">{isBodyweight(ex.name) ? '+ Weight' : 'Weight'}</span>
                     <span className="set-label">Vol</span>
                     <span />
                   </div>
@@ -991,7 +993,7 @@ function SessionTab({ session, setSession, db, goals, plan, pastSessions, exerci
                           sets: ex.sets.map((x, j) => j === si ? { ...x, reps: e.target.value } : x),
                         })} />
                       <input className="set-input" inputMode="decimal" value={s.weight}
-                        placeholder={ghost?.weight ? String(ghost.weight) : '—'}
+                        placeholder={ghost?.weight ? String(ghost.weight) : isBodyweight(ex.name) ? 'BW' : '—'}
                         onChange={(e) => updateEx(i, {
                           sets: ex.sets.map((x, j) => j === si ? { ...x, weight: e.target.value } : x),
                         })} />
@@ -1084,7 +1086,7 @@ function AddFromDB({ db, onAdd }) {
   exact same add/rename/delete row UI as the bodypart editor below it,
   just bound to a different slice of the same `local` object.
 */
-function ExerciseListEditor({ list, armPrefix, confirm, onChange, onCommit }) {
+function ExerciseListEditor({ list, armPrefix, confirm, onChange, onCommit, bodyweight, onToggleBodyweight }) {
   const [draft, setDraft] = useState('')
   function add() {
     if (!draft.trim()) return
@@ -1098,6 +1100,16 @@ function ExerciseListEditor({ list, armPrefix, confirm, onChange, onCommit }) {
             <input value={name} style={{ fontSize: 13, padding: '8px 10px' }}
               onChange={(e) => onChange(list.map((x, j) => j === i ? e.target.value : x))}
               onBlur={() => onCommit(list)} />
+            {bodyweight && (
+              <button className={`bw-toggle${bodyweight.has(name) ? ' on' : ''}`}
+                onClick={() => onToggleBodyweight(name)}
+                aria-pressed={bodyweight.has(name)}
+                title={bodyweight.has(name)
+                  ? 'Bodyweight: any weight logged is added on top of your bodyweight'
+                  : 'Mark as bodyweight'}>
+                <Icon name="accessibility_new" size={14} /> BW
+              </button>
+            )}
             <button className={`btn btn-icon btn-sm${confirm.isArmed(armPrefix + i) ? ' btn-danger' : ''}`}
               onClick={() => {
                 if (!confirm.isArmed(armPrefix + i)) return confirm.arm(armPrefix + i)
@@ -1134,6 +1146,12 @@ function DatabaseTab({ db, onSaved }) {
   }
 
   const list = local[bodypart] || []
+  const bodyweight = new Set(bodyweightList(local))
+  function toggleBodyweight(name) {
+    const next = new Set(bodyweight)
+    if (next.has(name)) next.delete(name); else next.add(name)
+    commit({ ...local, [BODYWEIGHT_KEY]: [...next] })
+  }
   // Templates ride along in the same blob under one reserved key (see
   // WORKOUT_TEMPLATES_KEY) rather than a separate table — falls back to
   // the built-ins exactly like DayModal's own selectType() does.
@@ -1155,6 +1173,7 @@ function DatabaseTab({ db, onSaved }) {
               onClick={() => commit({
                 ...JSON.parse(JSON.stringify(DEFAULT_EXERCISE_DB)),
                 [WORKOUT_TEMPLATES_KEY]: local[WORKOUT_TEMPLATES_KEY],
+                [BODYWEIGHT_KEY]: local[BODYWEIGHT_KEY],
               })}>
               <Icon name="restart_alt" size={15} /> Reset
             </button>
@@ -1175,7 +1194,11 @@ function DatabaseTab({ db, onSaved }) {
           </div>
           <div>
             <SectionLabel>{bodypartLabel(bodypart)} exercises</SectionLabel>
+            <p style={{ fontSize: 12.5, color: 'var(--text-3)', marginBottom: 10 }}>
+              Turn on BW for moves done with your own bodyweight. Weight logged for them counts as added load.
+            </p>
             <ExerciseListEditor list={list} armPrefix={bodypart} confirm={confirm}
+              bodyweight={bodyweight} onToggleBodyweight={toggleBodyweight}
               onChange={(next) => setLocal({ ...local, [bodypart]: next })}
               onCommit={(next) => commit({ ...local, [bodypart]: next })} />
           </div>
@@ -1901,7 +1924,7 @@ function NewGoalModal({ open, prefill, sessions, db, onClose, onSaved }) {
   const exerciseOptions = useMemo(() => {
     const names = new Set()
     sessions.forEach((s) => (s.exercises || []).forEach((e) => e.name?.trim() && names.add(e.name)))
-    Object.values(db || {}).forEach((list) => list.forEach((n) => names.add(n)))
+    bodypartKeys(db || {}).forEach((k) => (db[k] || []).forEach((n) => names.add(n)))
     return [...names].sort()
   }, [sessions, db])
 
