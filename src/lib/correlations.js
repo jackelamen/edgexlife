@@ -25,7 +25,7 @@
 */
 import { clarityDetails } from './scores'
 
-const MIN_DAYS_PER_BUCKET = 8 // was 3 — see header comment
+export const MIN_DAYS_PER_BUCKET = 8 // was 3 — see header comment
 const MIN_SCORE_GAP = 5 // 0-100 scale — a floor on practical size, not on its own sufficient
 const MIN_RATING_GAP = 0.4 // 1-5 scale — same role, for the mood pattern
 const SE_MULTIPLE = 1.5 // gap must clear this many standard errors of itself
@@ -52,7 +52,7 @@ function seOfDiff(yesVals, yesAvg, noVals, noAvg) {
   return Math.sqrt((sdYes ** 2) / yesVals.length + (sdNo ** 2) / noVals.length)
 }
 
-function bucketAvg(rows, predicate, valueFn) {
+export function bucketAvg(rows, predicate, valueFn) {
   const yes = [], no = []
   rows.forEach((r) => {
     const v = valueFn(r)
@@ -73,7 +73,7 @@ function bucketAvg(rows, predicate, valueFn) {
     noise two 8-day samples of a self-rated number would produce by
     chance. Either alone let too much through: the old code only checked
     the first. */
-function isSignificant(split, diff, minGap) {
+export function isSignificant(split, diff, minGap) {
   if (split.yesN < MIN_DAYS_PER_BUCKET || split.noN < MIN_DAYS_PER_BUCKET) return false
   if (Math.abs(diff) < minGap) return false
   if (split.se == null) return false

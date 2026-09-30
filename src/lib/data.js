@@ -540,6 +540,13 @@ function normalizeCheckin(c, fallbackDate) {
     grounded: num(c.grounded), present: c.present ?? null, lighter: c.lighter ?? null,
     sleepImpact: c.sleepImpact ?? null, state: c.state || null,
     loop: c.loop || '', reframe: c.reframe || '', savedAt: c.savedAt || null,
+    // Added with the emotion/trigger/commitment pass. All optional, so
+    // every older entry normalizes cleanly to empty values.
+    emotions: Array.isArray(c.emotions) ? c.emotions : [],
+    triggers: Array.isArray(c.triggers) ? c.triggers : [],
+    commit: c.commit && c.commit.text ? { text: c.commit.text, status: c.commit.status || 'open' } : null,
+    evidenceFor: c.evidenceFor || '', evidenceAgainst: c.evidenceAgainst || '',
+    reframeHelpful: c.reframeHelpful ?? null,
   }
 }
 
@@ -574,10 +581,13 @@ export const fetchWellnessNotes = (o) => cachedQuery('wellness-notes', async () 
     thoughts: (v.thoughts || []).map((t) => ({
       id: t.id, text: t.text || '', type: t.type || null,
       done: Boolean(t.done), createdAt: t.createdAt || null,
+      kind: t.kind || null, exp: t.exp || null, taskId: t.taskId || null,
     })),
     practices: (v.practices || []).map((p) => ({
       id: p.id, date: p.date, type: p.type || null,
       minutes: num(p.minutes), note: p.note || '', after: p.after ?? null,
+      savedAt: p.savedAt || null,
+      settledBefore: num(p.settledBefore), settledAfter: num(p.settledAfter),
     })),
   }
 }, { ttlMs: TTL.wellness, ...o })
@@ -585,7 +595,9 @@ export const fetchWellnessNotes = (o) => cachedQuery('wellness-notes', async () 
 export async function saveThought(t) {
   await rpc('life_save_thought', {
     p_thought: { id: t.id || newId('t'), text: t.text, type: t.type || null,
-      done: Boolean(t.done), createdAt: t.createdAt || new Date().toISOString() },
+      done: Boolean(t.done), createdAt: t.createdAt || new Date().toISOString(),
+      ...(t.kind ? { kind: t.kind } : {}), ...(t.exp ? { exp: t.exp } : {}),
+      ...(t.taskId ? { taskId: t.taskId } : {}) },
   })
   invalidate('wellness-notes')
 }
@@ -598,7 +610,11 @@ export async function deleteThought(id) {
 export async function addPractice(p) {
   await rpc('life_add_practice', {
     p_practice: { id: newId('p'), date: p.date, type: p.type, minutes: p.minutes,
-      note: p.note || '', after: p.after ?? null, savedAt: new Date().toISOString() },
+      note: p.note || '', after: p.after ?? null, savedAt: new Date().toISOString(),
+      // 1-5 "how settled am I" taps, before and after. Optional: a
+      // session logged without them still counts as a session.
+      ...(p.settledBefore != null ? { settledBefore: p.settledBefore } : {}),
+      ...(p.settledAfter != null ? { settledAfter: p.settledAfter } : {}) },
   })
   invalidate('wellness-notes')
 }
@@ -606,6 +622,17 @@ export async function addPractice(p) {
 export async function deletePractice(id) {
   await rpc('life_delete_practice', { p_id: id })
   invalidate('wellness-notes')
+}
+
+/** A real Pulse task, for converting a Mental Load item into something
+    that gets done. `goalId` is optional; status/priority take DB defaults. */
+export async function createTask({ title, goalId = null }) {
+  const { data, error } = await supabase.from('tasks')
+    .insert({ user_id: await uid(), title, goal_id: goalId })
+    .select('id').single()
+  if (error) throw error
+  invalidate('today-candidate-tasks'); invalidate('unlinked-tasks'); invalidate('goal-tasks'); invalidate('goal-rollup')
+  return data.id
 }
 
 /* ═══════════════════════ PULSE BRIDGE ═══════════════════════ */

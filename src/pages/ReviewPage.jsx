@@ -19,6 +19,7 @@ import {
   prettyWeek, gatherWeek, tacticBreakdown, reviewTargetWeekId,
 } from '../lib/review'
 import { IDENTITY_STATEMENT } from '../lib/identity'
+import { wellnessWeek } from '../lib/wellnessInsights'
 
 /*
   Weekly review.
@@ -141,6 +142,15 @@ export default function ReviewPage() {
     clarityOf: (c) => clarityDetails(c)?.score ?? null,
   }), [weekId, healthLogs.data, checkins.data, sessions.data, habitLogs.data, notes.data, settings.data])
 
+  // The inner side of the week, for the "How you felt" step. Bounded to the
+  // same Mon..Sun window as everything else here.
+  const inner = useMemo(() => {
+    const { from: wf, to: wt } = weekRange(weekId)
+    return wellnessWeek(
+      (checkins.data || []).filter((c) => c.date >= wf && c.date <= wt),
+      (notes.data?.practices || []).filter((p) => p.date >= wf && p.date <= wt))
+  }, [weekId, checkins.data, notes.data])
+
   /* Per-tactic completion for whichever cycle was live that week. Sorted
      worst first: the point of this block is to name what slipped, not to
      congratulate the tactics that didn't. */
@@ -199,7 +209,7 @@ export default function ReviewPage() {
         <ReviewFlow
           step={step} setStep={setStep}
           draft={draft} edit={edit} dirty={dirty} busy={busy} saved={saved} onSave={save}
-          summary={summary} loading={loading} lastWeek={lastWeek} lastWeekId={prevWeekId(weekId)}
+          summary={summary} inner={inner} loading={loading} lastWeek={lastWeek} lastWeekId={prevWeekId(weekId)}
           cycleRows={cycleRows} weekLabel={prettyWeek(weekId)}
         />
       )}
@@ -220,11 +230,12 @@ const SCORE_WORD = (n) => (n <= 3 ? 'Rough' : n <= 5 ? 'Mixed' : n <= 7 ? 'Solid
 const CORE = ['wins', 'challenges', 'learning']
 
 export function ReviewFlow({ step, setStep, draft, edit, dirty, busy, saved, onSave,
-  summary, loading, lastWeek, lastWeekId, cycleRows, weekLabel }) {
+  summary, inner, loading, lastWeek, lastWeekId, cycleRows, weekLabel }) {
   const promised = lastWeek && [lastWeek.priority_1, lastWeek.priority_2, lastWeek.priority_3].filter(Boolean)
   const hasPromises = (promised && promised.length) || cycleRows.length
   const steps = [
     { id: 'look', label: 'The week', done: true },
+    ...(inner && inner.checkins ? [{ id: 'inner', label: 'How you felt', done: true }] : []),
     ...(hasPromises ? [{ id: 'promises', label: 'Promises', done: true }] : []),
     { id: 'rate', label: 'Rate it', done: draft.score != null },
     { id: 'reflect', label: 'Reflect', done: CORE.some((k) => String(draft[k] || '').trim()) },
@@ -262,6 +273,28 @@ export function ReviewFlow({ step, setStep, draft, edit, dirty, busy, saved, onS
             <h2 className="rvf-q">Here's what the week actually did.</h2>
             <p className="rvf-sub">Gathered from what you logged, before you write anything. Memory rounds a week off; this doesn't.</p>
             {loading ? <Loading /> : <WeekStats s={summary} />}
+          </>
+        )}
+
+        {cur.id === 'inner' && (
+          <>
+            <h2 className="rvf-q">How the week felt from the inside.</h2>
+            <p className="rvf-sub">From your check-ins. Read it, then let it shape what you write next.</p>
+            <div className="rvf-block">
+              {inner.feelings.length > 0 && (
+                <div className="rvf-aside"><Icon name="psychology" size={15} /> Most named: {inner.feelings.map((f) => `${f.label} (${f.n})`).join(', ')}</div>
+              )}
+              {inner.triggers.length > 0 && (
+                <div className="rvf-aside"><Icon name="bolt" size={15} /> Behind it most: {inner.triggers.map((t) => `${t.label} (${t.n})`).join(', ')}</div>
+              )}
+              {inner.commitsMade > 0 && (
+                <div className="rvf-aside"><Icon name="task_alt" size={15} /> You kept {inner.commitsKept} of {inner.commitsMade} check-in commitments.</div>
+              )}
+              {inner.settled != null && (
+                <div className="rvf-aside"><Icon name="self_improvement" size={15} /> Practices moved you {inner.settled > 0 ? '+' : ''}{inner.settled} on the settled scale on average.</div>
+              )}
+            </div>
+            <p className="rvf-sub">Question for the next step: what one thing would you change about how you handled the hardest of these? Try it as an experiment in Wellness &rarr; Insights.</p>
           </>
         )}
 

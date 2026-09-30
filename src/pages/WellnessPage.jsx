@@ -11,20 +11,26 @@ import { useViewParam } from '../hooks/useViewParam'
 import {
   fetchWellnessIndex, fetchWellnessCheckins, fetchWellnessNotes,
   saveCheckin, deleteCheckin, saveThought, deleteThought,
-  addPractice, deletePractice, newId,
+  addPractice, deletePractice, newId, createTask, fetchGoals,
 } from '../lib/data'
 import {
-  clarityDetails, clarityLabel, MOOD_LABELS, STATES, SLEEP_IMPACTS, THOUGHT_TYPES,
+  clarityDetails, clarityLabel, MOOD_LABELS, SLEEP_IMPACTS, THOUGHT_TYPES,
 } from '../lib/scores'
 import { currentStreak, longestStreak, milestoneHit } from '../lib/streaks'
 import { RESET_TOOLS, suggestedReset, suggestedBreath, PRACTICE_TYPES, AFTER_STATES } from '../lib/practices'
 import { today, daysAgo, shiftDate, pretty } from '../lib/dates'
 import { STATUS } from '../lib/design'
 import BreathTimer from '../components/wellness/BreathTimer'
+import SettledRating from '../components/wellness/SettledRating'
+import InsightsView from '../components/wellness/InsightsView'
+import {
+  EMOTIONS, TRIGGERS, stateFromEmotions, feelLabel, practiceEffects, bestPractice, weeklyInsight,
+} from '../lib/wellnessInsights'
 
 // 'settings' used to be an 8th tab here — moved to the global Settings
 // page next to every other module's, same move as Health's (see the
-// VIEWS comment in HealthPage.jsx).
+// VIEWS comment in HealthPage.jsx). 'Trends' folded into Insights, which
+// carries the chart along with what the data says about you.
 const VIEWS = [
   { value: 'today', label: 'Today' },
   { value: 'checkin', label: 'Check In' },
@@ -32,8 +38,12 @@ const VIEWS = [
   { value: 'meditate', label: 'Meditate' },
   { value: 'inbox', label: 'Mental Load' },
   { value: 'journal', label: 'Journal' },
-  { value: 'trends', label: 'Trends' },
+  { value: 'insights', label: 'Insights' },
 ]
+
+// Mental Load types that mean "something to actually do" and can become a
+// real Pulse task; Hold / Journal / Release stay as thoughts.
+const ACTIONABLE = new Set(['Work task', 'Goal action', 'Finance action', 'Life admin'])
 
 const excerpt = (text, len = 130) => {
   const clean = String(text || '').replace(/\s+/g, ' ').trim()
@@ -55,13 +65,31 @@ export default function WellnessPage() {
   const [editingId, setEditingId] = useState(null)
 
   const index = useAsync((f) => fetchWellnessIndex({ force: f }))
-  const notes = useAsync((f) => fetchWellnessNotes({ force: f }))
+  const rawNotes = useAsync((f) => fetchWellnessNotes({ force: f }))
+
+  // Experiments ride in the thoughts list (tagged kind: 'experiment') so
+  // they need no new storage; everything that shows Mental Load items gets
+  // the list with them removed, and Insights gets the full one.
+  const notes = useMemo(() => rawNotes.data ? ({
+    ...rawNotes,
+    data: {
+      ...rawNotes.data,
+      allThoughts: rawNotes.data.thoughts,
+      thoughts: rawNotes.data.thoughts.filter((x) => x.kind !== 'experiment'),
+    },
+  }) : rawNotes, [rawNotes])
 
   const t = today()
   const todayCheckins = useAsync((f) => fetchWellnessCheckins(t, t, { force: f }), [t])
   const latest = (todayCheckins.data || [])[(todayCheckins.data || []).length - 1] || null
 
-  const reloadAll = () => { index.reload(); todayCheckins.reload(); notes.reload() }
+  // One 90-day read shared by the dashboard insight, Insights, and the
+  // personalised reset/breath suggestions, instead of each view fetching
+  // its own overlapping window.
+  const histFrom = daysAgo(90)
+  const history = useAsync((f) => fetchWellnessCheckins(histFrom, t, { force: f }), [histFrom, t])
+
+  const reloadAll = () => { index.reload(); todayCheckins.reload(); rawNotes.reload(); history.reload() }
 
   function openCheckin(date, id) {
     setEditingDate(date); setEditingId(id || null); setView('checkin')
@@ -83,6 +111,7 @@ export default function WellnessPage() {
 
       {view === 'today' && (
         <Dashboard latest={latest} notes={notes} todayCheckins={todayCheckins} index={index}
+          history={history.data || []} onChanged={reloadAll}
           onCheckIn={() => openCheckin(t, latest?.id)} onNav={setView} onOpenCheckin={openCheckin} />
       )}
       {view === 'checkin' && (
@@ -93,11 +122,15 @@ export default function WellnessPage() {
           onNav={setView}
         />
       )}
-      {view === 'reset' && <ResetView latest={latest} onNav={setView} onLogged={reloadAll} />}
-      {view === 'meditate' && <MeditateView latest={latest} onLogged={reloadAll} />}
-      {view === 'inbox' && <InboxView notes={notes} />}
+      {view === 'reset' && <ResetView latest={latest} notes={notes} onNav={setView} onLogged={reloadAll} />}
+      {view === 'meditate' && <MeditateView latest={latest} notes={notes} onLogged={reloadAll} />}
+      {view === 'inbox' && <InboxView notes={notes} onChanged={reloadAll} />}
       {view === 'journal' && <JournalView notes={notes} onEdit={openCheckin} />}
-      {view === 'trends' && <TrendsView />}
+      {(view === 'insights' || view === 'trends') && (
+        <InsightsView history={history.data || []} notes={notes} onNav={setView} onChanged={reloadAll}>
+          <TrendsView />
+        </InsightsView>
+      )}
     </View>
   )
 }
@@ -123,12 +156,29 @@ const CLARITY_PLACEHOLDERS = [
   { key: 'grounded', label: 'Groundedness' },
 ]
 
-function Dashboard({ latest, notes, todayCheckins, index, onCheckIn, onNav, onOpenCheckin }) {
+function Dashboard({ latest, notes, todayCheckins, index, history, onChanged, onCheckIn, onNav, onOpenCheckin }) {
   const details = latest ? clarityDetails(latest) : null
   const score = details?.score ?? null
   const [title, copy] = clarityLabel(score)
   const plan = getWellnessPlan(latest, score)
-  const tool = suggestedReset(latest?.state, score)
+  const practices = notes.data?.practices || []
+  const effects = useMemo(() => practiceEffects(practices), [practices])
+  const { tool, provenFor } = personalReset(latest, score, effects)
+  const insight = useMemo(() => weeklyInsight({ checkins: history, practices }), [history, practices])
+
+  // The most recent check-in (today's or yesterday's) still carrying an
+  // unanswered commitment, so a promise made last night is asked about
+  // this morning instead of silently expiring.
+  const pending = useMemo(() => {
+    const y = daysAgo(1)
+    return [...history].filter((c) => c.commit?.status === 'open' && c.date >= y)
+      .sort((a, b) => String(b.savedAt || b.date).localeCompare(String(a.savedAt || a.date)))[0] || null
+  }, [history])
+  async function answerCommit(c, status) {
+    await saveCheckin(c.date, { ...c, commit: { ...c.commit, status } })
+    toast.success(status === 'done' ? 'Kept. That counts.' : 'Noted. No judgment.')
+    onChanged()
+  }
   const practiceMins = (notes.data?.practices || [])
     .filter((p) => p.date === today()).reduce((s, p) => s + (p.minutes || 0), 0)
 
@@ -200,6 +250,22 @@ function Dashboard({ latest, notes, todayCheckins, index, onCheckIn, onNav, onOp
         <span className="practice-val">{practiceMins}m</span>
       </div>
 
+      {pending && (
+        <Card style={{ marginBottom: 18 }}>
+          <CardHead title="Follow through"
+            sub={`You committed to this ${pending.date === today() ? 'earlier today' : 'yesterday'}.`} />
+          <p style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>{pending.commit.text}</p>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button className="btn btn-primary btn-sm" onClick={() => answerCommit(pending, 'done')}>
+              <Icon name="check" size={15} /> Did it
+            </button>
+            <button className="btn btn-secondary btn-sm" onClick={() => answerCommit(pending, 'skipped')}>
+              Not this time
+            </button>
+          </div>
+        </Card>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5" style={{ marginBottom: 18 }}>
         <Card>
           <CardHead title="Score Breakdown"
@@ -213,8 +279,16 @@ function Dashboard({ latest, notes, todayCheckins, index, onCheckIn, onNav, onOp
           )}
         </Card>
         <Card>
-          <CardHead title="What Would Move It" sub="The score points to a lever, not a grade." />
-          {!details ? (
+          <CardHead title={insight ? 'What your data says' : 'What Would Move It'}
+            sub={insight ? 'Learned from your own check-ins and practices.' : 'The score points to a lever, not a grade.'} />
+          {insight ? (
+            <>
+              <CoachCard kicker={insight.kicker} title={insight.title}>{insight.body}</CoachCard>
+              <button className="btn btn-secondary btn-sm" style={{ marginTop: 10 }} onClick={() => onNav(insight.cta.view)}>
+                {insight.cta.label}
+              </button>
+            </>
+          ) : !details ? (
             <CoachCard kicker="Start here" title="Start with naming.">
               Mood, stress, clarity, groundedness, and one honest sentence are enough to make this useful.
             </CoachCard>
@@ -251,8 +325,15 @@ function Dashboard({ latest, notes, todayCheckins, index, onCheckIn, onNav, onOp
                   <Icon name={tool.icon || 'restart_alt'} size={16} />
                 </div>
                 <div>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: '.04em' }}>Suggested Reset</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: '.04em' }}>
+                    {provenFor ? 'Works for you' : 'Suggested Reset'}
+                  </div>
                   <div style={{ fontSize: 13, fontWeight: 700 }}>{tool.title}</div>
+                  {provenFor && (
+                    <div style={{ fontSize: 12, color: 'var(--text-3)' }}>
+                      +{provenFor.avgDelta} settled on average over {provenFor.n} sessions
+                    </div>
+                  )}
                 </div>
               </div>
               <button className="btn btn-secondary btn-sm" onClick={(e) => { e.stopPropagation(); onNav('reset') }}>
@@ -295,7 +376,7 @@ function RecentCheckins({ onOpen }) {
           <div key={c.id} className="mini-item" style={{ alignItems: 'flex-start' }} onClick={() => onOpen(c.date, c.id)}>
             <div>
               <strong>{pretty(c.date)} · {checkinTime(c)}</strong>
-              <small>{c.state || 'Unlabeled'} · stress {c.stress ?? '--'} · clarity {c.clarity ?? '--'}</small>
+              <small>{feelLabel(c)}{c.triggers?.length ? ` · ${c.triggers.slice(0, 2).join(', ')}` : ''} · stress {c.stress ?? '--'} · clarity {c.clarity ?? '--'}</small>
               {text && <small style={{ color: 'var(--text)', fontWeight: 600, marginTop: 7, display: 'block' }}>{excerpt(text)}</small>}
             </div>
             <Badge tone={s >= 80 ? 'green' : s >= 60 ? 'blue' : s >= 40 ? 'orange' : 'red'}>{s ?? '--'}</Badge>
@@ -331,9 +412,20 @@ function MemoryTiles({ latest, notes }) {
   )
 }
 
+/** The reset to suggest: the one that has measurably settled YOU, if there
+    is one, otherwise the state-based default. `provenFor` carries the
+    evidence so the UI can show it rather than assert it. */
+function personalReset(latest, score, effects) {
+  const best = (effects || []).find((e) => e.n >= 3 && e.avgDelta >= 0.5
+    && RESET_TOOLS.some((t) => t.title === e.type))
+  if (best) return { tool: RESET_TOOLS.find((t) => t.title === best.type), provenFor: best }
+  return { tool: suggestedReset(latest?.state, score), provenFor: null }
+}
+
 function confidenceLabel(c) {
-  const filled = ['mood', 'state', 'stress', 'clarity', 'grounded', 'present', 'lighter']
-    .filter((k) => c[k] !== '' && c[k] != null).length
+  const filled = [
+    'mood', c.emotions?.length ? 'emotions' : 'state', 'stress', 'clarity', 'grounded', 'present', 'lighter',
+  ].filter((k) => c[k] !== '' && c[k] != null).length
   return filled >= 6 ? 'High confidence' : filled >= 4 ? 'Useful signal' : 'Thin signal'
 }
 
@@ -379,11 +471,24 @@ function CheckinView({ date, entryId, onSaved, onDeleted, onNav }) {
   const current = selectedId ? list.find((c) => c.id === selectedId) : null
   const removeConfirm = useConfirm()
 
+  // mood starts at 3 like the other three scales (it was null, which the
+  // score treated as 3 anyway but the pattern code treated as "unrated").
   const blank = () => ({
-    id: null, date: d, mood: null, state: null, sleepImpact: null,
+    id: null, date: d, mood: 3, state: null, sleepImpact: null,
     stress: 3, clarity: 3, grounded: 3, present: '', lighter: '', loop: '', reframe: '',
+    emotions: [], triggers: [], commit: null, evidenceFor: '', evidenceAgainst: '', reframeHelpful: null,
   })
-  const [form, setForm] = useState(() => current ? { ...current } : blank())
+  // Quick is the default: a check-in should take thirty seconds or it
+  // stops happening. Full adds the deeper fields and the fix-up tools.
+  const [mode, setModeState] = useState(() => {
+    try { return localStorage.getItem('wellness-checkin-mode') || 'quick' } catch { return 'quick' }
+  })
+  const setMode = (m) => {
+    setModeState(m)
+    try { localStorage.setItem('wellness-checkin-mode', m) } catch { /* private mode */ }
+  }
+  const full = mode === 'full'
+  const [form, setForm] = useState(() => current ? { ...blank(), ...current } : blank())
   const [moveDate, setMoveDate] = useState(shiftDate(date, -1))
   const [saving, setSaving] = useState(false)
 
@@ -399,19 +504,41 @@ function CheckinView({ date, entryId, onSaved, onDeleted, onNav }) {
   // an existing check-in showed blank defaults instead of its saved
   // values, indistinguishable from starting a new one.
   useEffect(() => {
-    setForm(current ? { ...current } : blank())
+    setForm(current ? { ...blank(), ...current } : blank())
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [d, selectedId, entries.data])
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
   const preview = clarityDetails(form)?.score
+  const toggleIn = (k, v, max) => setForm((f) => {
+    const cur = f[k] || []
+    if (cur.includes(v)) return { ...f, [k]: cur.filter((x) => x !== v) }
+    return cur.length >= max ? f : { ...f, [k]: [...cur, v] }
+  })
+  const setCommit = (text) => setForm((f) => ({
+    ...f, commit: text.trim() ? { text, status: f.commit?.status || 'open' } : null,
+  }))
+  // Where the check-in points you next: the resets that suit the numbers
+  // just entered, offered as one-tap commitments.
+  const commitIdeas = useMemo(() => {
+    const ideas = []
+    if ((form.stress ?? 3) >= 4) ideas.push('Two minutes of slow breathing')
+    if ((form.clarity ?? 3) <= 2) ideas.push('Write the next three concerns down')
+    if ((form.grounded ?? 3) <= 2) ideas.push('Ten-minute walk, phone quiet')
+    if (form.loop?.trim()) ideas.push('Move the looping thought to Mental Load')
+    ideas.push('Send one honest message to someone steady', 'Take the next hour without notifications')
+    return ideas.slice(0, 4)
+  }, [form.stress, form.clarity, form.grounded, form.loop])
 
   async function save() {
     setSaving(true)
     try {
       const isNew = !form.id
       const id = form.id || newId('c')
-      await saveCheckin(d, { ...form, id })
+      // `state` stays populated (rolled up from the first feeling) so the
+      // breath/reset routing and Today's "Felt ..." line keep working.
+      const state = stateFromEmotions(form.emotions) || form.state || null
+      await saveCheckin(d, { ...form, id, state })
       // Only a genuinely new day's first check-in should be able to move
       // the streak — editing an existing entry (isNew === false) can't, so
       // it never checks or refires a milestone.
@@ -468,53 +595,31 @@ function CheckinView({ date, entryId, onSaved, onDeleted, onNav }) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-3.5">
       <Card>
-        <div className="form-section-label">Basics</div>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <Field label="Date">
-            <input type="date" value={d} onChange={(e) => { setD(e.target.value); setSelectedId(null) }} />
-          </Field>
-          <Field label="Mood">
-            <select value={form.mood ?? ''} onChange={(e) => set('mood', e.target.value ? Number(e.target.value) : null)}>
-              <option value="">Choose</option>
-              {Object.entries(MOOD_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-            </select>
-          </Field>
-          <Field label="Dominant State">
-            <select value={form.state || ''} onChange={(e) => set('state', e.target.value || null)}>
-              <option value="">Choose</option>
-              {STATES.map((s) => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </Field>
-          <Field label="Sleep Impact">
-            <select value={form.sleepImpact || ''} onChange={(e) => set('sleepImpact', e.target.value || null)}>
-              <option value="">Unknown</option>
-              {SLEEP_IMPACTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-            </select>
-          </Field>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 6, flexWrap: 'wrap' }}>
+          <div className="form-section-label" style={{ flex: 1, margin: 0 }}>How are you, right now?</div>
+          <Tabs value={mode} onChange={setMode} options={[{ value: 'quick', label: '30 seconds' }, { value: 'full', label: 'Full' }]} />
         </div>
 
-        <div className="form-section" style={{ marginTop: 20 }}>
-          <div className="form-section-label">Entry</div>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        {full && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3" style={{ marginTop: 10 }}>
+            <Field label="Date">
+              <input type="date" value={d} onChange={(e) => { setD(e.target.value); setSelectedId(null) }} />
+            </Field>
             <Field label="Saved check-ins for this date">
               <select value={selectedId || ''} onChange={(e) => setSelectedId(e.target.value || null)}>
                 {list.map((c, i) => (
-                  <option key={c.id} value={c.id}>{i + 1}. {checkinTime(c)} · {c.state || 'Unlabeled'}</option>
+                  <option key={c.id} value={c.id}>{i + 1}. {checkinTime(c)} · {feelLabel(c)}</option>
                 ))}
                 <option value="">+ New check-in</option>
               </select>
             </Field>
-            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10 }}>
-              <button className="btn btn-secondary" onClick={() => setSelectedId(null)}>
-                <Icon name="add" size={17} /> New check-in
-              </button>
-            </div>
           </div>
-        </div>
+        )}
 
-        <div className="form-section" style={{ marginTop: 20 }}>
-          <div className="form-section-label">Scores</div>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="form-section" style={{ marginTop: 16 }}>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <ScaleField label="Mood" value={form.mood ?? 3} onChange={(v) => set('mood', v)}
+              low={MOOD_LABELS[1]} high={MOOD_LABELS[5]} />
             {/* Stress is the one scale here where a HIGHER number is a
                 WORSE reading — invert so its green lands on "calm", not
                 on "5", matching Clarity/Groundedness where high is good. */}
@@ -528,65 +633,145 @@ function CheckinView({ date, entryId, onSaved, onDeleted, onNav }) {
         </div>
 
         <div className="form-section" style={{ marginTop: 20 }}>
+          <div className="form-section-label">What are you feeling? <span style={{ fontWeight: 500, textTransform: 'none', letterSpacing: 0 }}>(up to 3)</span></div>
+          {['pleasant', 'hard'].map((tone) => (
+            <div key={tone}>
+              <div className="pick-group-label">{tone === 'pleasant' ? 'Steady and good' : 'Hard'}</div>
+              <div className="pick-chips">
+                {EMOTIONS.filter((e) => e.tone === tone).map((e) => (
+                  <button key={e.label} type="button" className={`pick-chip${form.emotions?.includes(e.label) ? ' on' : ''}`}
+                    onClick={() => toggleIn('emotions', e.label, 3)}>{e.label}</button>
+                ))}
+              </div>
+            </div>
+          ))}
+          {!form.emotions?.length && form.state && (
+            <p style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 8 }}>Earlier label on this entry: {form.state}.</p>
+          )}
+        </div>
+
+        <div className="form-section" style={{ marginTop: 20 }}>
+          <div className="form-section-label">What is behind it? <span style={{ fontWeight: 500, textTransform: 'none', letterSpacing: 0 }}>(optional)</span></div>
+          <div className="pick-chips">
+            {TRIGGERS.map((t) => (
+              <button key={t} type="button" className={`pick-chip${form.triggers?.includes(t) ? ' on' : ''}`}
+                onClick={() => toggleIn('triggers', t, 3)}>{t}</button>
+            ))}
+          </div>
+        </div>
+
+        <div className="form-section" style={{ marginTop: 20 }}>
           <div className="form-section-label">Reflection</div>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
             <Field label="What is present?">
               <textarea value={form.present} placeholder="A plain sentence about what is true right now."
                 onChange={(e) => set('present', e.target.value)} />
             </Field>
-            <Field label="What would make today lighter?">
-              <textarea value={form.lighter} placeholder="One adjustment, support, boundary, or reset."
-                onChange={(e) => set('lighter', e.target.value)} />
-            </Field>
+            {full && (
+              <Field label="What would make today lighter?">
+                <textarea value={form.lighter} placeholder="One adjustment, support, boundary, or reset."
+                  onChange={(e) => set('lighter', e.target.value)} />
+              </Field>
+            )}
           </div>
+          {full && (
+            <div style={{ maxWidth: 260, marginTop: 12 }}>
+              <Field label="Sleep impact">
+                <select value={form.sleepImpact || ''} onChange={(e) => set('sleepImpact', e.target.value || null)}>
+                  <option value="">Unknown</option>
+                  {SLEEP_IMPACTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+                </select>
+              </Field>
+            </div>
+          )}
         </div>
 
-        <div className="form-section" style={{ marginTop: 20 }}>
-          <div className="form-section-label">Loop &amp; Reframe (optional)</div>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-            <Field label="Looping Thought">
-              <textarea value={form.loop} placeholder="Optional: the thought that keeps repeating."
-                onChange={(e) => set('loop', e.target.value)} />
-            </Field>
-            <Field label="Reframe">
-              <textarea value={form.reframe} placeholder="Optional: a kinder or more useful interpretation."
-                onChange={(e) => set('reframe', e.target.value)} />
-            </Field>
+        {full && (
+          <div className="form-section" style={{ marginTop: 20 }}>
+            <div className="form-section-label">Work a looping thought (optional)</div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+              <Field label="The thought that keeps repeating">
+                <textarea value={form.loop} placeholder="Say it as it sounds in your head."
+                  onChange={(e) => set('loop', e.target.value)} />
+              </Field>
+              <Field label="What supports it?">
+                <textarea value={form.evidenceFor} placeholder="Facts, not feelings."
+                  onChange={(e) => set('evidenceFor', e.target.value)} />
+              </Field>
+              <Field label="What does not fit it?">
+                <textarea value={form.evidenceAgainst} placeholder="Exceptions, other explanations, what a friend would say."
+                  onChange={(e) => set('evidenceAgainst', e.target.value)} />
+              </Field>
+              <Field label="A more balanced version">
+                <textarea value={form.reframe} placeholder="True, and kinder or more useful."
+                  onChange={(e) => set('reframe', e.target.value)} />
+              </Field>
+            </div>
+            {form.reframe?.trim() && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 13, color: 'var(--text-2)' }}>Does this version help?</span>
+                {[[true, 'Yes'], [false, 'Not really']].map(([v, l]) => (
+                  <button key={l} type="button" className={`pick-chip${form.reframeHelpful === v ? ' on' : ''}`}
+                    onClick={() => set('reframeHelpful', form.reframeHelpful === v ? null : v)}>{l}</button>
+                ))}
+              </div>
+            )}
           </div>
+        )}
+
+        <div className="form-section" style={{ marginTop: 20 }}>
+          <div className="form-section-label">One thing you will do next</div>
+          <div className="pick-chips" style={{ marginBottom: 10 }}>
+            {commitIdeas.map((idea) => (
+              <button key={idea} type="button" className={`pick-chip${form.commit?.text === idea ? ' on' : ''}`}
+                onClick={() => setCommit(form.commit?.text === idea ? '' : idea)}>{idea}</button>
+            ))}
+          </div>
+          <input type="text" value={form.commit?.text || ''} placeholder="Or write your own. We will ask how it went."
+            onChange={(e) => setCommit(e.target.value)} />
         </div>
 
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 20 }}>
           <button className="btn btn-primary" disabled={saving} onClick={save}>
-            <Icon name="save" size={17} /> {saving ? 'Saving…' : form.id ? 'Update check-in' : 'Save new check-in'}
+            <Icon name="save" size={17} /> {saving ? 'Saving…' : form.id ? 'Update check-in' : 'Save check-in'}
           </button>
-          <button className="btn btn-secondary" onClick={sendLoop}>
-            <Icon name="move_to_inbox" size={17} /> Send loop to inbox
-          </button>
-          <button className="btn btn-secondary" onClick={() => onNav('journal')}>
-            <Icon name="auto_stories" size={17} /> View saved writing
-          </button>
-          <button className="btn btn-danger" onClick={remove}>
-            <Icon name={current && removeConfirm.isArmed(current.id) ? 'warning' : 'delete'} size={17} />
-            {current && removeConfirm.isArmed(current.id) ? 'Tap again to delete' : 'Delete This Entry'}
-          </button>
+          {full && (
+            <>
+              <button className="btn btn-secondary" onClick={() => setSelectedId(null)}>
+                <Icon name="add" size={17} /> New check-in
+              </button>
+              <button className="btn btn-secondary" onClick={sendLoop}>
+                <Icon name="move_to_inbox" size={17} /> Send loop to inbox
+              </button>
+              <button className="btn btn-secondary" onClick={() => onNav('journal')}>
+                <Icon name="auto_stories" size={17} /> View saved writing
+              </button>
+              <button className="btn btn-danger" onClick={remove}>
+                <Icon name={current && removeConfirm.isArmed(current.id) ? 'warning' : 'delete'} size={17} />
+                {current && removeConfirm.isArmed(current.id) ? 'Tap again to delete' : 'Delete This Entry'}
+              </button>
+            </>
+          )}
         </div>
 
-        <div className="form-section" style={{ marginTop: 20 }}>
-          <div className="form-section-label">Fix Date</div>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-            <Field label="Move this check-in to">
-              <input type="date" value={moveDate} onChange={(e) => setMoveDate(e.target.value)} />
-            </Field>
-            <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-              <button className="btn btn-secondary" onClick={() => moveTo(moveDate)}>
-                <Icon name="drive_file_move" size={17} /> Move to date
-              </button>
-              <button className="btn btn-secondary" onClick={() => moveTo(shiftDate(d, -1))}>
-                <Icon name="undo" size={17} /> Move to previous day
-              </button>
+        {full && current && (
+          <details style={{ marginTop: 20 }}>
+            <summary style={{ cursor: 'pointer', fontSize: 13, fontWeight: 700, color: 'var(--text-2)' }}>Logged on the wrong day?</summary>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3" style={{ marginTop: 10 }}>
+              <Field label="Move this check-in to">
+                <input type="date" value={moveDate} onChange={(e) => setMoveDate(e.target.value)} />
+              </Field>
+              <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                <button className="btn btn-secondary" onClick={() => moveTo(moveDate)}>
+                  <Icon name="drive_file_move" size={17} /> Move to date
+                </button>
+                <button className="btn btn-secondary" onClick={() => moveTo(shiftDate(d, -1))}>
+                  <Icon name="undo" size={17} /> Previous day
+                </button>
+              </div>
             </div>
-          </div>
-        </div>
+          </details>
+        )}
       </Card>
 
       <Card>
@@ -597,15 +782,12 @@ function CheckinView({ date, entryId, onSaved, onDeleted, onNav }) {
             {clarityLabel(preview)[1]}
           </p>
         </div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 16 }}>
-          {STATES.map((s) => (
-            <button key={s} type="button" className="btn btn-sm"
-              style={form.state === s ? { background: 'var(--accent)', borderColor: 'var(--accent)', color: '#fff' } : undefined}
-              onClick={() => set('state', form.state === s ? null : s)}>
-              {s}
-            </button>
-          ))}
-        </div>
+        {(form.emotions?.length > 0 || form.triggers?.length > 0) && (
+          <div style={{ marginTop: 16, fontSize: 13, color: 'var(--text-2)' }}>
+            {form.emotions?.length > 0 && <div><strong>Feeling</strong> {form.emotions.join(', ')}</div>}
+            {form.triggers?.length > 0 && <div style={{ marginTop: 4 }}><strong>Behind it</strong> {form.triggers.join(', ')}</div>}
+          </div>
+        )}
       </Card>
     </div>
   )
@@ -613,8 +795,9 @@ function CheckinView({ date, entryId, onSaved, onDeleted, onNav }) {
 
 /* ══════════════════ Reset Tools ══════════════════ */
 
-function ResetView({ latest, onNav, onLogged }) {
-  const suggested = suggestedReset(latest?.state, latest ? clarityDetails(latest).score : null)
+function ResetView({ latest, notes, onNav, onLogged }) {
+  const effects = useMemo(() => practiceEffects(notes.data?.practices || []), [notes.data])
+  const { tool: suggested, provenFor } = personalReset(latest, latest ? clarityDetails(latest).score : null, effects)
   const [running, setRunning] = useState(null)
   // Breathe and Brain Dump already go somewhere real — a guided timer and
   // the Mental Load inbox, respectively. The other four used to just toast
@@ -635,7 +818,11 @@ function ResetView({ latest, onNav, onLogged }) {
             <div className="script-list">
               {t.steps.map((s, i) => <div key={i} className="script-line">{s}</div>)}
             </div>
-            {t.id === suggested.id && <div style={{ marginTop: 10 }}><Badge tone="purple">Suggested for you</Badge></div>}
+            {t.id === suggested.id && (
+              <div style={{ marginTop: 10 }}>
+                <Badge tone="purple">{provenFor ? `Works for you (+${provenFor.avgDelta})` : 'Suggested for you'}</Badge>
+              </div>
+            )}
             <button className="btn btn-secondary btn-sm" style={{ marginTop: 12 }}>
               <Icon name="play_arrow" size={15} /> Use reset
             </button>
@@ -662,9 +849,15 @@ function ResetRunner({ tool, onClose, onLogged }) {
   const [walkSecs, setWalkSecs] = useState(600)
   const [walkRunning, setWalkRunning] = useState(false)
   const [saving, setSaving] = useState(false)
+  // Before/after "how settled am I" taps are what let Insights say which
+  // resets actually work for you. Both optional; skipping still logs.
+  const [started, setStarted] = useState(false)
+  const [before, setBefore] = useState(null)
+  const [afterRating, setAfterRating] = useState(null)
 
   useEffect(() => {
     setStep(0); setNote(''); setWalkSecs(600); setWalkRunning(false); setSaving(false)
+    setStarted(false); setBefore(null); setAfterRating(null)
   }, [tool?.id])
 
   useEffect(() => {
@@ -680,11 +873,29 @@ function ResetRunner({ tool, onClose, onLogged }) {
   async function finish() {
     setSaving(true)
     try {
-      await addPractice({ date: today(), type: tool.title, minutes: tool.id === 'walk' ? 10 : 2, note: note.trim(), after: null })
+      await addPractice({
+        date: today(), type: tool.title, minutes: tool.id === 'walk' ? 10 : 2, note: note.trim(), after: null,
+        settledBefore: before, settledAfter: afterRating,
+      })
       toast.success(`${tool.title} logged`)
       onLogged()
       onClose()
     } catch (e) { toast.error(e.message) } finally { setSaving(false) }
+  }
+
+  if (!started) {
+    return (
+      <Modal open onClose={onClose} title={tool.title} sub={tool.body} width={480}>
+        <p style={{ fontSize: 14, color: 'var(--text-2)', marginBottom: 12 }}>
+          One tap first, so we can tell you afterwards whether this actually helps you.
+        </p>
+        <SettledRating label="How settled are you right now?" value={before} onChange={setBefore} />
+        <div style={{ display: 'flex', gap: 8, marginTop: 18 }}>
+          <button className="btn btn-primary" onClick={() => setStarted(true)}>Begin</button>
+          {before == null && <button className="btn btn-ghost" onClick={() => setStarted(true)}>Skip rating</button>}
+        </div>
+      </Modal>
+    )
   }
 
   return (
@@ -721,6 +932,9 @@ function ResetRunner({ tool, onClose, onLogged }) {
               <Icon name="content_copy" size={13} /> Copy
             </button>
           )}
+          <div style={{ marginTop: 14 }}>
+            <SettledRating label="How settled are you now?" value={afterRating} onChange={setAfterRating} />
+          </div>
         </div>
       )}
 
@@ -740,9 +954,11 @@ function ResetRunner({ tool, onClose, onLogged }) {
 
 /* ══════════════════ Meditate ══════════════════ */
 
-function MeditateView({ latest, onLogged }) {
+function MeditateView({ latest, notes, onLogged }) {
   const [note, setNote] = useState('')
   const [after, setAfter] = useState('')
+  const [before, setBefore] = useState(null)
+  const [settledAfter, setSettledAfter] = useState(null)
   const [practiceType, setPracticeType] = useState('Meditation')
   const [last, setLast] = useState(null)
 
@@ -750,10 +966,23 @@ function MeditateView({ latest, onLogged }) {
   // field the Reset tab already routes on — so the two tabs can't
   // disagree about what you told the app you're feeling.
   const suggestion = useMemo(() => suggestedBreath(latest?.state), [latest?.state])
+  // If one breath pattern has measurably settled you, say so. The state
+  // routing above stays as the default and the reason text; this only adds
+  // the evidence line, it doesn't silently swap the suggested preset.
+  const proven = useMemo(() => bestPractice(practiceEffects(notes.data?.practices || [])
+    .filter((e) => !RESET_TOOLS.some((t) => t.title === e.type))), [notes.data])
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5">
       <Card>
+        {proven && (
+          <p style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 12 }}>
+            <strong>{proven.type}</strong> has settled you most so far: +{proven.avgDelta} over {proven.n} rated sessions.
+          </p>
+        )}
+        <div style={{ marginBottom: 14 }}>
+          <SettledRating label="Before you start: how settled are you?" value={before} onChange={setBefore} />
+        </div>
         <BreathTimer suggestion={suggestion}
           onComplete={(r) => { setLast(r); setPracticeType(r.preset.practiceType) }} />
       </Card>
@@ -773,6 +1002,9 @@ function MeditateView({ latest, onLogged }) {
           </Field>
         </div>
         <div style={{ marginTop: 12 }}>
+          <SettledRating label="After: how settled are you now?" value={settledAfter} onChange={setSettledAfter} />
+        </div>
+        <div style={{ marginTop: 12 }}>
           <Field label="Note">
             <textarea value={note} placeholder="What shifted? What did you notice?"
               onChange={(e) => setNote(e.target.value)} />
@@ -780,9 +1012,12 @@ function MeditateView({ latest, onLogged }) {
         </div>
         <button className="btn btn-primary" style={{ marginTop: 14 }} onClick={async () => {
           const minutes = last?.minutes || 1
-          await addPractice({ date: today(), type: practiceType, minutes, note, after: after || null })
+          await addPractice({
+            date: today(), type: practiceType, minutes, note, after: after || null,
+            settledBefore: before, settledAfter,
+          })
           toast.success('Practice saved')
-          setNote(''); setAfter(''); setLast(null)
+          setNote(''); setAfter(''); setLast(null); setBefore(null); setSettledAfter(null)
           onLogged()
         }}>
           <Icon name="save" size={17} /> Save session
@@ -802,8 +1037,23 @@ function MeditateView({ latest, onLogged }) {
 function InboxView({ notes }) {
   const [text, setText] = useState('')
   const [type, setType] = useState(THOUGHT_TYPES[0])
+  const [goalFor, setGoalFor] = useState({})
   const confirm = useConfirm()
   const list = notes.data?.thoughts || []
+  const goals = useAsync((f) => fetchGoals({ force: f }))
+  const activeGoals = (goals.data || []).filter((g) => (g.status || 'active') === 'active')
+
+  // An actionable loop becomes a real Pulse task (optionally on a goal) and
+  // the loop is closed, so "Work task" means a task exists, not just a label.
+  async function makeTask(t) {
+    try {
+      const goalId = t.type === 'Goal action' ? goalFor[t.id] || null : null
+      const taskId = await createTask({ title: t.text, goalId })
+      await saveThought({ ...t, done: true, taskId })
+      notes.reload()
+      toast.success(goalId ? 'Task added to your goal' : 'Task added to Pulse')
+    } catch (e) { toast.error(e.message) }
+  }
 
   async function add() {
     if (!text.trim()) return
@@ -838,9 +1088,23 @@ function InboxView({ notes }) {
             <div key={t.id} className={`thought-row${t.done ? ' done' : ''}`}>
               <div>
                 <strong>{t.text}</strong>
-                <small>{t.type} · {t.createdAt ? new Date(t.createdAt).toLocaleDateString() : ''}</small>
+                <small>{t.type} · {t.createdAt ? new Date(t.createdAt).toLocaleDateString() : ''}{t.taskId ? ' · task created' : ''}</small>
               </div>
-              <div style={{ display: 'flex', gap: 6 }}>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                {!t.done && ACTIONABLE.has(t.type) && (
+                  <>
+                    {t.type === 'Goal action' && activeGoals.length > 0 && (
+                      <select style={{ maxWidth: 150 }} value={goalFor[t.id] || ''}
+                        onChange={(e) => setGoalFor((g) => ({ ...g, [t.id]: e.target.value }))}>
+                        <option value="">No goal</option>
+                        {activeGoals.map((g) => <option key={g.id} value={g.id}>{g.title}</option>)}
+                      </select>
+                    )}
+                    <button className="btn btn-secondary btn-sm" onClick={() => makeTask(t)}>
+                      <Icon name="add_task" size={15} /> Make task
+                    </button>
+                  </>
+                )}
                 <button className="btn btn-icon" title="Toggle"
                   onClick={async () => { await saveThought({ ...t, done: !t.done }); notes.reload() }}>
                   <Icon name={t.done ? 'undo' : 'check'} size={17} />
@@ -875,10 +1139,13 @@ function JournalView({ notes, onEdit }) {
   const entries = useMemo(() => {
     const cs = (checkins.data || []).map((c) => ({
       kind: 'checkin', date: c.date, savedAt: c.savedAt, title: 'Check-in',
-      meta: `${checkinTime(c)} · ${c.state || 'Unlabeled'} · mood ${c.mood ?? '--'} · stress ${c.stress ?? '--'} · clarity ${c.clarity ?? '--'}`,
+      meta: `${checkinTime(c)} · ${feelLabel(c)}${c.triggers?.length ? ' · ' + c.triggers.join(', ') : ''} · mood ${c.mood ?? '--'} · stress ${c.stress ?? '--'} · clarity ${c.clarity ?? '--'}`,
       fields: [['What is present?', c.present], ['What would make today lighter?', c.lighter],
-        ['Looping thought', c.loop], ['Reframe', c.reframe]].filter(([, v]) => String(v || '').trim()),
-      search: [c.date, c.state, c.present, c.lighter, c.loop, c.reframe].join(' '), ref: c,
+        ['Looping thought', c.loop], ['Supports it', c.evidenceFor], ['Does not fit it', c.evidenceAgainst],
+        ['Reframe', c.reframe],
+        ['Committed to', c.commit ? `${c.commit.text} (${{ done: 'kept', skipped: 'not this time', open: 'open' }[c.commit.status] || 'open'})` : '']]
+        .filter(([, v]) => String(v || '').trim()),
+      search: [c.date, c.state, (c.emotions || []).join(' '), (c.triggers || []).join(' '), c.present, c.lighter, c.loop, c.reframe, c.commit?.text].join(' '), ref: c,
     }))
     const ps = (notes.data?.practices || []).map((p) => ({
       kind: 'practice', date: p.date, savedAt: p.savedAt || p.date, title: 'Practice note',
