@@ -719,7 +719,8 @@ export default function TodayPage() {
              to a delta). What connects itself isn't gone — it folds in
              below once it actually has a pattern to report, and stays a
              one-line teaser rather than a full empty card while it doesn't. ── */}
-      <Card style={{ marginTop: 14 }} className="today-order-connects">
+      <Card style={{ marginTop: 14 }} className="today-order-connects" fold="Where to focus"
+        summary={weakest ? `${weakest.label}${weakestWellness ? ` and ${weakestWellness.label.toLowerCase()}` : ''} need the most` : 'Log a day to see it'}>
         <CardHead title="Where to focus" sub="The one lever worth pulling in each system right now." />
         <div className="focus-list">
           <FocusLever mod="health" label="Health" to="/health"
@@ -751,7 +752,8 @@ export default function TodayPage() {
       </Card>
 
       {/* ── Standing goals state ── */}
-      <Card style={{ marginTop: 14 }} className="today-order-goals">
+      <Card style={{ marginTop: 14 }} className="today-order-goals" fold="Goals in play"
+        summary={`${activeGoals.length} active ${activeGoals.length === 1 ? 'goal' : 'goals'}`}>
         <CardHead title="Goals in play" sub="Active goals and what's attached to them."
           right={<Link to="/goals" className="btn btn-ghost btn-sm">Open <Icon name="arrow_forward" size={15} /></Link>} />
         {!activeGoals.length ? (

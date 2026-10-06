@@ -9,6 +9,7 @@ import {
 } from '../components/ui/Kit'
 import { useAsync } from '../hooks/useAsync'
 import { useViewParam } from '../hooks/useViewParam'
+import { usePhone } from '../hooks/usePhone'
 import {
   fetchHealthIndex, fetchHealthLogs, fetchHealthSettings, saveHealthLog,
   deleteHealthLog, saveHealthSettings, fetchRoutines, saveRoutines,
@@ -104,6 +105,7 @@ export default function HealthPage() {
 /* ═══════════════ Today ═══════════════ */
 
 function TodayView({ settings, index, onNavFasting }) {
+  const phone = usePhone()
   const t = today()
   const logs = useAsync((f) => fetchHealthLogs(t, t, { force: f }), [t])
   const routines = useAsync((f) => fetchRoutines({ force: f }))
@@ -165,6 +167,18 @@ function TodayView({ settings, index, onNavFasting }) {
   const dots = Array.from({ length: 14 }).map((_, idx) => byDate[daysAgo(13 - idx)] ?? null)
   const onTrack = dots.filter((d) => d != null && d >= 85).length
 
+  const exercisedRow = (
+    <label className={`habit-row${log?.exercisedToday ? ' done' : ''}`}
+      style={{ cursor: 'pointer', marginTop: phone ? 0 : details ? 12 : 0 }}>
+      <input type="checkbox" checked={Boolean(log?.exercisedToday)} onChange={toggleExercised} />
+      <span style={{ fontWeight: 700, flex: 1 }}>Exercised today</span>
+      <Badge tone={log?.exercisedToday ? 'green' : 'muted'}>
+        {log?.exercisedToday ? `+${MOVEMENT_BONUS_POINTS} bonus applied` : `+${MOVEMENT_BONUS_POINTS} if checked`}
+      </Badge>
+    </label>
+  )
+
+
   return (
     <>
       <div className="hero-card" style={{ marginBottom: 14 }}>
@@ -204,8 +218,10 @@ function TodayView({ settings, index, onNavFasting }) {
           sub={log?.isFastingDay ? 'fasting day' : "today's rating"} />
       </div>
 
+      {phone && <div style={{ marginBottom: 14 }}>{exercisedRow}</div>}
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5">
-        <Card>
+        <Card fold="Score breakdown" summary={weakest ? `${weakest.label} is lowest` : 'No log yet today'}>
           <CardHead title="What's driving your score" sub="Same hue as the tile above, biggest point impact first." />
           {details ? (
             [...details.components]
@@ -220,19 +236,7 @@ function TodayView({ settings, index, onNavFasting }) {
             </Empty>
           )}
 
-          {/* Movement lives outside the weighted list on purpose — it's a
-              flat bonus (lib/scores.js MOVEMENT_BONUS_POINTS), not one more
-              thing averaged in, so it gets its own row instead of a
-              ScoreRow. Works with no log yet today, same as the routine
-              checkboxes below. */}
-          <label className={`habit-row${log?.exercisedToday ? ' done' : ''}`}
-            style={{ cursor: 'pointer', marginTop: details ? 12 : 0 }}>
-            <input type="checkbox" checked={Boolean(log?.exercisedToday)} onChange={toggleExercised} />
-            <span style={{ fontWeight: 700, flex: 1 }}>Exercised today</span>
-            <Badge tone={log?.exercisedToday ? 'green' : 'muted'}>
-              {log?.exercisedToday ? `+${MOVEMENT_BONUS_POINTS} bonus applied` : `+${MOVEMENT_BONUS_POINTS} if checked`}
-            </Badge>
-          </label>
+          {!phone && exercisedRow}
 
           <div style={{
             display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
@@ -312,8 +316,12 @@ const WINDOWS = [
   { value: 30, label: '30 days' }, { value: 90, label: '90 days' }, { value: 365, label: '1 year' },
 ]
 
+const LOG_PAGE = 20
+
 function LogView({ settings, index, onEdit }) {
   const [days, setDays] = useState(90)
+  // A year of logs is hundreds of rows; show the recent ones and let the rest be asked for.
+  const [shown, setShown] = useState(LOG_PAGE)
   const from = daysAgo(days)
   const to = today()
   const logs = useAsync((f) => fetchHealthLogs(from, to, { force: f }), [from, to])
@@ -328,7 +336,7 @@ function LogView({ settings, index, onEdit }) {
         <CardHead
           title="Log history"
           sub="Every day you have recorded."
-          right={<Tabs value={days} onChange={setDays} options={WINDOWS} />}
+          right={<Tabs sub value={days} onChange={(d) => { setDays(d); setShown(LOG_PAGE) }} options={WINDOWS} />}
         />
         {stale && (
           <div style={{ background: 'var(--orange-light)', color: 'var(--orange)', borderRadius: 12, padding: '11px 13px', fontSize: 12.5, fontWeight: 700, marginBottom: 14 }}>
@@ -344,13 +352,10 @@ function LogView({ settings, index, onEdit }) {
               <Icon name="add" size={17} /> Log today</button>} />
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {logs.data.map((l) => {
+            {logs.data.slice(0, shown).map((l) => {
               const score = healthDetails(l, settings)?.score
               return (
-                <div key={l.date} style={{
-                  display: 'grid', gridTemplateColumns: '1.1fr 2fr auto', gap: 14, alignItems: 'center',
-                  padding: 14, border: '1px solid var(--border)', borderRadius: 12, background: 'var(--white)',
-                }}>
+                <div key={l.date} className="log-row">
                   <div>
                     <div style={{ fontSize: 14, fontWeight: 650 }}>{pretty(l.date)}</div>
                     <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 2 }}>
@@ -401,6 +406,12 @@ function LogView({ settings, index, onEdit }) {
                 </div>
               )
             })}
+            {logs.data.length > shown && (
+              <button type="button" className="btn btn-secondary" onClick={() => setShown(shown + LOG_PAGE)}>
+                Show {Math.min(LOG_PAGE, logs.data.length - shown)} more
+                <span style={{ color: 'var(--text-3)', fontWeight: 400 }}>{logs.data.length - shown} older</span>
+              </button>
+            )}
           </div>
         )}
       </Card>
@@ -623,7 +634,7 @@ function LogEditor({ date, settings, onClose, onSaved, onBodyweightSynced }) {
               placeholder="Anything that explains today's numbers." />
           </div>
 
-          <div style={{
+          <div className="modal-foot" style={{
             display: 'flex', gap: 10, marginTop: 20, alignItems: 'center', flexWrap: 'wrap',
           }}>
             <button className="btn btn-primary" onClick={save} disabled={saving}>
@@ -758,8 +769,8 @@ function TrendsView({ settings, index }) {
   return (
     <>
       <div className="flex items-center justify-between gap-3 flex-wrap" style={{ marginBottom: 16 }}>
-        <Tabs value={metric} onChange={setMetric} options={METRICS} />
-        <Tabs value={days} onChange={setDays} options={WINDOWS} />
+        <Tabs sub value={metric} onChange={setMetric} options={METRICS} />
+        <Tabs sub value={days} onChange={setDays} options={WINDOWS} />
       </div>
 
       {stale && (
@@ -795,7 +806,7 @@ function TrendsView({ settings, index }) {
             </Card>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <Card>
+              <Card fold="What's driving it" summary={drivers[0] ? `${drivers[0].label} is weakest` : undefined}>
                 <CardHead title="What's driving it" sub="Weakest driver first." />
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
                   {drivers.map((d) => (
@@ -838,7 +849,7 @@ export function SettingsView({ settings }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 560 }}>
-    <Card>
+    <Card fold="Targets" summary="Sleep, steps, water, exercise">
       <CardHead title="Targets" sub="These feed the Health Score directly." />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14 }}>
         <Field label="Sleep target (h)">
@@ -868,7 +879,7 @@ export function SettingsView({ settings }) {
       </button>
     </Card>
 
-    <Card>
+    <Card fold="Bodyweight" summary="Used by Workout and weight goals">
       <CardHead title="Bodyweight" sub="Doesn't feed the Health Score. Used by Workout and, optionally, a weight goal." />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14 }}>
         <Field label="Current bodyweight (kg)">

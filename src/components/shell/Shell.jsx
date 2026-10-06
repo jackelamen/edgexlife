@@ -27,6 +27,10 @@ const NAV = [
 
 const LINKS = NAV.filter((n) => n.to)
 
+/* Modules that live behind the phone's "More" slot. */
+const MORE_MODULES = ['review', 'identity', 'momentum', 'settings']
+const MORE_LINKS = LINKS.filter((n) => MORE_MODULES.includes(n.module))
+
 /* Sibling apps on the same Supabase account. The sidebar already lists every
    Life module, so Cmd+K jumps out to these instead of duplicating the nav. */
 const APPS = [
@@ -58,7 +62,8 @@ export default function Shell({ children }) {
   const [cmd, setCmd] = useState(false)
   const { user, signOut } = useAuth()
   const location = useLocation()
-  useModuleTheme(location.pathname)
+  const mod = useModuleTheme(location.pathname)
+  const moreActive = MORE_MODULES.includes(mod)
 
   useEffect(() => { setOpen(false) }, [location.pathname])
 
@@ -122,38 +127,16 @@ export default function Shell({ children }) {
     <div style={{ display: 'flex', minHeight: '100vh' }}>
       <aside id="sidebar-desktop">{sidebar}</aside>
 
-      {/* Mobile top bar — visible only under 1024px, see .mobile-topbar in index.css */}
-      <div className="mobile-topbar">
-        <button onClick={() => setOpen(true)} aria-label="Menu"
-          style={{ background: 'none', border: 'none', color: 'var(--text-2)', cursor: 'pointer' }}>
-          <Icon name="menu" size={22} />
-        </button>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <BrandMark size={24} />
-          <Wordmark size={18} color="var(--text)" />
-        </div>
-      </div>
-
-      {open && (
-        <>
-          <div onClick={() => setOpen(false)}
-            style={{ position: 'fixed', inset: 0, background: 'rgba(12,12,11,.42)', backdropFilter: 'blur(4px)', zIndex: 70 }} />
-          <aside id="sidebar-mobile">
-            {sidebar}
-          </aside>
-        </>
-      )}
-
       <main className="app-main">
         {children}
       </main>
 
       {/*
-        Bottom nav — phones only (see .botnav in index.css). Modules are the
-        thing you switch between constantly, so they belong under the thumb
-        rather than behind a hamburger. The drawer stays for Settings and
-        sign-out. The active tab is marked in that module's own hue, the same
-        way its hero and desktop nav pill are.
+        Bottom nav, phones only (see .botnav in index.css). The four daily
+        modules sit under the thumb; everything else (Review, Identity,
+        Momentum, Settings, connected apps, sign out) is one tap away in
+        "More". There is no top bar or hamburger on a phone: the page's own
+        header carries the title, which gives the screen back to content.
       */}
       <nav className="botnav">
         {BOTTOM_NAV.map((n) => (
@@ -162,15 +145,65 @@ export default function Shell({ children }) {
             {({ isActive }) => (
               <>
                 {isActive && <span className="botnav-ind" />}
-                <Icon name={n.icon} size={21} fill={isActive} />
+                <Icon name={n.icon} size={22} fill={isActive} />
                 {n.label}
               </>
             )}
           </NavLink>
         ))}
+        <button type="button" className={`botnav-item${moreActive ? ' active' : ''}`} onClick={() => setOpen(true)}>
+          {moreActive && <span className="botnav-ind" />}
+          <Icon name="menu" size={22} fill={moreActive} />
+          More
+        </button>
       </nav>
 
+      {open && <MoreSheet user={user} signOut={signOut} onClose={() => setOpen(false)} />}
+
       {cmd && <CommandPalette onClose={() => setCmd(false)} />}
+    </div>
+  )
+}
+
+function MoreSheet({ user, signOut, onClose }) {
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  return (
+    <div className="modal-backdrop more-backdrop" onClick={onClose}>
+      <div className="modal-sheet more-sheet" role="dialog" aria-label="More" onClick={(e) => e.stopPropagation()}>
+        <div className="sheet-grabber" />
+        <div className="more-list">
+          {MORE_LINKS.map((n) => (
+            <NavLink key={n.to} to={n.to} className="more-row" onClick={onClose}>
+              <Icon name={n.icon} size={22} />
+              <span>{n.label}</span>
+              <Icon name="chevron_right" size={18} className="more-go" />
+            </NavLink>
+          ))}
+        </div>
+
+        <div className="more-label">Connected apps</div>
+        <div className="more-list">
+          {APPS.map((a) => (
+            <button key={a.label} type="button" className="more-row" onClick={() => { openApp(a); onClose() }}>
+              <Icon name={a.icon} size={22} />
+              <span>{a.label}<small>{a.desc}</small></span>
+              <Icon name="open_in_new" size={16} className="more-go" />
+            </button>
+          ))}
+        </div>
+
+        <div className="more-list" style={{ marginTop: 12 }}>
+          <button type="button" className="more-row signout" onClick={signOut}>
+            <Icon name="logout" size={22} />
+            <span>Sign out<small>{user?.email}</small></span>
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

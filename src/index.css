@@ -2532,3 +2532,197 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
 }
 
 .area-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 7px; vertical-align: 1px; }
+
+/* ══════════════════════════════════════════════════════════════════
+   Phone layout (below 1024px)
+   ------------------------------------------------------------------
+   Same features as desktop, arranged for one hand and one screen at a
+   time: no top bar or drawer (bottom nav + "More" instead), a single
+   sticky scrollable tab row, larger tap targets, 16px inputs (iOS zooms
+   into anything smaller on focus), and secondary cards that fold away
+   (see Fold in components/ui/Kit.jsx). Kept in one block so desktop
+   rules above stay readable and nothing here can leak upward.
+   ══════════════════════════════════════════════════════════════════ */
+@media (max-width: 1023px) {
+  .mobile-topbar, #sidebar-mobile { display: none !important; }
+  .app-main { padding-top: 0; }
+  .view { padding: calc(18px + env(safe-area-inset-top, 0px)) 16px calc(92px + env(safe-area-inset-bottom, 0px)); }
+
+  /* Bottom nav: five slots, bigger targets */
+  .botnav { grid-template-columns: repeat(5, 1fr); height: calc(64px + env(safe-area-inset-bottom, 0px)); }
+  .botnav-item { height: 64px; font-size: 11.5px; font-weight: 550; gap: 3px; background: none; border: 0; font-family: inherit; cursor: pointer; }
+  .botnav-item .icon { font-size: 22px; }
+  .mob-fab { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
+
+  /* Page header: title and primary action share a row */
+  .page-head { margin-bottom: 14px !important; flex-wrap: nowrap; align-items: center; gap: 12px; }
+  .page-head .page-header { min-width: 0; }
+  .page-title { font-size: 28px; }
+  .page-date { font-size: 12.5px; margin-bottom: 2px; }
+
+  /* Tabs: one sticky row that scrolls sideways, underline for the active one */
+  .tabs {
+    display: flex; width: auto; max-width: none; gap: 2px; margin: 0 -16px 16px; padding: 0 12px;
+    border-radius: 0; border: 0; border-bottom: 1px solid var(--border); background: var(--bg);
+    overflow-x: auto; overflow-y: hidden; scroll-snap-type: x proximity;
+    position: sticky; top: 0; z-index: 40;
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+  .tab {
+    flex: none; position: relative; padding: 13px 12px; border-radius: 0; font-size: 14.5px; min-width: 0;
+    overflow: visible; text-overflow: clip; scroll-snap-align: center; color: var(--text-3);
+  }
+  .tab.active { background: transparent; box-shadow: none; color: var(--text); font-weight: 600; }
+  .tab.active::after {
+    content: ''; position: absolute; left: 10px; right: 10px; bottom: -1px; height: 2px;
+    border-radius: 2px; background: var(--accent);
+  }
+
+  /* Touch targets */
+  .btn { min-height: 44px; padding: 11px 18px; font-size: 14.5px; }
+  .btn-sm { min-height: 40px; padding: 9px 14px; font-size: 13.5px; }
+  .btn-xs { min-height: 38px; }
+  .btn-icon { width: 44px; height: 44px; }
+  .btn-icon.btn-sm { width: 40px; height: 40px; }
+  .scale-seg { min-height: 46px; }
+  .wk-dot { width: 36px; height: 36px; font-size: 12px; }
+  .check-box { width: 26px; height: 26px; }
+  input, select, textarea { font-size: 16px; padding: 12px 13px; }
+  input[type=checkbox], input[type=radio] { font-size: 16px; }
+
+  /* Heroes and tiles a little tighter */
+  .hero-card, .hero-banner { border-radius: var(--radius-lg); }
+  .hero-h, .hero-title { font-size: 26px; }
+  .card-pad { padding: 16px; }
+  .stat-card { padding: 14px; min-height: 104px; gap: 12px; }
+  .stat-value { font-size: 26px; }
+
+  /* Sheets: full-width from the bottom with a grabber */
+  .modal-sheet { max-width: none; border-radius: 22px 22px 0 0; padding: 12px 18px calc(24px + env(safe-area-inset-bottom, 0px)); max-height: 92vh; }
+  .sheet-grabber { width: 40px; height: 4px; border-radius: 4px; background: var(--border-med); margin: 0 auto 14px; }
+}
+.sheet-grabber { display: none; }
+@media (max-width: 1023px) { .sheet-grabber { display: block; } }
+
+/* "More" sheet */
+.more-list { background: var(--white-soft); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.more-row {
+  display: flex; align-items: center; gap: 14px; width: 100%; padding: 14px 16px; background: transparent; border: 0;
+  border-top: 1px solid var(--border); color: var(--text); font-family: inherit; font-size: 15.5px; font-weight: 550;
+  text-align: left; text-decoration: none; cursor: pointer; min-height: 56px;
+}
+.more-row:first-child { border-top: 0; }
+.more-row:active { background: var(--border); }
+.more-row > span { flex: 1; min-width: 0; }
+.more-row small { display: block; font-size: 12.5px; font-weight: 400; color: var(--text-3); margin-top: 1px; overflow: hidden; text-overflow: ellipsis; }
+.more-row.active { color: var(--accent-ink); }
+.more-row.signout { color: var(--s-risk); }
+.more-go { color: var(--text-3); }
+.more-label { font-size: 13px; font-weight: 550; color: var(--text-3); margin: 18px 4px 8px; }
+
+/* Foldable cards (Card `fold` prop). Phone only: desktop never renders .fold. */
+.fold { padding: 0; }
+.fold-head {
+  display: flex; align-items: center; gap: 12px; width: 100%; padding: 16px 18px; background: transparent; border: 0;
+  font-family: inherit; color: var(--text); text-align: left; cursor: pointer; min-height: 60px;
+}
+.fold-title { flex: 1; min-width: 0; }
+.fold-title strong { display: block; font-size: 16px; font-weight: 600; letter-spacing: -.01em; }
+.fold-title small { display: block; font-size: 13px; color: var(--text-3); margin-top: 1px; font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fold-chev { color: var(--text-3); transition: transform .2s var(--ease); flex-shrink: 0; }
+.fold.open .fold-chev { transform: rotate(180deg); }
+.fold-body { border-top: 1px solid var(--border); }
+.fold-body[hidden] { display: none; }
+/* The fold header already names the card, so its own title is not repeated. */
+.fold-body .card-head:not(:has(> :nth-child(2))) { display: none; }
+.fold-body .card-head > div:first-child { display: none; }
+.fold-body .card-head { justify-content: flex-end; margin-bottom: 12px !important; }
+.fold-body .panel-title { display: none !important; }
+
+/* Selectors inside a page or card stay compact segmented controls on a phone. */
+@media (max-width: 1023px) {
+  .tabs.tabs-sub {
+    position: static; margin: 0 0 14px; padding: 3px; gap: 2px; border: 1px solid var(--border); border-radius: 12px;
+    background: var(--white-soft); max-width: 100%; width: max-content;
+  }
+  .tabs.tabs-sub .tab { padding: 9px 14px; border-radius: 9px; font-size: 14px; color: var(--text-2); }
+  .tabs.tabs-sub .tab.active { background: var(--white); box-shadow: 0 1px 2px rgba(16,18,19,.08), 0 0 0 1px var(--border); color: var(--text); }
+  .tabs.tabs-sub .tab.active::after { display: none; }
+  .card-head > .tabs.tabs-sub { margin-bottom: 0; }
+}
+
+/* Daily log rows: date and actions on top, the chips beneath on a phone. */
+.log-row {
+  display: grid; grid-template-columns: 1.1fr 2fr auto; gap: 14px; align-items: center;
+  padding: 14px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--white);
+}
+@media (max-width: 1023px) {
+  .log-row { grid-template-columns: 1fr auto; gap: 10px 12px; }
+  .log-row > :nth-child(2) { grid-column: 1 / -1; grid-row: 2; }
+}
+
+@media (max-width: 1023px) {
+  /* Three small tiles across instead of three full-width rows */
+  .stat-strip { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 14px; }
+  .stat-strip .stat-card { min-height: 0; padding: 12px; gap: 8px; border-radius: var(--radius); }
+  .stat-strip .stat-label { font-size: 12.5px; line-height: 1.25; }
+  .stat-strip .stat-value { font-size: 22px; }
+  .stat-strip .stat-sub { font-size: 12px; line-height: 1.3; }
+  .stat-strip .stat-head { flex-direction: column; gap: 2px; }
+
+  .coach-card { padding: 18px; }
+  .coach-title { font-size: 18px; }
+  .cycle-outcome-empty { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+}
+.phase-fold { margin-bottom: 14px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--white-soft); }
+.phase-fold > summary { list-style: none; display: flex; align-items: center; gap: 10px; padding: 13px 14px; cursor: pointer; font-size: 14.5px; font-weight: 600; min-height: 48px; }
+.phase-fold > summary::-webkit-details-marker { display: none; }
+.phase-fold > summary small { margin-left: auto; font-size: 13px; font-weight: 400; color: var(--text-3); }
+.phase-fold[open] > summary .fold-chev { transform: rotate(180deg); }
+.phase-fold > .phase-milestones { padding: 0 10px 10px; }
+
+@media (max-width: 1023px) {
+  /* Week selector: status dot above the number, a real tap target */
+  .phase-strip-week { flex-direction: column; gap: 3px; height: 46px; padding: 0; }
+  .phase-strip-week .phase-strip-dot { margin: 0; }
+  .phase-strip-week:not(:has(.phase-strip-dot)) { gap: 0; }
+  .phase-strip-weeks { padding: 3px; gap: 2px; }
+  /* A week's day buttons spread across the row instead of wrapping */
+  .tactic-row .wk-dot-row { width: 100%; flex-wrap: nowrap; justify-content: space-between; gap: 4px; }
+  .tactic-row .wk-dot { width: 38px; height: 38px; flex: none; }
+}
+
+@media (max-width: 1023px) {
+  .north-star { margin: 0 0 16px; padding-bottom: 14px; }
+  .north-star-txt { font-size: 15.5px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .north-star small { font-size: 12px; margin-bottom: 3px; }
+}
+
+@media (max-width: 1023px) {
+  .id-hero { padding: 22px 20px 20px; }
+  .id-quote { font-size: 21px; line-height: 1.35; }
+  .rv-weeknav .btn { white-space: nowrap; }
+  .wk-tabs { padding: 3px; }
+  .wk-tab { font-size: 12.5px; padding: 10px 4px; min-height: 44px; }
+}
+
+/* Sheets on a phone: title and actions stay pinned while the form scrolls. */
+@media (max-width: 1023px) {
+  .modal-head { position: sticky; top: -12px; z-index: 2; background: var(--white); padding: 10px 0 6px; margin: -10px 0 0; }
+  .modal-x { width: 44px; height: 44px; margin-right: -10px; font-size: 26px !important; }
+  .modal-foot {
+    position: sticky; bottom: calc(-24px - env(safe-area-inset-bottom, 0px)); z-index: 2; background: var(--white);
+    margin: 20px -18px calc(-24px - env(safe-area-inset-bottom, 0px)) !important;
+    padding: 12px 18px calc(14px + env(safe-area-inset-bottom, 0px)) !important;
+    flex-wrap: nowrap !important;
+  }
+  .modal-foot .btn { flex: 1; }
+}
+@media (max-width: 1023px) { .modal-foot > span { flex: none; margin-left: 4px; } }
+
+@media (max-width: 1023px) {
+  .script-list { gap: 6px; margin-top: 10px; }
+  .script-line { padding: 9px 12px; font-size: 14px; }
+  .reset-card { padding: 16px; }
+}
+@media (max-width: 1023px) { .empty { padding: 24px 12px; gap: 8px; } }

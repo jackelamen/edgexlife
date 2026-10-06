@@ -48,7 +48,7 @@ export default function SettingsPage() {
         </div>
 
         <div className="flex flex-col gap-3.5" style={{ marginTop: 14 }}>
-          <Panel title="Account">
+          <Panel title="Account" fold summary={user?.email}>
             <p className="text-[13px] mb-3" style={{ color: 'var(--text-2)' }}>{user?.email}</p>
             <p className="text-[12px] mb-3" style={{ color: 'var(--text-3)' }}>
               Shared with Pulse and xFocus, same Supabase project, same user id.
@@ -78,8 +78,8 @@ function AppearancePanel() {
     { value: 'dark', label: 'Dark' },
   ]
   return (
-    <Panel title="Appearance">
-      <Tabs value={theme} onChange={(v) => { setTheme(v); setThemeState(v) }} options={OPTIONS} />
+    <Panel title="Appearance" fold summary="Light, dark or match your device">
+      <Tabs sub value={theme} onChange={(v) => { setTheme(v); setThemeState(v) }} options={OPTIONS} />
       <p className="text-[12px] mt-2" style={{ color: 'var(--text-3)' }}>
         System matches your device's own light/dark setting.
       </p>
@@ -203,7 +203,7 @@ function ReminderPanel() {
   }
 
   return (
-    <Panel title="Reminders" sub="A daily nudge to log, server-sent even if the app is closed.">
+    <Panel title="Reminders" fold summary="A daily nudge to log" sub="A daily nudge to log, server-sent even if the app is closed.">
       {!supported ? (
         <p className="text-[13px]" style={{ color: 'var(--text-3)' }}>
           This browser doesn't support push notifications.

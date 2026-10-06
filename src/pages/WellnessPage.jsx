@@ -267,7 +267,7 @@ function Dashboard({ latest, notes, todayCheckins, index, history, onChanged, on
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5" style={{ marginBottom: 18 }}>
-        <Card>
+        <Card fold="Score breakdown" summary={details ? `${[...details.components].sort((a, b) => a.value - b.value)[0].label} is lowest` : 'Check in to see it'}>
           <CardHead title="Score breakdown"
             right={<Badge tone="purple">{details ? confidenceLabel(latest) : 'No signal'}</Badge>} />
           {!details ? (
@@ -343,13 +343,13 @@ function Dashboard({ latest, notes, todayCheckins, index, history, onChanged, on
           </div>
         </Card>
 
-        <Card>
+        <Card fold="Recent check-ins" summary="Your last seven entries">
           <CardHead title="Recent check-ins" sub="Last seven entries." />
           <RecentCheckins onOpen={onOpenCheckin} />
         </Card>
       </div>
 
-      <Card>
+      <Card fold="Today's journal" summary="Words you saved today">
         <CardHead title="Today's journal" sub="The saved words from today's check-in, practice, and mental load." />
         <MemoryTiles latest={latest} notes={notes} />
       </Card>
@@ -597,7 +597,7 @@ function CheckinView({ date, entryId, onSaved, onDeleted, onNav }) {
       <Card>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 6, flexWrap: 'wrap' }}>
           <div className="form-section-label" style={{ flex: 1, margin: 0 }}>How are you, right now?</div>
-          <Tabs value={mode} onChange={setMode} options={[{ value: 'quick', label: '30 seconds' }, { value: 'full', label: 'Full' }]} />
+          <Tabs sub value={mode} onChange={setMode} options={[{ value: 'quick', label: '30 seconds' }, { value: 'full', label: 'Full' }]} />
         </div>
 
         {full && (
@@ -1249,7 +1249,7 @@ function TrendsView() {
 
   return (
     <>
-      <Tabs value={metric} onChange={setMetric} options={TREND_METRICS} />
+      <Tabs sub value={metric} onChange={setMetric} options={TREND_METRICS} />
       <Card>
         <CardHead title={meta.label} sub={`Last ${vals.length} check-ins.`}
           right={<Badge tone="purple">Avg {metric === 'clarityScore' ? Math.round(avg) : avg.toFixed(1)}</Badge>} />
@@ -1278,7 +1278,7 @@ function TrendsView() {
 export function SettingsView({ onSync }) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5">
-      <Card>
+      <Card fold="Sync" summary="Where Wellness data lives">
         <CardHead title="Sync" sub="Wellness data lives in Supabase, shared across your EdgeX apps." />
         <p style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 16 }}>
           Check-ins, practice notes, and mental-load items sync automatically. Use this if you changed

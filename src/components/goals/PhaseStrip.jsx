@@ -1,4 +1,5 @@
 import toast from 'react-hot-toast'
+import { usePhone } from '../../hooks/usePhone'
 import Icon from '../ui/Icon'
 import { Badge } from '../ui/Kit'
 import { setMilestoneDone } from '../../lib/data'
@@ -19,6 +20,7 @@ import { sprintMilestones, fmtMetricValue } from '../../lib/outcomes'
   milestone landed.
 */
 export default function PhaseStrip({ sprint, phases, tactics, metrics, logs, week, currentWeek, onPick, onChanged }) {
+  const phone = usePhone()
   const total = sprintWeeks(sprint)
   const sorted = [...phases].sort((a, b) => a.phase_index - b.phase_index)
   if (!sorted.length || total < 2) return null
@@ -72,7 +74,41 @@ export default function PhaseStrip({ sprint, phases, tactics, metrics, logs, wee
         })}
       </div>
 
-      {milestones.length > 0 && (
+      {milestones.length > 0 && (phone ? (
+        <details className="phase-fold">
+          <summary>
+            <span>Milestones</span>
+            <small>{milestones.filter((m) => m.met).length} of {milestones.length} met</small>
+            <Icon name="expand_more" size={20} className="fold-chev" />
+          </summary>
+          <div className="phase-milestones">
+          {milestones.map((m) => {
+            const tone = m.status === 'met' ? 'green' : m.status === 'missed' ? 'red' : m.status === 'due' ? 'orange' : 'muted'
+            const word = m.status === 'met' ? 'Met' : m.status === 'missed' ? 'Missed' : m.status === 'due' ? 'Due this week' : 'Upcoming'
+            return (
+              <div key={m.phase.id} className="phase-milestone">
+                <Icon name={m.met ? 'check_circle' : 'flag'} size={16} fill={m.met}
+                  style={{ color: m.met ? 'var(--s-good)' : 'var(--text-3)' }} />
+                <div className="phase-milestone-body">
+                  <strong>{m.text}</strong>
+                  <small>
+                    End of {m.phase.name}{m.dueOn ? ` · ${prettyShort(m.dueOn)}` : ''}
+                    {!m.manual && m.current != null && m.target != null &&
+                      ` · now ${fmtMetricValue(m.metric.type, m.current)} of ${fmtMetricValue(m.metric.type, m.target)}`}
+                  </small>
+                </div>
+                <Badge tone={tone}>{word}</Badge>
+                {m.manual && (
+                  <button className="btn btn-ghost btn-sm" onClick={() => toggle(m)}>
+                    {m.met ? 'Undo' : 'Mark met'}
+                  </button>
+                )}
+              </div>
+            )
+          })}
+        </div>
+        </details>
+      ) : (
         <div className="phase-milestones">
           {milestones.map((m) => {
             const tone = m.status === 'met' ? 'green' : m.status === 'missed' ? 'red' : m.status === 'due' ? 'orange' : 'muted'
@@ -99,7 +135,7 @@ export default function PhaseStrip({ sprint, phases, tactics, metrics, logs, wee
             )
           })}
         </div>
-      )}
+      ))}
     </div>
   )
 }

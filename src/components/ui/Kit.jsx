@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import toast from 'react-hot-toast'
 import Icon from './Icon'
+import { usePhone } from '../../hooks/usePhone'
 import { metric, statusFor, statusColor } from '../../lib/design'
 
 /*
@@ -16,7 +17,7 @@ import { metric, statusFor, statusColor } from '../../lib/design'
 
 export function PageHeader({ kicker, title, actions }) {
   return (
-    <div className="flex items-start justify-between gap-4 flex-wrap" style={{ marginBottom: 28 }}>
+    <div className="page-head flex items-start justify-between gap-4 flex-wrap" style={{ marginBottom: 28 }}>
       <div className="page-header" style={{ marginBottom: 0 }}>
         {kicker && <div className="page-date">{kicker}</div>}
         <h1 className="page-title">{title}</h1>
@@ -26,7 +27,30 @@ export function PageHeader({ kicker, title, actions }) {
   )
 }
 
-export function Card({ children, pad = true, className = '', style }) {
+/**
+ * `fold` (a title) makes the card collapsible on a phone: it shows as one
+ * tappable row (title, an optional one-line `summary`, a chevron) and opens
+ * to the full card. On desktop it is always the normal open card, so the
+ * same markup serves both. The body stays mounted while closed, so forms
+ * and in-progress state survive a collapse.
+ */
+export function Card({ children, pad = true, className = '', style, fold, summary, defaultOpen = false }) {
+  const phone = usePhone()
+  const [open, setOpen] = useState(defaultOpen)
+  if (fold && phone) {
+    return (
+      <div className={`card fold${open ? ' open' : ''}${className ? ' ' + className : ''}`} style={style}>
+        <button type="button" className="fold-head" aria-expanded={open} onClick={() => setOpen(!open)}>
+          <span className="fold-title">
+            <strong>{fold}</strong>
+            {summary && <small>{summary}</small>}
+          </span>
+          <Icon name="expand_more" size={22} className="fold-chev" />
+        </button>
+        <div className={`fold-body${pad ? ' card-pad' : ''}`} hidden={!open}>{children}</div>
+      </div>
+    )
+  }
   return (
     <div className={`card${pad ? ' card-pad' : ''}${className ? ' ' + className : ''}`} style={style}>
       {children}
@@ -36,7 +60,7 @@ export function Card({ children, pad = true, className = '', style }) {
 
 export function CardHead({ title, sub, right }) {
   return (
-    <div className="flex items-start justify-between gap-3.5 flex-wrap" style={{ marginBottom: 20 }}>
+    <div className="card-head flex items-start justify-between gap-3.5 flex-wrap" style={{ marginBottom: 20 }}>
       <div>
         <h2 style={{ fontSize: 16, fontWeight: 650 }}>{title}</h2>
         {sub && <p style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 3 }}>{sub}</p>}
@@ -109,7 +133,9 @@ export function Badge({ tone = 'blue', children }) {
   return <span className={`badge badge-${tone}`}>{children}</span>
 }
 
-export function Tabs({ value, onChange, options, variant = 'pill' }) {
+/** `sub` marks a selector inside a page or card (a date window, a metric), as
+    opposed to the page's own tabs: on a phone only the page tabs stick to the top. */
+export function Tabs({ value, onChange, options, variant = 'pill', sub = false }) {
   if (variant === 'segment') {
     return (
       <div className="wk-tabs">
@@ -123,10 +149,23 @@ export function Tabs({ value, onChange, options, variant = 'pill' }) {
       </div>
     )
   }
+  return <PillTabs value={value} onChange={onChange} options={options} sub={sub} />
+}
+
+/* On a phone the tab strip is one scrollable row; keep the active tab in view. */
+function PillTabs({ value, onChange, options, sub }) {
+  const ref = useRef(null)
+  useEffect(() => {
+    const el = ref.current?.querySelector('.tab.active')
+    if (el && ref.current.scrollWidth > ref.current.clientWidth) {
+      el.scrollIntoView({ inline: 'center', block: 'nearest', behavior: prefersReducedMotion() ? 'auto' : 'smooth' })
+    }
+  }, [value])
   return (
-    <div className="tabs">
+    <div className={`tabs${sub ? ' tabs-sub' : ''}`} ref={ref} role="tablist">
       {options.map((o) => (
-        <button key={o.value} className={`tab${o.value === value ? ' active' : ''}`}
+        <button key={o.value} role="tab" aria-selected={o.value === value}
+          className={`tab${o.value === value ? ' active' : ''}`}
           onClick={() => onChange(o.value)}>
           {o.label}
         </button>
@@ -258,9 +297,10 @@ export function Modal({ open, onClose, title, sub, children, footer, maxWidth = 
   return createPortal(
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal-sheet" style={{ maxWidth: width || maxWidth }} onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between" style={{ marginBottom: 4 }}>
+        <div className="sheet-grabber" />
+        <div className="modal-head flex items-center justify-between" style={{ marginBottom: 4 }}>
           <h3>{title}</h3>
-          <button onClick={onClose} aria-label="Close"
+          <button onClick={onClose} aria-label="Close" className="modal-x"
             style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-3)', fontSize: 22, lineHeight: 1 }}>
             ×
           </button>
@@ -268,7 +308,7 @@ export function Modal({ open, onClose, title, sub, children, footer, maxWidth = 
         {sub && <p className="sub">{sub}</p>}
         {children}
         {footer && (
-          <div style={{
+          <div className="modal-foot" style={{
             display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20,
             paddingTop: 16, borderTop: '1px solid var(--border-med)', flexWrap: 'wrap',
           }}>
@@ -515,11 +555,11 @@ export const Grid = ({ cols = 4, gap = 14, children, style }) => (
    callers as of the Wellness/Goals v3 pass and were removed.
    ──────────────────────────────────────────────────────────── */
 
-export function Panel({ title, actions, children, className = '', bodyClass }) {
+export function Panel({ title, actions, children, className = '', bodyClass, fold, summary, defaultOpen }) {
   return (
-    <Card pad={false} className={className}>
+    <Card pad={false} className={className} fold={fold ? title : undefined} summary={summary} defaultOpen={defaultOpen}>
       {(title || actions) && (
-        <div style={{
+        <div className="panel-title" style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           gap: 12, padding: '14px 18px 0',
         }}>
