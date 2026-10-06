@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
 import Icon from '../ui/Icon'
-import { Card, CardHead, Badge, Empty, Loading, Modal, Field, useConfirm } from '../ui/Kit'
+import { Card, CardHead, Badge, Empty, Loading, Modal, Field } from '../ui/Kit'
 import { useAsync } from '../../hooks/useAsync'
 import { fetchFastingSessions, saveFastingSession, deleteFastingSession, newId } from '../../lib/data'
 import {
@@ -24,8 +24,8 @@ import { metric } from '../../lib/design'
 */
 export default function FastingModule() {
   const sessions = useAsync((f) => fetchFastingSessions({ force: f }))
-  const confirm = useConfirm()
   const list = sessions.data || []
+  const [shown, setShown] = useState(8)
   const activeSession = list.find(isActive) || null
   // `editing` holds whichever session is open in the modal — a completed
   // session (from history), the live session (to fix a start time you
@@ -49,11 +49,12 @@ export default function FastingModule() {
     setEditRequireEnd(true)
   }
 
-  async function startFast(methodId) {
+  async function startFast(methodId, agoHours = 0) {
     const method = FAST_METHODS.find((m) => m.id === methodId)
     const session = {
       id: newId('fast'),
-      startedAt: new Date().toISOString(),
+      // "Started 2h ago" is the common case: you began, then remembered the timer.
+      startedAt: new Date(Date.now() - agoHours * 3600000).toISOString(),
       endedAt: null,
       targetHours: method?.hours ?? 16,
       method: methodId,
@@ -76,6 +77,26 @@ export default function FastingModule() {
     } catch (err) { toast.error(err.message || 'Could not end fast') }
   }
 
+  // A fast left running for days: close it at the moment it should have
+  // ended (start + target), so the record is plausible without hand-editing.
+  async function endFastAtTarget() {
+    if (!activeSession) return
+    const target = targetHoursFor(activeSession)
+    if (!target) return
+    const ended = { ...activeSession, endedAt: new Date(new Date(activeSession.startedAt).getTime() + target * 3600000).toISOString() }
+    try {
+      await saveFastingSession(ended)
+      sessions.reload()
+      toast.success(`Fast closed at ${target}h`)
+    } catch (err) { toast.error(err.message || 'Could not end fast') }
+  }
+
+  async function discardActive() {
+    if (!activeSession) return
+    try { await deleteFastingSession(activeSession.id); sessions.reload(); toast.success('Fast discarded') }
+    catch (err) { toast.error(err.message || 'Could not discard') }
+  }
+
   async function saveReflection(notes) {
     if (!reflecting) return
     try {
@@ -87,7 +108,7 @@ export default function FastingModule() {
   }
 
   async function removeSession(id) {
-    try { await deleteFastingSession(id); sessions.reload() }
+    try { await deleteFastingSession(id); sessions.reload(); setEditing(null); toast.success('Fast deleted') }
     catch (err) { toast.error(err.message || 'Could not delete') }
   }
 
@@ -110,38 +131,45 @@ export default function FastingModule() {
 
   if (sessions.loading) return <Loading />
 
+  const done = list.filter((x) => x.endedAt).sort((a, b) => new Date(b.startedAt) - new Date(a.startedAt))
+
   return (
     <>
       {activeSession
-        ? <ActiveFastCard session={activeSession} onEnd={endFast} onEditStart={openEditActiveStart} />
+        ? <ActiveFastCard session={activeSession} onEnd={endFast} onEditStart={openEditActiveStart}
+          onEndAtTarget={endFastAtTarget} onDiscard={discardActive} />
         : <StartFastCard onStart={startFast} />}
 
       <FastingStages session={activeSession} />
 
       <WeeklyStats sessions={list} />
 
-      <Card>
-        <CardHead title="Fasting history" sub="Completed fasts, most recent first. Tap to edit start, end, method or notes."
+      <Card className="fast-history">
+        <CardHead title="Fasting history" sub="Completed fasts, most recent first. Tap one to edit or delete it."
           right={<button className="btn btn-secondary btn-sm" onClick={openLogPastFast}>
             <Icon name="add" size={15} /> Log a past fast
           </button>} />
-        {!list.filter((s) => s.endedAt).length ? (
+        {!done.length ? (
           <Empty icon="schedule" title="No completed fasts yet">
             Start one above, or log a past one if you forgot to start the timer.
           </Empty>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {list.filter((s) => s.endedAt)
-              .sort((a, b) => new Date(b.startedAt) - new Date(a.startedAt))
-              .map((s) => (
-              <FastRow key={s.id} session={s} confirm={confirm}
-                onEdit={() => openEdit(s)} onDelete={() => removeSession(s.id)} />
+          <div className="fast-rows">
+            {done.slice(0, shown).map((s) => (
+              <FastRow key={s.id} session={s} onEdit={() => openEdit(s)} />
             ))}
+            {done.length > shown && (
+              <button type="button" className="btn btn-secondary" onClick={() => setShown(shown + 8)}>
+                Show {Math.min(8, done.length - shown)} more
+                <span style={{ color: 'var(--text-3)', fontWeight: 400 }}>{done.length - shown} older</span>
+              </button>
+            )}
           </div>
         )}
       </Card>
 
-      <EditFastModal session={editing} requireEnd={editRequireEnd} onClose={() => setEditing(null)} onSave={updateSession} />
+      <EditFastModal session={editing} requireEnd={editRequireEnd} onClose={() => setEditing(null)} onSave={updateSession}
+        onDelete={editing && list.some((x) => x.id === editing.id) && editing.endedAt ? () => removeSession(editing.id) : null} />
       <PostFastModal session={reflecting} onSave={saveReflection} onSkip={() => setReflecting(null)} />
     </>
   )
@@ -160,11 +188,15 @@ export default function FastingModule() {
         with a fresh id and no dates, `requireEnd=true` since a
         retroactive entry is definitionally already over.
 */
-function EditFastModal({ session, requireEnd = true, onClose, onSave }) {
+const AGO_CHIPS = [['Now', 0], ['1h ago', 1], ['2h ago', 2], ['4h ago', 4], ['8h ago', 8], ['12h ago', 12]]
+const agoValue = (h) => toLocalInputValue(new Date(Date.now() - h * 3600000).toISOString())
+
+function EditFastModal({ session, requireEnd = true, onClose, onSave, onDelete }) {
   const [start, setStart] = useState('')
   const [end, setEnd] = useState('')
   const [method, setMethod] = useState('16:8')
   const [notes, setNotes] = useState('')
+  const [armed, setArmed] = useState(false)
 
   useEffect(() => {
     if (!session) return
@@ -172,6 +204,7 @@ function EditFastModal({ session, requireEnd = true, onClose, onSave }) {
     setEnd(toLocalInputValue(session.endedAt))
     setMethod(session.method || '16:8')
     setNotes(session.notes || '')
+    setArmed(false)
   }, [session])
 
   if (!session) return null
@@ -180,6 +213,8 @@ function EditFastModal({ session, requireEnd = true, onClose, onSave }) {
   const endedAt = fromLocalInputValue(end)
   const invalid = !startedAt || (requireEnd && !endedAt) || (endedAt && new Date(endedAt) <= new Date(startedAt))
   const isNew = !session.startedAt
+  const running = !requireEnd
+  const lengthMs = startedAt && !invalid ? (endedAt ? new Date(endedAt) : new Date()) - new Date(startedAt) : null
 
   return (
     <Modal open={!!session} onClose={onClose}
@@ -194,18 +229,33 @@ function EditFastModal({ session, requireEnd = true, onClose, onSave }) {
           <Icon name="check" size={16} /> Save
         </button>
       </>}>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 4 }}>
+      <div className="fast-times">
         <Field label="Started">
           <input type="datetime-local" value={start} onChange={(e) => setStart(e.target.value)} />
+          {running && (
+            <div className="fast-chips" role="group" aria-label="Quick start times">
+              {AGO_CHIPS.map(([label, h]) => (
+                <button key={label} type="button" className="fast-chip" onClick={() => setStart(agoValue(h))}>{label}</button>
+              ))}
+            </div>
+          )}
         </Field>
         <Field label="Ended" hint={requireEnd ? undefined : 'Optional, blank keeps it running'}>
           <input type="datetime-local" value={end} onChange={(e) => setEnd(e.target.value)} />
+          {requireEnd && (
+            <div className="fast-chips">
+              <button type="button" className="fast-chip" onClick={() => setEnd(agoValue(0))}>Now</button>
+            </div>
+          )}
         </Field>
       </div>
       {invalid && start && end && (
-        <p style={{ fontSize: 11.5, color: 'var(--s-risk, #c8452f)', fontWeight: 700, marginBottom: 4 }}>
+        <p style={{ fontSize: 13, color: 'var(--s-risk, #c8452f)', fontWeight: 600, marginBottom: 8 }}>
           End must be after start.
         </p>
+      )}
+      {lengthMs != null && (
+        <p className="fast-len">{running && !endedAt ? 'Running for' : 'Fast length'} <strong>{formatDuration(lengthMs)}</strong></p>
       )}
       <Field label="Method">
         <select value={method} onChange={(e) => setMethod(e.target.value)}>
@@ -215,6 +265,12 @@ function EditFastModal({ session, requireEnd = true, onClose, onSave }) {
       <Field label="Notes" hint="Optional">
         <textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="How it went, why it ran long, etc." />
       </Field>
+      {onDelete && (
+        <button type="button" className={`btn btn-ghost fast-del${armed ? ' armed' : ''}`}
+          onClick={() => (armed ? onDelete() : setArmed(true))}>
+          <Icon name="delete" size={16} /> {armed ? 'Tap again to delete this fast' : 'Delete this fast'}
+        </button>
+      )}
     </Modal>
   )
 }
@@ -281,13 +337,11 @@ export function FastingStatusCard({ onNav }) {
   if (active) {
     const pct = progressPct(active)
     return (
-      <button className="check-row" style={{ cursor: 'pointer', marginBottom: 14 }} onClick={() => onNav?.()}>
-        <span style={{ width: 34, height: 34, borderRadius: 10, flexShrink: 0, display: 'grid', placeItems: 'center', background: m.tint, color: m.color }}>
-          <Icon name="schedule" size={17} />
-        </span>
+      <button className="check-row fast-status" style={{ cursor: 'pointer', marginBottom: 14 }} onClick={() => onNav?.()}>
+        <Icon name="schedule" size={22} style={{ color: m.color, flexShrink: 0 }} />
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontWeight: 700, fontSize: 13.5 }}>Fasting &middot; {formatDuration(elapsedMs(active))}</div>
-          <div style={{ fontSize: 11.5, color: 'var(--text-3)', fontWeight: 600 }}>{methodLabel(active.method)} target &middot; {pct != null ? `${Math.round(Math.min(100, pct))}%` : '--'} there</div>
+          <div className="fs-line1">Fasting &middot; {formatDuration(elapsedMs(active))}</div>
+          <div className="fs-line2">{methodLabel(active.method)} target &middot; {pct != null ? `${Math.round(Math.min(100, pct))}%` : '--'} there</div>
         </div>
         <Badge tone="blue">Live</Badge>
       </button>
@@ -295,15 +349,13 @@ export function FastingStatusCard({ onNav }) {
   }
 
   return (
-    <button className="check-row" style={{ cursor: 'pointer', marginBottom: 14 }} onClick={() => onNav?.()}>
-      <span style={{ width: 34, height: 34, borderRadius: 10, flexShrink: 0, display: 'grid', placeItems: 'center', background: m.tint, color: m.color }}>
-        <Icon name="schedule" size={17} />
-      </span>
+    <button className="check-row fast-status" style={{ cursor: 'pointer', marginBottom: 14 }} onClick={() => onNav?.()}>
+      <Icon name="schedule" size={22} style={{ color: m.color, flexShrink: 0 }} />
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontWeight: 700, fontSize: 13.5 }}>
+        <div className="fs-line1">
           {lastDone ? `Last fast ${formatDuration(elapsedMs(lastDone))} · ${methodLabel(lastDone.method)}` : 'No fasts logged yet'}
         </div>
-        <div style={{ fontSize: 11.5, color: 'var(--text-3)', fontWeight: 600 }}>
+        <div className="fs-line2">
           {wkCount >= 1 ? `${wkCount} this week · ${streak}-week streak` : 'None yet this week · tap to start one'}
         </div>
       </div>
@@ -314,7 +366,8 @@ export function FastingStatusCard({ onNav }) {
 
 /* ── Active timer ─────────────────────────────────────────── */
 
-function ActiveFastCard({ session, onEnd, onEditStart }) {
+function ActiveFastCard({ session, onEnd, onEditStart, onEndAtTarget, onDiscard }) {
+  const [discardArmed, setDiscardArmed] = useState(false)
   // Re-render once a minute so the elapsed time actually counts up without
   // a full reload — a fast is measured in hours, a second-tick would just
   // burn cycles for no visible benefit.
@@ -329,6 +382,8 @@ function ActiveFastCard({ session, onEnd, onEditStart }) {
   const m = metric('fasting')
   const target = targetHoursFor(session)
   const overTarget = target && ms / 3600000 >= target
+  // Two days past any sensible fast almost always means the timer was never ended.
+  const forgotten = ms / 3600000 > Math.max(48, (target || 0) * 2)
 
   return (
     <div className="hero-card" style={{ marginBottom: 14, background: m.color }}>
@@ -379,12 +434,28 @@ function ActiveFastCard({ session, onEnd, onEditStart }) {
             — where the ring sits beside the copy rather than under it — the
             two buttons got squeezed into a 255px column and wrapped into a
             ragged stack, with the wider one overflowing its own pill. */}
-        <div className="hero-actions">
+        {forgotten && (
+          <div className="fast-warn">
+            <Icon name="warning" size={20} fill />
+            <div>
+              <strong>This fast has been running {formatDuration(ms)}.</strong>
+              <span>Did you forget to end it? Close it at the time it should have ended, or fix when it started.</span>
+              <div className="fast-warn-actions">
+                {target && <button type="button" className="btn btn-secondary btn-sm" onClick={onEndAtTarget}>It ended at {target}h</button>}
+                <button type="button" className="btn btn-secondary btn-sm" onClick={onEditStart}>Edit times</button>
+              </div>
+            </div>
+          </div>
+        )}
+        <div className="hero-actions fast-actions">
           <button className="btn btn-primary" onClick={onEnd}>
-            <Icon name="stop_circle" size={17} /> End fast
+            <Icon name="stop_circle" size={17} /> End fast now
           </button>
           <button className="btn btn-secondary" onClick={onEditStart} title="Forgot to start the timer on time?">
             <Icon name="edit" size={17} /> Fix start time
+          </button>
+          <button type="button" className="fast-discard" onClick={() => (discardArmed ? onDiscard() : setDiscardArmed(true))}>
+            {discardArmed ? 'Tap again to discard' : 'Started by mistake? Discard'}
           </button>
         </div>
       </div>
@@ -421,7 +492,10 @@ export function FastingStages({ session }) {
   }
 
   return (
-    <Card style={{ marginBottom: 14 }}>
+    <Card style={{ marginBottom: 14 }} className="fast-stages" fold={session ? "What's happening now" : 'Stages of a fast'}
+      summary={current != null
+        ? `${FAST_STAGES[current].name}${hoursToNextStage(hours) != null ? ` · next in ${formatDuration(hoursToNextStage(hours) * 3600000)}` : ''}`
+        : 'What your body does, hour by hour'}>
       <CardHead title={session ? "What's happening now" : 'Stages of a fast'}
         sub={session ? 'Tap any stage to read ahead or look back.' : 'What your body does as a fast goes on. Tap a stage to read about it.'}
         right={target ? (
@@ -527,19 +601,31 @@ function StageTrack({ hours, target, current, sel, onPick }) {
 
 function StartFastCard({ onStart }) {
   const [method, setMethod] = useState('16:8')
+  const [ago, setAgo] = useState(0)
+  const chosen = FAST_METHODS.find((m) => m.id === method)
   return (
-    <Card style={{ marginBottom: 14 }}>
+    <Card style={{ marginBottom: 14 }} className="fast-start">
       <CardHead title="Start a fast" sub="Pick a target. The timer tracks real elapsed time either way." />
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(84px, 1fr))', gap: 8, marginBottom: 16 }}>
+      <div className="fast-methods" role="group" aria-label="Fasting method">
         {FAST_METHODS.map((m) => (
-          <button key={m.id} className={`btn ${method === m.id ? 'btn-primary' : 'btn-secondary'} btn-sm`}
-            onClick={() => setMethod(m.id)}>
-            {m.label}
+          <button key={m.id} type="button" aria-pressed={method === m.id}
+            className={`fast-method${method === m.id ? ' on' : ''}`} onClick={() => setMethod(m.id)}>
+            <strong>{m.label}</strong>
+            <small>{m.hours ? `${m.hours} hours` : 'your own'}</small>
           </button>
         ))}
       </div>
-      <button className="btn btn-primary" onClick={() => onStart(method)}>
-        <Icon name="play_circle" size={17} /> Start {methodLabel(method)} Fast
+      <div className="fast-when">
+        <span>Started</span>
+        <div className="fast-chips" role="group" aria-label="When you started">
+          {[['Just now', 0], ['1h ago', 1], ['2h ago', 2], ['4h ago', 4]].map(([label, h]) => (
+            <button key={label} type="button" aria-pressed={ago === h} className={`fast-chip${ago === h ? ' on' : ''}`}
+              onClick={() => setAgo(h)}>{label}</button>
+          ))}
+        </div>
+      </div>
+      <button className="btn btn-primary fast-go" onClick={() => onStart(method, ago)}>
+        <Icon name="play_arrow" size={18} /> Start {chosen?.label} fast
       </button>
     </Card>
   )
@@ -578,48 +664,32 @@ function WeeklyStats({ sessions }) {
     </div>
   )
 }
-const rowStyle = { background: 'var(--white)', borderRadius: 15, padding: '14px 16px', boxShadow: 'var(--shadow-sm)', display: 'flex', flexDirection: 'column', gap: 3 }
-const kStyle = { fontSize: 12, fontWeight: 550, color: 'var(--text-2)' }
-const vStyle = { fontSize: 26, fontWeight: 650, letterSpacing: '-.02em' }
-const subStyle = { fontSize: 11.5, color: 'var(--text-3)', fontWeight: 600 }
+const rowStyle = { background: 'var(--white)', border: '1px solid var(--border)', borderRadius: 14, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 3 }
+const kStyle = { fontSize: 13, fontWeight: 500, color: 'var(--text-2)' }
+const vStyle = { fontSize: 28, fontWeight: 600, letterSpacing: '-.03em', fontFamily: 'var(--font-brand)', lineHeight: 1.1 }
+const subStyle = { fontSize: 12.5, color: 'var(--text-3)', fontWeight: 400 }
 
 /* ── History row ──────────────────────────────────────────── */
 
-function FastRow({ session, confirm, onEdit, onDelete }) {
+function FastRow({ session, onEdit }) {
   const ms = elapsedMs(session)
-  const hours = ms / 3600000
   const target = targetHoursFor(session)
-  const hit = target && hours >= target
-  const armed = confirm.isArmed(session.id)
+  const hit = target && ms / 3600000 >= target
 
   return (
-    /* The badge sits with the date rather than as its own column. Five
-       competing columns (icon, text, badge, edit, delete) left the text
-       ~114px on a phone, so "36h 42m · 16:8" wrapped to two lines, the
-       date to a third, and the delete button pushed past the card edge.
-       Pairing it with the date costs nothing on desktop and stops the
-       row from having more fixed-width children than a phone can hold. */
-    <div className="check-row fast-row" style={{ cursor: 'default' }}>
-      <span className="fast-row-ic" style={{ background: metric('fasting').tint, color: metric('fasting').color }}>
-        <Icon name="schedule" size={17} />
+    /* The whole row is the edit control (the sheet it opens also holds
+       Delete), so there are no tiny icon buttons to hit on a phone. */
+    <button type="button" className="fast-row2" onClick={onEdit}>
+      <span className="fr-main">
+        <strong>{formatDuration(ms)}</strong>
+        <span>{methodLabel(session.method)}</span>
       </span>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontWeight: 700, fontSize: 13.5 }}>
-          {formatDuration(ms)} <span style={{ color: 'var(--text-3)', fontWeight: 600 }}>&middot; {methodLabel(session.method)}</span>
-        </div>
-        <div className="fast-row-meta">
-          <span>{pretty(session.startedAt.slice(0, 10))}</span>
-          <Badge tone={hit ? 'green' : 'muted'}>{hit ? 'Hit target' : 'Under target'}</Badge>
-        </div>
-      </div>
-      <button className="btn-icon btn-sm" onClick={onEdit} title="Edit">
-        <Icon name="edit" size={15} />
-      </button>
-      <button className="btn-icon btn-sm" onClick={() => armed ? onDelete() : confirm.arm(session.id)}
-        title={armed ? 'Confirm delete' : 'Delete'}
-        style={armed ? { background: 'var(--s-risk-bg)', color: 'var(--s-risk)' } : undefined}>
-        <Icon name={armed ? 'check' : 'delete'} size={15} />
-      </button>
-    </div>
+      <span className="fr-meta">
+        {pretty(session.startedAt.slice(0, 10))}
+        <i className={`fr-dot${hit ? ' hit' : ''}`} />{hit ? 'Hit target' : 'Under target'}
+      </span>
+      {session.notes && <span className="fr-note">{session.notes}</span>}
+      <Icon name="chevron_right" size={18} className="fr-go" />
+    </button>
   )
 }
