@@ -2791,3 +2791,14 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
 @media (max-width: 1023px) {
   .tabs.tabs-few .tab { flex: 1; text-align: center; }
 }
+
+/* Long text must never widen the page. Flex and grid children default to
+   min-width:auto, so a single unbreakable (or nowrap) line, like a long goal
+   name under a checklist item, pushes its whole card past the screen edge.
+   These let the text containers shrink so the ellipsis can do its job. */
+.check-row, .check-text, .check-list, .alert-text, .fold-title, .more-row > span:not(.icon) { min-width: 0; }
+.check-text { overflow: hidden; }
+.card, .view > * { min-width: 0; }
+@media (max-width: 1023px) {
+  .app-main { overflow-x: clip; }
+}
