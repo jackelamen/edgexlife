@@ -551,19 +551,24 @@ export default function TodayPage() {
               ? <Badge tone={dueDone === dueActions.length ? 'green' : 'orange'}>{dueDone}/{dueActions.length}</Badge>
               : null}
           />
+          {dueActions.length > 0 && (
+            <div className="prog-track check-prog" aria-hidden="true">
+              <span className={`prog-fill${dueDone === dueActions.length ? ' green' : ''}`} style={{ width: `${(dueDone / dueActions.length) * 100}%` }} />
+            </div>
+          )}
           {sprints.loading ? <Loading /> : !dueActions.length ? (
             <Empty icon="flag" title="Nothing due from your cycles"
               action={<Link to="/goals" className="btn btn-secondary btn-sm">Open goals</Link>}>
               {liveCycles.length ? 'Nothing is scheduled for today.' : 'No live cycle is running right now.'}
             </Empty>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+            <div className="check-list" style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
               {dueActions.map((a, i) => (
                 <button key={i} className={`check-row${a.done ? ' done' : ''}`} onClick={() => toggleAction(a)}>
                   <span className="check-box">{a.done && <Icon name="check" size={14} style={{ color: '#fff' }} />}</span>
                   <span className="check-text">
                     {a.tac.text}
-                    <small style={{ display: 'block', fontSize: 11, color: 'var(--text-3)', fontWeight: 600 }}>
+                    <small className="check-sub">
                       {goalTitle[a.sp.goal_id] || a.sp.name}
                       {a.kind === 'xpw' && ` · ${a.c}/${a.n} this week`}
                       {a.kind === 'once' && ' · weekly'}
@@ -574,7 +579,7 @@ export default function TodayPage() {
                       Shown here, not just on the goal card, because this
                       is where the actual work happens. */}
                   {goalThread[a.sp.goal_id] && identityThreadByKey[goalThread[a.sp.goal_id]] && (
-                    <span title={identityThreadByKey[goalThread[a.sp.goal_id]].label} style={{ flexShrink: 0, marginLeft: 6, display: 'inline-flex' }}>
+                    <span className="check-thread" title={identityThreadByKey[goalThread[a.sp.goal_id]].label} style={{ flexShrink: 0, marginLeft: 6, display: 'inline-flex' }}>
                       <Icon name={identityThreadByKey[goalThread[a.sp.goal_id]].icon} size={13}
                         style={{ color: MODULES.identity.color, opacity: .8 }} />
                     </span>
@@ -593,11 +598,16 @@ export default function TodayPage() {
               ? <Badge tone={habitsDone === habitList.length ? 'green' : 'blue'}>{habitsDone}/{habitList.length}</Badge>
               : null}
           />
+          {habitList.length > 0 && (
+            <div className="prog-track check-prog" aria-hidden="true">
+              <span className={`prog-fill${habitsDone === habitList.length ? ' green' : ''}`} style={{ width: `${(habitsDone / habitList.length) * 100}%` }} />
+            </div>
+          )}
           {habits.loading ? <Loading /> : !habitList.length ? (
             <Empty icon="repeat"
               title={(habits.data || []).length ? 'Nothing due today' : 'No habits in Pulse yet'} />
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 7, maxHeight: 300, overflowY: 'auto' }}>
+            <div className="check-list" style={{ display: 'flex', flexDirection: 'column', gap: 7, maxHeight: 300, overflowY: 'auto' }}>
               {habitList.map((h) => {
                 const done = doneToday.has(h.id)
                 return (
@@ -606,7 +616,7 @@ export default function TodayPage() {
                     <span className="check-text">
                       {h.name}
                       {h.goal_id && goalTitle[h.goal_id] && (
-                        <small style={{ display: 'block', fontSize: 11, color: 'var(--text-3)', fontWeight: 600 }}>
+                        <small className="check-sub">
                           {goalTitle[h.goal_id]}
                         </small>
                       )}
@@ -660,6 +670,7 @@ export default function TodayPage() {
                     <Icon name={al.icon} size={20} style={{ color: s.color }} />
                   </div>
                   <span className="alert-text">{al.text}</span>
+                  <div className="alert-actions">
                   {quickable && (
                     <button type="button" className="btn btn-secondary btn-xs"
                       onClick={() => setQuickOpen(open ? null : al.kind)}>
@@ -676,6 +687,7 @@ export default function TodayPage() {
                       Open <Icon name="arrow_forward" size={14} />
                     </Link>
                   )}
+                  </div>
                 </div>
                 {open && al.kind === 'health' && (
                   <QuickHealthForm busy={quickBusy} onCancel={() => setQuickOpen(null)} onSave={quickSaveHealth} />
@@ -690,7 +702,8 @@ export default function TodayPage() {
       )}
 
       {/* ── The three systems: freshness and a way in, as one quiet list ── */}
-      <div className="card sys-list today-order-systems">
+      <Card pad={false} className="sys-list today-order-systems" fold="Last logged"
+        summary={`Health ${healthAge == null ? 'never' : healthAge === 0 ? 'today' : `${healthAge}d ago`} · Wellness ${checkinAge == null ? 'never' : checkinAge === 0 ? 'today' : `${checkinAge}d ago`}`}>
         <SystemRow
           module="health" to="/health"
           lastLabel={lastHealthDate ? `Logged ${pretty(lastHealthDate)}` : 'Never logged'}
@@ -709,7 +722,7 @@ export default function TodayPage() {
           age={null}
           foot={dueActions.length ? `${dueDone} of ${dueActions.length} done today` : `${activeGoals.length} active goals`}
         />
-      </div>
+      </Card>
 
       {/* ── Where to focus: replaced "What connects" as the lead card here.
              That card needed ~200 days of Health+Wellness overlap before it

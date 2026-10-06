@@ -2613,7 +2613,7 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
 }
 .more-row:first-child { border-top: 0; }
 .more-row:active { background: var(--border); }
-.more-row > span { flex: 1; min-width: 0; }
+.more-row > span:not(.icon) { flex: 1; min-width: 0; }
 .more-row small { display: block; font-size: 12.5px; font-weight: 400; color: var(--text-3); margin-top: 1px; overflow: hidden; text-overflow: ellipsis; }
 .more-row.active { color: var(--accent-ink); }
 .more-row.signout { color: var(--s-risk); }
@@ -2726,3 +2726,68 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
   .reset-card { padding: 16px; }
 }
 @media (max-width: 1023px) { .empty { padding: 24px 12px; gap: 8px; } }
+
+/* ── Today, checklists and alerts ─────────────────────────────────
+   Desktop keeps the soft rows. On a phone the nested boxes (grey row in a
+   white card on a grey page) are what made everything read as one wall of
+   text, so rows go flat: hairline-separated, a large round checkbox,
+   a clear title with one quiet line under it. Done turns green (the
+   reserved "good" colour), and a progress bar says how far along you are. */
+.check-prog { height: 6px; margin: -6px 0 12px; }
+.check-sub { display: block; font-size: 12px; color: var(--text-3); font-weight: 500; }
+.alert-actions { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
+.intention-card--prompt { background: var(--white); border-color: rgba(168, 120, 28, 0.38); box-shadow: none; }
+
+@media (max-width: 1023px) {
+  .today-order-checklist .card-head p { display: none; }
+  .today-order-checklist .card-head { margin-bottom: 12px !important; }
+  .check-prog { margin: 0 0 4px; }
+  .check-list { gap: 0 !important; max-height: none !important; overflow: visible !important; }
+  .check-row { background: transparent; border: 0; border-top: 1px solid var(--border); border-radius: 0; padding: 15px 0; gap: 14px; }
+  .check-row:first-child { border-top: 0; }
+  .check-row:hover { background: transparent; }
+  .check-box { width: 28px; height: 28px; border-radius: 50%; border-width: 2px; }
+  .check-row.done .check-box { background: var(--s-good); border-color: var(--s-good); }
+  .check-text { font-size: 16px; font-weight: 550; line-height: 1.35; }
+  .check-sub { font-size: 12.5px; font-weight: 400; margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .check-row.done .check-sub { opacity: .7; }
+  .check-thread { display: none !important; }
+
+  /* Alerts: the sentence gets the whole width, the actions sit beneath it */
+  .alert-row { flex-wrap: wrap; align-items: flex-start; padding: 14px 16px; gap: 10px 12px; }
+  .alert-ic { padding-top: 1px; }
+  .alert-text { flex: 1 1 0; min-width: 0; font-size: 15px; line-height: 1.4; }
+  .alert-actions { flex: 1 1 100%; padding-left: 32px; }
+  .alert-actions .btn { flex: 1; }
+
+  /* Streaks: one row of four */
+  .hero-mc-strip-mobile .hero-mc-strip { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; padding: 16px 14px; }
+  .hero-stat-v { font-size: 22px; }
+  .hero-stat-v small { display: block; font-size: 11.5px; margin-top: 1px; }
+  .hero-stat-l { font-size: 11.5px; line-height: 1.25; margin-top: 6px; align-items: flex-start; }
+  .hero-stat-l::before { margin-top: 5px; }
+
+  /* Intention chips: one swipeable row instead of a three-row wrap */
+  .intention-card--prompt .thread-row { flex-wrap: nowrap; overflow-x: auto; margin: 6px -20px 0; padding: 2px 20px 4px; scrollbar-width: none; }
+  .intention-card--prompt .thread-row::-webkit-scrollbar { display: none; }
+  .thread-chip { flex: none; min-height: 40px; }
+}
+
+/* Phone view switcher (see ViewSwitcher in Kit.jsx) */
+.view-switch {
+  position: sticky; top: 0; z-index: 40; margin: 0 -16px 14px; background: var(--bg); border-bottom: 1px solid var(--border);
+  padding: calc(8px + env(safe-area-inset-top, 0px)) 16px 10px;
+}
+.view-switch-btn {
+  display: flex; align-items: center; gap: 10px; width: 100%; min-height: 50px; padding: 0 14px 0 16px; text-align: left;
+  background: var(--white); border: 1px solid var(--border-med); border-radius: 14px; box-shadow: var(--shadow-sm);
+  font-family: inherit; color: var(--text); cursor: pointer;
+}
+.vs-label { flex: 1; min-width: 0; font-size: 17px; font-weight: 600; letter-spacing: -.01em; }
+.vs-hint { font-size: 13px; color: var(--text-3); }
+.vs-chev { color: var(--text-3); }
+.more-check { color: var(--accent-ink); }
+.stat-value.is-empty { font-family: var(--font); font-size: 15px; font-weight: 400; letter-spacing: 0; color: var(--text-3); line-height: 1.4; }
+@media (max-width: 1023px) {
+  .tabs.tabs-few .tab { flex: 1; text-align: center; }
+}

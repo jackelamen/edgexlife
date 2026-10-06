@@ -106,7 +106,7 @@ export function StatCard({ label, value, sub, metricKey, pct, color, tint }) {
         {status && <span className="stat-pct" style={{ color: status.color }}>{Math.round(pct)}%</span>}
       </div>
       <div className="tile-bot">
-        <div className="stat-value tnum">{value ?? '--'}</div>
+        <div className={`stat-value tnum${value == null || value === '--' ? ' is-empty' : ''}`}>{value == null || value === '--' ? 'Not logged' : value}</div>
         {sub && <div className="stat-sub">{sub}</div>}
       </div>
     </div>
@@ -152,8 +152,65 @@ export function Tabs({ value, onChange, options, variant = 'pill', sub = false }
   return <PillTabs value={value} onChange={onChange} options={options} sub={sub} />
 }
 
-/* On a phone the tab strip is one scrollable row; keep the active tab in view. */
+/* Icons for the page-level views, used by the phone view switcher's sheet. */
+const VIEW_ICONS = {
+  today: 'today', log: 'edit_calendar', workout: 'fitness_center', fasting: 'schedule', routines: 'checklist', trends: 'show_chart',
+  checkin: 'edit_note', reset: 'restart_alt', meditate: 'self_improvement', inbox: 'inbox', journal: 'notes', insights: 'insights',
+  goals: 'flag', cycles: 'loop', roadmap: 'map', visions: 'auto_awesome', retros: 'history',
+}
+
+/**
+ * On a phone, a module with four or more views (Health has six) can't show
+ * them all in a row, and a clipped, swipeable strip hides what is off-screen.
+ * So the phone shows a sticky bar naming the current view; tapping it opens a
+ * sheet listing every view at once. With three or fewer, a plain full-width
+ * toggle is enough. Desktop keeps the tab strip.
+ */
+function ViewSwitcher({ value, onChange, options }) {
+  const [open, setOpen] = useState(false)
+  const current = options.find((o) => o.value === value) || options[0]
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e) => e.key === 'Escape' && setOpen(false)
+    document.addEventListener('keydown', onKey)
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.removeEventListener('keydown', onKey); document.body.style.overflow = prev }
+  }, [open])
+  return (
+    <>
+      <div className="view-switch">
+        <button type="button" className="view-switch-btn" aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(true)}>
+          <span className="vs-label">{current.label}</span>
+          <span className="vs-hint">{options.length} views</span>
+          <Icon name="expand_more" size={20} className="vs-chev" />
+        </button>
+      </div>
+      {open && createPortal(
+        <div className="modal-backdrop more-backdrop" onClick={() => setOpen(false)}>
+          <div className="modal-sheet more-sheet" role="dialog" aria-label="Choose a view" onClick={(e) => e.stopPropagation()}>
+            <div className="sheet-grabber" />
+            <div className="more-list">
+              {options.map((o) => (
+                <button key={o.value} type="button" className={`more-row${o.value === value ? ' active' : ''}`}
+                  onClick={() => { onChange(o.value); setOpen(false) }}>
+                  <Icon name={o.icon || VIEW_ICONS[o.value] || 'circle'} size={22} fill={o.value === value} />
+                  <span>{o.label}</span>
+                  {o.value === value && <Icon name="check" size={20} className="more-check" />}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+    </>
+  )
+}
+
+/* Desktop: the tab strip. Phone: see ViewSwitcher above. */
 function PillTabs({ value, onChange, options, sub }) {
+  const phone = usePhone()
   const ref = useRef(null)
   useEffect(() => {
     const el = ref.current?.querySelector('.tab.active')
@@ -161,8 +218,9 @@ function PillTabs({ value, onChange, options, sub }) {
       el.scrollIntoView({ inline: 'center', block: 'nearest', behavior: prefersReducedMotion() ? 'auto' : 'smooth' })
     }
   }, [value])
+  if (phone && !sub && options.length > 3) return <ViewSwitcher value={value} onChange={onChange} options={options} />
   return (
-    <div className={`tabs${sub ? ' tabs-sub' : ''}`} ref={ref} role="tablist">
+    <div className={`tabs${sub ? ' tabs-sub' : ''}${!sub && options.length <= 3 ? ' tabs-few' : ''}`} ref={ref} role="tablist">
       {options.map((o) => (
         <button key={o.value} role="tab" aria-selected={o.value === value}
           className={`tab${o.value === value ? ' active' : ''}`}
