@@ -36,7 +36,7 @@ export default class ErrorBoundary extends Component {
         padding: 24, background: 'var(--card-bg, #fff)', borderRadius: 16,
       }}>
         <div style={{ fontSize: 32, marginBottom: 8 }}>⚠️</div>
-        <h2 style={{ fontSize: 17, fontWeight: 800, marginBottom: 6 }}>This page hit an error</h2>
+        <h2 style={{ fontSize: 17, fontWeight: 650, marginBottom: 6 }}>This page hit an error</h2>
         <p style={{ fontSize: 13, color: 'var(--text-3, #888)', marginBottom: 16 }}>
           Nothing you had was lost. This page just couldn't render. Try reloading it.
         </p>

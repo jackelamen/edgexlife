@@ -6,9 +6,9 @@ import Wordmark from './Wordmark'
 import { useAuth } from '../../store/authStore'
 
 /*
-  Sidebar ported from the originals: 256px, #1a1a2e, section labels, and
-  Material Symbols that switch to their FILL variant when active. The module
-  accent tints the active pill via --accent-rgb.
+  Sidebar: 252px, follows the theme (light/dark) with a hairline edge, section
+  labels, and Material Symbols that switch to their FILL variant when active.
+  The module accent tints the active item via --accent-rgb.
 */
 
 const NAV = [
@@ -76,13 +76,10 @@ export default function Shell({ children }) {
 
   const sidebar = (
     <>
-      <div style={{ marginBottom: 32 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-          <BrandMark size={30} />
-          <Wordmark size={19} color="#fff" />
-        </div>
-        <div style={{ color: 'rgba(255,255,255,.35)', fontSize: 11.5, fontWeight: 600, marginTop: 3, marginLeft: 39 }}>
-          Goals · Health · Wellness
+      <div style={{ margin: '2px 0 26px 12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <BrandMark size={32} />
+          <Wordmark size={21} color="var(--text)" />
         </div>
       </div>
 
@@ -97,7 +94,7 @@ export default function Shell({ children }) {
               className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}>
               {({ isActive }) => (
                 <>
-                  <Icon name={n.icon} size={19} fill={isActive} />
+                  <Icon name={n.icon} size={20} fill={isActive} />
                   {n.label}
                 </>
               )}
@@ -106,25 +103,17 @@ export default function Shell({ children }) {
         )}
       </div>
 
-      <div style={{
-        marginTop: 20, display: 'flex', flexDirection: 'column', gap: 8,
-        borderTop: '1px solid rgba(255,255,255,0.07)', paddingTop: 16,
-      }}>
+      <div className="sidebar-foot">
         <button className="nav-item" onClick={() => setCmd(true)}>
-          <Icon name="apps" size={19} />
+          <Icon name="apps" size={20} />
           Connected apps
-          <kbd style={{
-            marginLeft: 'auto', fontSize: 10, background: 'rgba(255,255,255,.08)',
-            borderRadius: 4, padding: '2px 5px', color: 'rgba(255,255,255,.45)',
-          }}>⌘K</kbd>
+          <kbd className="nav-kbd">⌘K</kbd>
         </button>
-        <button className="nav-item" onClick={signOut} style={{ color: 'rgba(248,113,113,.85)' }}>
-          <Icon name="logout" size={19} />
+        <button className="nav-item signout" onClick={signOut}>
+          <Icon name="logout" size={20} />
           Sign out
         </button>
-        <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,.25)', paddingLeft: 14 }}>
-          {user?.email}
-        </div>
+        <div className="sidebar-user">{user?.email}</div>
       </div>
     </>
   )
@@ -136,19 +125,19 @@ export default function Shell({ children }) {
       {/* Mobile top bar — visible only under 1024px, see .mobile-topbar in index.css */}
       <div className="mobile-topbar">
         <button onClick={() => setOpen(true)} aria-label="Menu"
-          style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.7)', cursor: 'pointer' }}>
+          style={{ background: 'none', border: 'none', color: 'var(--text-2)', cursor: 'pointer' }}>
           <Icon name="menu" size={22} />
         </button>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <BrandMark size={22} />
-          <Wordmark size={17} color="#fff" />
+          <BrandMark size={24} />
+          <Wordmark size={18} color="var(--text)" />
         </div>
       </div>
 
       {open && (
         <>
           <div onClick={() => setOpen(false)}
-            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 70 }} />
+            style={{ position: 'fixed', inset: 0, background: 'rgba(12,12,11,.42)', backdropFilter: 'blur(4px)', zIndex: 70 }} />
           <aside id="sidebar-mobile">
             {sidebar}
           </aside>
@@ -205,19 +194,19 @@ function CommandPalette({ onClose }) {
 
   return (
     <div onClick={onClose} className="cmdk-backdrop" style={{
-      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
+      position: 'fixed', inset: 0, background: 'rgba(12,12,11,0.42)', backdropFilter: 'blur(8px)',
       zIndex: 9999, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: '14vh',
     }}>
       <div onClick={(e) => e.stopPropagation()} className="cmdk-panel" style={{
-        width: '100%', maxWidth: 520, background: 'var(--sidebar-bg)',
-        border: '1px solid rgba(255,255,255,0.1)', borderRadius: 16, overflow: 'hidden',
-        boxShadow: '0 24px 80px rgba(0,0,0,0.6)',
+        width: '100%', maxWidth: 520, background: 'var(--white)',
+        border: '1px solid var(--border-med)', borderRadius: 18, overflow: 'hidden',
+        boxShadow: 'var(--shadow-lg)',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 18px', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
-          <Icon name="search" size={18} style={{ color: 'rgba(255,255,255,.45)' }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 18px', borderBottom: '1px solid var(--border)' }}>
+          <Icon name="search" size={18} style={{ color: 'var(--text-3)' }} />
           <input autoFocus value={q} onChange={(e) => { setQ(e.target.value); setSel(0) }}
             placeholder="Open app…"
-            style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: '#fff', fontSize: 15, fontWeight: 500, padding: 0 }} />
+            style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: 'var(--text)', fontSize: 15, fontWeight: 500, padding: 0, boxShadow: 'none' }} />
         </div>
         <div style={{ maxHeight: 320, overflowY: 'auto', padding: 8 }}>
           {items.map((it, i) => (
@@ -227,17 +216,17 @@ function CommandPalette({ onClose }) {
               style={{
                 display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px',
                 borderRadius: 10, width: '100%', textAlign: 'left', border: 'none', cursor: 'pointer',
-                background: i === sel ? 'rgba(255,255,255,0.08)' : 'transparent',
-                color: 'rgba(255,255,255,0.82)', fontFamily: 'inherit',
+                background: i === sel ? 'var(--white-soft)' : 'transparent',
+                color: 'var(--text)', fontFamily: 'inherit',
               }}>
-              <span style={{ width: 36, height: 36, borderRadius: 8, display: 'grid', placeItems: 'center', background: 'rgba(255,255,255,.06)' }}>
+              <span style={{ width: 36, height: 36, borderRadius: 8, display: 'grid', placeItems: 'center', background: 'var(--white-soft)', border: '1px solid var(--border)' }}>
                 <Icon name={it.icon} size={18} />
               </span>
               <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                 <span style={{ fontSize: 13.5, fontWeight: 600 }}>{it.label}</span>
-                {it.desc && <span style={{ fontSize: 12, color: 'rgba(255,255,255,.45)' }}>{it.desc}</span>}
+                {it.desc && <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{it.desc}</span>}
               </span>
-              <Icon name="open_in_new" size={16} style={{ marginLeft: 'auto', color: 'rgba(255,255,255,.35)' }} />
+              <Icon name="open_in_new" size={16} style={{ marginLeft: 'auto', color: 'var(--text-3)' }} />
             </button>
           ))}
         </div>

@@ -553,7 +553,7 @@ function DayModal({ date, plan, effectiveByDate, db, allDates, sessions = [], on
               style={{ fontSize: 13, padding: '8px 10px' }} />
             <input type="number" value={ex.sets ?? 3} min={1} max={12} title="Sets"
               onChange={(e) => setExercises(exercises.map((x, j) => j === i ? { ...x, sets: Number(e.target.value) } : x))}
-              style={{ width: 62, fontSize: 13, padding: '8px 6px', textAlign: 'center', fontWeight: 800 }} />
+              style={{ width: 62, fontSize: 13, padding: '8px 6px', textAlign: 'center', fontWeight: 650 }} />
             <button className="btn btn-icon btn-sm ex-move" disabled={i === 0}
               onClick={() => moveExercise(i, -1)} aria-label="Move exercise up" title="Move up">
               <Icon name="arrow_upward" size={15} />
@@ -832,7 +832,7 @@ function SessionTab({ session, setSession, db, goals, plan, pastSessions, exerci
       <div className="session-header">
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div>
-            <h2 style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-.02em' }}>
+            <h2 style={{ fontSize: 22, fontWeight: 650, letterSpacing: '-.02em' }}>
               {session.type} Session
             </h2>
             <div style={{ fontSize: 13, color: 'rgba(255,255,255,.6)', marginTop: 3 }}>
@@ -903,7 +903,7 @@ function SessionTab({ session, setSession, db, goals, plan, pastSessions, exerci
                   placeholder="Exercise name"
                   onClick={(e) => e.stopPropagation()}
                   onChange={(e) => updateEx(i, { name: e.target.value })}
-                  style={{ border: 'none', background: 'transparent', padding: 0, fontWeight: 800, fontSize: 14 }}
+                  style={{ border: 'none', background: 'transparent', padding: 0, fontWeight: 650, fontSize: 14 }}
                 />
                 <span className="ex-summary">
                   {done}/{ex.sets?.length || 0}{doneReps > 0 ? ` · ${doneReps} reps` : ''}
@@ -997,7 +997,7 @@ function SessionTab({ session, setSession, db, goals, plan, pastSessions, exerci
                         onChange={(e) => updateEx(i, {
                           sets: ex.sets.map((x, j) => j === si ? { ...x, weight: e.target.value } : x),
                         })} />
-                      <span className="tnum" style={{ fontSize: 12, fontWeight: 800, color: 'var(--text-3)', textAlign: 'center' }}>
+                      <span className="tnum" style={{ fontSize: 12, fontWeight: 650, color: 'var(--text-3)', textAlign: 'center' }}>
                         {Math.round((parseFloat(s.reps) || 0) * setLoadKg(ex.name, s.weight, bodyweightKg) * 10) / 10 || '—'}
                       </span>
                       <button className={`set-done-btn${s.done ? ' done' : ''}`}
@@ -1343,7 +1343,7 @@ function HistoryTab({ sessions, onEdit, onTab, bodyweightKg = 70, activeSessionI
               return (
                 <div key={s.id} className="session-log-row">
                   <div>
-                    <div style={{ fontSize: 13, fontWeight: 800 }}>{s.date?.slice(5)}</div>
+                    <div style={{ fontSize: 13, fontWeight: 650 }}>{s.date?.slice(5)}</div>
                     <small style={{ display: 'block', fontSize: 11, color: 'var(--text-3)', fontWeight: 600, marginTop: 1 }}>
                       {s.durationSec ? fmtDuration(s.durationSec) : '—'}
                     </small>
@@ -1363,7 +1363,7 @@ function HistoryTab({ sessions, onEdit, onTab, bodyweightKg = 70, activeSessionI
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <div style={{ textAlign: 'right' }}>
-                      <div className="tnum" style={{ fontSize: 13, fontWeight: 900 }}>
+                      <div className="tnum" style={{ fontSize: 13, fontWeight: 650 }}>
                         {vol ? Math.round(vol).toLocaleString() : '—'}
                       </div>
                       <small style={{ display: 'block', fontSize: 10, color: 'var(--text-3)', fontWeight: 700 }}>kg vol</small>
@@ -1611,7 +1611,7 @@ function GoalRing({ pct, size = 100, stroke = 10 }) {
           style={{ transition: 'stroke-dashoffset 1s cubic-bezier(.4,0,.2,1)' }} />
       </svg>
       <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <span className="tnum" style={{ fontSize: size * 0.26, fontWeight: 800, letterSpacing: '-.02em', color: 'var(--accent-dark)' }}>
+        <span className="tnum" style={{ fontSize: size * 0.26, fontWeight: 650, letterSpacing: '-.02em', color: 'var(--accent-dark)' }}>
           {Math.round(val)}%
         </span>
       </div>
@@ -1694,7 +1694,7 @@ function ProgressTab({ sessions, exGoals, db, bodyweightKg = 70 }) {
     <>
       <div className="flex items-start justify-between gap-3 flex-wrap" style={{ marginBottom: 16 }}>
         <div>
-          <h2 style={{ fontSize: 18, fontWeight: 800 }}>Goals</h2>
+          <h2 style={{ fontSize: 18, fontWeight: 650 }}>Goals</h2>
           <p style={{ fontSize: 12.5, color: 'var(--text-2)', marginTop: 3 }}>
             Pick an exercise, set a target, track it from the day you started until you hit it.
           </p>
@@ -1774,10 +1774,10 @@ function ProgressTab({ sessions, exGoals, db, bodyweightKg = 70 }) {
                   <div style={{ flex: '1 1 220px', minWidth: 0 }}>
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.07em', textTransform: 'uppercase', color: 'var(--accent-dark)', opacity: .75 }}>
+                        <div style={{ fontSize: 11, fontWeight: 650, color: 'var(--accent-dark)', opacity: .75 }}>
                           Closest to goal
                         </div>
-                        <div style={{ fontSize: 16, fontWeight: 800, marginTop: 2 }}>
+                        <div style={{ fontSize: 16, fontWeight: 650, marginTop: 2 }}>
                           {goal.exercise}{qualifier && <span style={{ color: 'var(--accent-dark)', fontWeight: 700, opacity: .75 }}> · {qualifier}</span>}
                         </div>
                       </div>
@@ -1788,7 +1788,7 @@ function ProgressTab({ sessions, exGoals, db, bodyweightKg = 70 }) {
                       </button>
                     </div>
                     <div className="flex items-end gap-3 flex-wrap" style={{ marginTop: 8 }}>
-                      <span className="tnum" style={{ fontSize: 44, fontWeight: 800, letterSpacing: '-.03em', color: 'var(--accent-dark)', lineHeight: 1 }}>
+                      <span className="tnum" style={{ fontSize: 44, fontWeight: 650, letterSpacing: '-.03em', color: 'var(--accent-dark)', lineHeight: 1 }}>
                         {Math.round(best)}{unit}
                       </span>
                       <span style={{ fontSize: 13.5, color: 'var(--text-2)', fontWeight: 700, marginBottom: 5 }}>
@@ -1819,7 +1819,7 @@ function ProgressTab({ sessions, exGoals, db, bodyweightKg = 70 }) {
                   <Card key={goal.id}>
                     <div className="flex items-start justify-between gap-3" style={{ marginBottom: 10 }}>
                       <div>
-                        <div style={{ fontSize: 15, fontWeight: 800 }}>
+                        <div style={{ fontSize: 15, fontWeight: 650 }}>
                           {goal.exercise}{qualifier && <span style={{ color: 'var(--text-3)', fontWeight: 700 }}> · {qualifier}</span>}
                         </div>
                         <div style={{ fontSize: 11.5, color: 'var(--text-3)', fontWeight: 600, marginTop: 2 }}>
@@ -1833,7 +1833,7 @@ function ProgressTab({ sessions, exGoals, db, bodyweightKg = 70 }) {
                       </button>
                     </div>
                     <div className="flex items-end justify-between gap-2" style={{ marginBottom: 8 }}>
-                      <span className="tnum" style={{ fontSize: 26, fontWeight: 800, letterSpacing: '-.02em', color: 'var(--accent)' }}>
+                      <span className="tnum" style={{ fontSize: 26, fontWeight: 650, letterSpacing: '-.02em', color: 'var(--accent)' }}>
                         {Math.round(best)}{unit}
                       </span>
                       <span style={{ fontSize: 13, color: 'var(--text-3)', fontWeight: 700, marginBottom: 4 }}>
@@ -1881,7 +1881,7 @@ function ProgressTab({ sessions, exGoals, db, bodyweightKg = 70 }) {
       )}
 
       <div style={{ borderTop: '1px solid var(--border)', paddingTop: 20, marginTop: 8 }}>
-        <h3 style={{ fontSize: 14, fontWeight: 800, color: 'var(--text-2)', marginBottom: 3 }}>Explore any exercise</h3>
+        <h3 style={{ fontSize: 14, fontWeight: 650, color: 'var(--text-2)', marginBottom: 3 }}>Explore any exercise</h3>
         <p style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 14 }}>
           A secondary view: every exercise you've logged, with a chart, whether or not it has a goal.
         </p>

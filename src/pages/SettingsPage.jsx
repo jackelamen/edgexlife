@@ -109,7 +109,7 @@ function DataDiagnostics() {
       <div className="flex flex-col gap-3.5" style={{ marginTop: 14 }}>
         <Panel title={`Egress this month (${ledger.month})`}
           actions={<span className="chip">{ledger.calls} reads</span>}>
-          <div className="tnum" style={{ fontSize: 30, fontWeight: 800, letterSpacing: '-.02em', color: 'var(--accent)' }}>
+          <div className="tnum" style={{ fontSize: 30, fontWeight: 650, letterSpacing: '-.02em', color: 'var(--accent)' }}>
             {formatBytes(ledger.bytes)}
           </div>
           <p className="text-[12.5px] mt-1" style={{ color: 'var(--text-3)' }}>

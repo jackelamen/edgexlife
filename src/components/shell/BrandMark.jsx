@@ -19,7 +19,7 @@
 export default function BrandMark({ size = 30 }) {
   const r = size * 0.22
   return (
-    <svg width={size} height={size} viewBox="0 0 48 48" style={{ flexShrink: 0 }}>
+    <svg className="brandmark" width={size} height={size} viewBox="0 0 48 48" style={{ flexShrink: 0 }}>
       <rect x="0" y="0" width="48" height="48" rx={r * (48 / size)} fill="#14140f" />
       <polygon points="9.89,11.70 28.44,11.70 25.21,17.75 9.89,17.75" fill="#d76d24" />
       <polygon points="9.89,20.98 33.27,20.98 30.05,27.02 9.89,27.02" fill="#11ae95" />

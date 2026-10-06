@@ -12,7 +12,7 @@ export default function Wordmark({ size = 17, color = 'currentColor' }) {
     <span
       style={{
         display: 'inline-block',
-        fontSize: size, fontWeight: 800, lineHeight: 1, color,
+        fontFamily: 'var(--font-brand)', fontSize: size, fontWeight: 800, lineHeight: 1, color,
         fontVariationSettings: '"opsz" 96', letterSpacing: '-.045em',
       }}
     >

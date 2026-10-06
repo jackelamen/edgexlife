@@ -363,7 +363,7 @@ function ActiveFastCard({ session, onEnd, onEditStart }) {
               strokeDashoffset={2 * Math.PI * 34 * (1 - Math.min(100, pct ?? 0) / 100)} />
           </svg>
           <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column' }}>
-            <div style={{ fontSize: 17, fontWeight: 800, letterSpacing: '-.02em', color: '#fff' }}>
+            <div style={{ fontSize: 17, fontWeight: 650, letterSpacing: '-.02em', color: '#fff' }}>
               {pct != null ? `${Math.round(Math.min(100, pct))}%` : '--'}
             </div>
             {/* "of target" in 8px caps clipped against the ring edge; the
@@ -579,8 +579,8 @@ function WeeklyStats({ sessions }) {
   )
 }
 const rowStyle = { background: 'var(--white)', borderRadius: 15, padding: '14px 16px', boxShadow: 'var(--shadow-sm)', display: 'flex', flexDirection: 'column', gap: 3 }
-const kStyle = { fontSize: 11, fontWeight: 800, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: '.06em' }
-const vStyle = { fontSize: 26, fontWeight: 800, letterSpacing: '-.02em' }
+const kStyle = { fontSize: 12, fontWeight: 550, color: 'var(--text-2)' }
+const vStyle = { fontSize: 26, fontWeight: 650, letterSpacing: '-.02em' }
 const subStyle = { fontSize: 11.5, color: 'var(--text-3)', fontWeight: 600 }
 
 /* ── History row ──────────────────────────────────────────── */

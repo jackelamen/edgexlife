@@ -325,7 +325,7 @@ function Dashboard({ latest, notes, todayCheckins, index, history, onChanged, on
                   <Icon name={tool.icon || 'restart_alt'} size={16} />
                 </div>
                 <div>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: '.04em' }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-2)' }}>
                     {provenFor ? 'Works for you' : 'Suggested Reset'}
                   </div>
                   <div style={{ fontSize: 13, fontWeight: 700 }}>{tool.title}</div>
@@ -813,7 +813,7 @@ function ResetView({ latest, notes, onNav, onLogged }) {
         {RESET_TOOLS.map((t) => (
           <div key={t.id} className="reset-card" onClick={() => start(t)}>
             <div className="reset-icon"><Icon name={t.icon || 'restart_alt'} size={18} /></div>
-            <h3 style={{ fontSize: 15, fontWeight: 800, marginBottom: 4 }}>{t.title}</h3>
+            <h3 style={{ fontSize: 15, fontWeight: 650, marginBottom: 4 }}>{t.title}</h3>
             <p style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 12 }}>{t.body}</p>
             <div className="script-list">
               {t.steps.map((s, i) => <div key={i} className="script-line">{s}</div>)}
@@ -906,14 +906,14 @@ function ResetRunner({ tool, onClose, onLogged }) {
         ))}
       </div>
 
-      <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.07em', textTransform: 'uppercase', color: 'var(--text-3)', marginBottom: 6 }}>
+      <div style={{ fontSize: 11, fontWeight: 650, color: 'var(--text-3)', marginBottom: 6 }}>
         Step {step + 1} of {tool.steps.length}
       </div>
       <p style={{ fontSize: 17, fontWeight: 700, lineHeight: 1.4 }}>{tool.steps[step]}</p>
 
       {isWalkTimerStep && (
         <div style={{ textAlign: 'center', padding: '18px 0 4px' }}>
-          <div className="tnum" style={{ fontSize: 40, fontWeight: 800, marginBottom: 10 }}>
+          <div className="tnum" style={{ fontSize: 40, fontWeight: 650, marginBottom: 10 }}>
             {String(Math.floor(walkSecs / 60)).padStart(2, '0')}:{String(walkSecs % 60).padStart(2, '0')}
           </div>
           <button className={`timer-btn ${walkRunning ? 'stop' : 'start'}`} onClick={() => setWalkRunning((r) => !r)}>

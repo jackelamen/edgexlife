@@ -27,8 +27,8 @@ export default defineConfig({
         name: 'xLife · Goals, Health, Wellness',
         short_name: 'xLife',
         description: 'Vision, goals, health and wellness for The EDGEx',
-        theme_color: '#f6f4ef',
-        background_color: '#f6f4ef',
+        theme_color: '#f6f6f3',
+        background_color: '#f6f6f3',
         display: 'standalone',
         start_url: '/',
         icons: [

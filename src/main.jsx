@@ -29,10 +29,14 @@ if (!supabaseConfigured) {
           position="bottom-center"
           toastOptions={{
             style: {
-              background: '#16241f',
-              color: '#f7f8f6',
-              borderRadius: 10,
+              background: '#141413',
+              color: '#f6f6f3',
+              border: '1px solid rgba(255,255,255,.10)',
+              borderRadius: 12,
               fontSize: 14,
+              fontWeight: 500,
+              padding: '10px 14px',
+              boxShadow: '0 12px 32px -12px rgba(0,0,0,.45)',
             },
           }}
         />

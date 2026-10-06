@@ -241,7 +241,7 @@ function TodayView({ settings, index, onNavFasting }) {
             marginTop: 20, paddingTop: 18, borderTop: '1px solid var(--border)',
           }}>
             <div>
-              <strong style={{ fontSize: 13.5, fontWeight: 800 }}>Last 14 days</strong>
+              <strong style={{ fontSize: 13.5, fontWeight: 650 }}>Last 14 days</strong>
               <div style={{ fontSize: 11.5, color: 'var(--text-3)', fontWeight: 600 }}>
                 Colour here is status, not metric
               </div>
@@ -354,7 +354,7 @@ function LogView({ settings, index, onEdit }) {
                   padding: 14, border: '1px solid var(--border)', borderRadius: 12, background: 'var(--white)',
                 }}>
                   <div>
-                    <div style={{ fontSize: 14, fontWeight: 900 }}>{pretty(l.date)}</div>
+                    <div style={{ fontSize: 14, fontWeight: 650 }}>{pretty(l.date)}</div>
                     <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 2 }}>
                       Score {score ?? '--'}
                     </div>

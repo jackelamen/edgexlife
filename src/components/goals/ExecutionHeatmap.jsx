@@ -138,7 +138,7 @@ export default function ExecutionHeatmap({ sprint, phases, tactics }) {
               <span style={{ flex: 1, minWidth: 0, fontWeight: 600, color: 'var(--text-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {r.tactic.text}
               </span>
-              <span className="tnum" style={{ fontWeight: 800, color: 'var(--text)' }}>{r.done}<span style={{ color: 'var(--text-3)', fontWeight: 600 }}>/{r.total}</span></span>
+              <span className="tnum" style={{ fontWeight: 650, color: 'var(--text)' }}>{r.done}<span style={{ color: 'var(--text-3)', fontWeight: 600 }}>/{r.total}</span></span>
               <span style={{ width: 62, height: 5, borderRadius: 99, background: 'var(--white-soft)', overflow: 'hidden', flexShrink: 0 }}>
                 <span style={{ display: 'block', height: '100%', borderRadius: 99, width: `${Math.round((r.done / r.total) * 100)}%`, background: STATUS.good.color }} />
               </span>

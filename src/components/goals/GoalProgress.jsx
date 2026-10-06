@@ -24,7 +24,7 @@ export default function GoalProgress({ progress, time, standing, onPhoto }) {
         <strong className="tnum" style={{ fontSize: 20, lineHeight: 1, color: ink }}>{progress.pct}%</strong>
         <span style={{ fontSize: 12, fontWeight: 600, color: soft }}>{progress.label}</span>
         {standing && (
-          <span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 800, color: onPhoto ? '#fff' : color }}>
+          <span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 650, color: onPhoto ? '#fff' : color }}>
             {PACE_LABEL[standing].replace(' pace', '')}
           </span>
         )}

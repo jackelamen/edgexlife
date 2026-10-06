@@ -359,7 +359,7 @@ export default function BreathTimer({ onComplete, suggestion }) {
         </div>
       </div>
       <div className="timer-time">{m}:{s}</div>
-      <div style={{ fontSize: isFs ? 18 : 12, color: 'rgba(255,255,255,.55)', fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase' }}>
+      <div style={{ fontSize: isFs ? 18 : 12, color: 'rgba(255,255,255,.55)', fontWeight: 650, letterSpacing: '.08em', textTransform: 'uppercase' }}>
         {phaseLabel}
       </div>
       {isFs && (
@@ -441,7 +441,7 @@ export default function BreathTimer({ onComplete, suggestion }) {
       <div className="audio-panel">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
           <div>
-            <h2 style={{ fontSize: 13, fontWeight: 800 }}>{track.label} Music</h2>
+            <h2 style={{ fontSize: 13, fontWeight: 650 }}>{track.label} Music</h2>
             <p style={{ fontSize: 12, color: 'var(--text-2)' }}>{track.sub}</p>
           </div>
           <Icon name="music_note" size={18} style={{ color: 'var(--accent)' }} />
@@ -476,7 +476,7 @@ export default function BreathTimer({ onComplete, suggestion }) {
             <Icon name="fullscreen_exit" size={24} />
           </button>
           <div className="fs-inner">
-            <div style={{ fontSize: 13, fontWeight: 800, letterSpacing: '.14em', textTransform: 'uppercase', color: 'rgba(255,255,255,.55)' }}>
+            <div style={{ fontSize: 13, fontWeight: 650, letterSpacing: '.14em', textTransform: 'uppercase', color: 'rgba(255,255,255,.55)' }}>
               Meditation Timer
             </div>
             {face(true)}

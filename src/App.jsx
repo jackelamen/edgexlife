@@ -19,7 +19,7 @@ import SettingsPage from './pages/SettingsPage'
 // already left.
 function Page({ children }) {
   const { pathname } = useLocation()
-  return <ErrorBoundary key={pathname}>{children}</ErrorBoundary>
+  return <ErrorBoundary key={pathname}><div className="page-enter">{children}</div></ErrorBoundary>
 }
 
 export default function App() {

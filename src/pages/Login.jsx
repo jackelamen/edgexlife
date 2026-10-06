@@ -24,19 +24,16 @@ export default function Login() {
   }
 
   return (
-    <div style={{
-      minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-      padding: '20px', background: 'var(--bg)',
-    }}>
-      <form onSubmit={submit} className="card card-pad" style={{ width: '100%', maxWidth: 380 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 26 }}>
-          <BrandMark size={40} />
-          <div>
-            <h1 className="page-title" style={{ fontSize: 20 }}><Wordmark size={22} /></h1>
-            <p style={{ fontSize: 13, color: 'var(--text-3)', fontWeight: 600 }}>
-              Sign in with your Pulse account
-            </p>
-          </div>
+    <div className="login-bg">
+      <form onSubmit={submit} className="card card-pad login-card">
+        <div style={{ marginBottom: 28 }}>
+          <BrandMark size={44} />
+          <h1 className="page-title" style={{ fontSize: 26, margin: '18px 0 4px' }}>
+            Welcome back to <Wordmark size={26} />
+          </h1>
+          <p style={{ fontSize: 14, color: 'var(--text-2)' }}>
+            Sign in with your Pulse account.
+          </p>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>

@@ -39,7 +39,7 @@ export function CardHead({ title, sub, right }) {
   return (
     <div className="flex items-start justify-between gap-3.5 flex-wrap" style={{ marginBottom: 20 }}>
       <div>
-        <h2 style={{ fontSize: 16, fontWeight: 800 }}>{title}</h2>
+        <h2 style={{ fontSize: 16, fontWeight: 650 }}>{title}</h2>
         {sub && <p style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 3 }}>{sub}</p>}
       </div>
       {right}
@@ -143,7 +143,7 @@ export function DesignLegend() {
 
       {DESIGN_RULES.map((r) => (
         <div key={r.title} style={{ marginBottom: 12 }}>
-          <strong style={{ fontSize: 13, fontWeight: 800, display: 'block', marginBottom: 2 }}>{r.title}</strong>
+          <strong style={{ fontSize: 13, fontWeight: 650, display: 'block', marginBottom: 2 }}>{r.title}</strong>
           <p style={{ fontSize: 12.5, color: 'var(--text-2)', lineHeight: 1.6 }}>{r.body}</p>
         </div>
       ))}
@@ -441,10 +441,10 @@ export function Ring({ score, size = 150, stroke = 13, sub, onAccent = true }) {
           style={{ transition: 'stroke-dashoffset 1s cubic-bezier(.4,0,.2,1), stroke .4s' }} />
       </svg>
       <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column' }}>
-        <div className="tnum score-ring-num" style={{ fontSize: size * 0.3, fontWeight: 800, letterSpacing: '-.03em', lineHeight: 1 }}>
+        <div className="tnum score-ring-num" style={{ fontSize: size * 0.3, fontWeight: 650, letterSpacing: '-.03em', lineHeight: 1 }}>
           {score == null ? '--' : <CountUp value={Math.round(score)} />}
         </div>
-        {sub && <div className="score-ring-sub" style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.09em', textTransform: 'uppercase', opacity: .72, marginTop: 4 }}>{sub}</div>}
+        {sub && <div className="score-ring-sub" style={{ fontSize: 12, fontWeight: 550, opacity: .72, marginTop: 4 }}>{sub}</div>}
       </div>
     </div>
   )
@@ -474,7 +474,7 @@ export function ScoreRow({ label, detail, value, weight, maxPoints, metricKey })
       <div className="score-meter" style={m ? { background: m.tint } : undefined}>
         <span style={{ width: `${Math.max(0, Math.min(100, value))}%`, background: m ? m.color : undefined }} />
       </div>
-      <span className="tnum" style={{ fontSize: 14, fontWeight: 800, textAlign: 'right' }}>
+      <span className="tnum" style={{ fontSize: 14, fontWeight: 650, textAlign: 'right' }}>
         {Math.round(value)}
         {impact != null && <span className="score-weight" style={{ display: 'block' }}>up to {impact} pt</span>}
       </span>
@@ -529,7 +529,7 @@ export function undoToast(message, onUndo) {
             instead, so the affordance reads on either theme. */}
         <button type="button" style={{
           background: 'none', border: 'none', padding: 0, cursor: 'pointer',
-          color: 'inherit', font: 'inherit', fontWeight: 800,
+          color: 'inherit', font: 'inherit', fontWeight: 650,
           textDecoration: 'underline', textUnderlineOffset: 2, flexShrink: 0,
         }}
           onClick={async () => {
@@ -585,7 +585,7 @@ export function Panel({ title, actions, children, className = '', bodyClass }) {
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           gap: 12, padding: '14px 18px 0',
         }}>
-          <span style={{ fontSize: 15, fontWeight: 800 }}>{title}</span>
+          <span style={{ fontSize: 15, fontWeight: 650 }}>{title}</span>
           {actions && <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>{actions}</div>}
         </div>
       )}

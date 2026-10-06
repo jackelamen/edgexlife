@@ -308,7 +308,7 @@ function TodayView({ goals, rollup, cycleData, onStartCycle, onOpenRetros }) {
             goal={featured.goal} compact={false} sprintsAsync={cycleData.sprints} outcomeData={cycleData} />
           {rest.length > 0 && (
             <>
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.06em', marginTop: 2 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', marginTop: 2 }}>
                 Also live
               </div>
               {rest.map((c) => (
@@ -855,12 +855,12 @@ function GoalCard({ goal, roll, progress, time, goalSprints, onOutcomeChanged, h
             <p style={{ fontSize: 15, fontStyle: 'italic', fontWeight: 700, color: photo ? '#fff' : 'var(--text)', lineHeight: 1.42, marginBottom: 8 }}>
               "{goal.why}"
             </p>
-            <div style={{ fontSize: 11.5, fontWeight: 700, color: photo ? 'rgba(255,255,255,.75)' : 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 12 }}>
+            <div style={{ fontSize: 11.5, fontWeight: 700, color: photo ? 'rgba(255,255,255,.75)' : 'var(--text-3)', marginBottom: 12 }}>
               {goal.title}
             </div>
           </>
         ) : (
-          <h3 style={{ fontSize: 16, fontWeight: 800, marginBottom: 12, lineHeight: 1.3, color: photo ? '#fff' : undefined }}>{goal.title}</h3>
+          <h3 style={{ fontSize: 16, fontWeight: 650, marginBottom: 12, lineHeight: 1.3, color: photo ? '#fff' : undefined }}>{goal.title}</h3>
         )}
         <GoalProgress progress={progress} time={time} standing={goalStanding(progress, time)} onPhoto={Boolean(photo)} />
         {/* A brand-new goal used to just sit here with nothing to do next —
@@ -1014,7 +1014,7 @@ function GoalDetail({ goal, sprints, onChanged }) {
                 )}
                 <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', fontSize: 11.5, fontWeight: 600, color: 'var(--text-3)' }}>
                   {prog != null && <span>{Math.round(prog * 100)}% of the way</span>}
-                  {pace && pace.status !== 'none' && <span style={{ color, fontWeight: 800 }}>{PACE_LABEL[pace.status]}</span>}
+                  {pace && pace.status !== 'none' && <span style={{ color, fontWeight: 650 }}>{PACE_LABEL[pace.status]}</span>}
                   {startN == null && num(m.target) != null && <span>No start value, so progress counts from 0. Edit to set one.</span>}
                 </div>
               </div>
