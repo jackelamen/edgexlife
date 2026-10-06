@@ -353,7 +353,6 @@ function CycleCard({ sprint, phases, tactics, goal, compact, sprintsAsync, outco
   const toDay = (iso) => Math.round(new Date(`${iso}T00:00:00`).getTime() / dayMs)
   const spanDays = sprint.start_date && sprint.end_date ? Math.max(1, toDay(sprint.end_date) - toDay(sprint.start_date) + 1) : 0
   const elapsedDays = spanDays ? Math.max(0, Math.min(spanDays, toDay(today()) - toDay(sprint.start_date) + 1)) : 0
-  const timePct = spanDays ? Math.round((elapsedDays / spanDays) * 100) : 0
   const daysLeft = spanDays && !ended ? Math.max(0, spanDays - elapsedDays) : null
 
   // Optimistic, same pattern as TodayPage's toggleAction: write the new
@@ -431,7 +430,7 @@ function CycleCard({ sprint, phases, tactics, goal, compact, sprintsAsync, outco
   }
 
   return (
-    <div className="cycle-card" style={{ '--cycle-hue': areaColor(goal?.area) }}>
+    <div className="cycle-card" style={{ borderLeftColor: areaColor(goal?.area) }}>
       <div className="cycle-header">
         {/* onAccent defaults to true, meant for the ring sitting on a solid
             accent background (hero cards). This card is plain white, so
@@ -443,7 +442,7 @@ function CycleCard({ sprint, phases, tactics, goal, compact, sprintsAsync, outco
         <div className="cycle-ring-section" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}
           title={`Commitment rate: ${rate.done} of ${rate.total} commitments met on days that have fully elapsed`}>
           {rate.pct != null ? (
-            <Ring score={rate.pct} size={88} stroke={8} sub="rate" onAccent={false} />
+            <Ring score={rate.pct} size={80} stroke={8} sub="rate" onAccent={false} />
           ) : (
             // Too few elapsed commitment-days for a percentage to mean
             // anything yet — show the raw count rather than a number one
@@ -470,13 +469,13 @@ function CycleCard({ sprint, phases, tactics, goal, compact, sprintsAsync, outco
           </div>
           <div className="cycle-name">{sprint.name}</div>
           {sprint.outcome && <p className="cycle-outcome-line">{sprint.outcome}</p>}
-          <div className="cycle-chips">
-            {sprint.start_date && sprint.end_date && (
-              <span className="cycle-chip"><Icon name="calendar_month" size={14} />{prettyShort(sprint.start_date)} to {prettyShort(sprint.end_date)}</span>
-            )}
-            <span className="cycle-chip"><Icon name="target" size={14} />{ended ? `${totalWeeks} weeks` : `Week ${cw} of ${totalWeeks}`}</span>
-            {rate.total > 0 && <span className="cycle-chip"><Icon name="check_circle" size={14} />{rate.done} of {rate.total} met</span>}
-            {daysLeft != null && <span className="cycle-chip"><Icon name="schedule" size={14} />{daysLeft === 0 ? 'Last day' : `${daysLeft} ${daysLeft === 1 ? 'day' : 'days'} left`}</span>}
+          <div className="cycle-meta-line">
+            {[
+              sprint.start_date && sprint.end_date && `${prettyShort(sprint.start_date)} to ${prettyShort(sprint.end_date)}`,
+              ended ? `${totalWeeks} weeks` : `Week ${cw} of ${totalWeeks}`,
+              rate.total > 0 && `${rate.done} of ${rate.total} commitments met`,
+              daysLeft != null && (daysLeft === 0 ? 'Last day' : `${daysLeft} ${daysLeft === 1 ? 'day' : 'days'} left`),
+            ].filter(Boolean).join(' · ')}
           </div>
         </div>
         <div className="cycle-actions">
@@ -491,12 +490,6 @@ function CycleCard({ sprint, phases, tactics, goal, compact, sprintsAsync, outco
           </button>
         </div>
       </div>
-
-      {spanDays > 0 && (
-        <div className="cycle-time" title={`${timePct}% of the cycle has elapsed`}>
-          <span style={{ width: `${timePct}%` }} />
-        </div>
-      )}
 
       {ended && (onRetro || onCompleteGoal) && (
         <div className="cycle-complete">
