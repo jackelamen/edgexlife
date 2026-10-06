@@ -21,7 +21,7 @@ import { smoothPath, rollingMean } from '../../lib/chart'
   direction instead of day-to-day jitter. The hover tooltip still reports
   the real logged value for that day.
 */
-export default function TrendChart({ points = [], target = null, unit = '', height, format }) {
+export default function TrendChart({ points = [], target = null, unit = '', height, format, average = true }) {
   const wrapRef = useRef(null)
   const [w, setW] = useState(0)
   const [hoverX, setHoverX] = useState(null)
@@ -79,7 +79,7 @@ export default function TrendChart({ points = [], target = null, unit = '', heig
   const idx = points.map((p, i) => ({ ...p, i })).filter((p) => p.value != null)
   const last = idx[idx.length - 1]
   // Enough logs to smooth: bold = 7-day mean, raw = faint context.
-  const smoothed = idx.length >= 14
+  const smoothed = average && idx.length >= 14
   const means = smoothed ? rollingMean(idx.map((p) => p.value), 7) : null
   const mainPts = idx.map((p, k) => [x(p.i), y(means ? means[k] : p.value)])
   const line = smoothPath(mainPts)
@@ -115,8 +115,8 @@ export default function TrendChart({ points = [], target = null, unit = '', heig
       <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{ display: 'block', maxWidth: '100%' }}>
         <defs>
           <linearGradient id={`tcArea${gid}`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.24" />
-            <stop offset="100%" stopColor="var(--accent)" stopOpacity="0" />
+            <stop offset="0%" stopColor="var(--accent-ink)" stopOpacity="0.24" />
+            <stop offset="100%" stopColor="var(--accent-ink)" stopOpacity="0" />
           </linearGradient>
         </defs>
 

@@ -209,8 +209,8 @@ export function weeklyInsight({ checkins, practices }) {
   if (rh) {
     const s = rh.unit === 'day of week' ? 's' : ''
     return {
-      icon: 'schedule', kicker: 'Rhythm', title: `You are clearest on ${rh.high.toLowerCase()}${s}`,
-      body: `${rh.gap} points above your ${rh.low.toLowerCase()}${s}. Put the decisions that matter there.`,
+      icon: 'schedule', kicker: 'Rhythm', title: `You are clearest on ${rh.unit === 'day of week' ? rh.high : rh.high.toLowerCase()}${s}`,
+      body: `${rh.gap} points above your ${rh.unit === 'day of week' ? rh.low : rh.low.toLowerCase()}${s}. Put the decisions that matter there.`,
       cta: { label: 'See rhythm', view: 'insights' },
     }
   }

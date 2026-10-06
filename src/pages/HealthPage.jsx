@@ -31,7 +31,7 @@ import TrendChart from '../components/health/TrendChart'
 // rewritten.
 const VIEWS = [
   { value: 'today', label: 'Today' },
-  { value: 'log', label: 'Daily Log' },
+  { value: 'log', label: 'Daily log' },
   { value: 'workout', label: 'Workout' },
   { value: 'fasting', label: 'Fasting' },
   { value: 'routines', label: 'Routines' },
@@ -717,7 +717,7 @@ function RoutinesView() {
 /* ═══════════════ Trends ═══════════════ */
 
 const METRICS = [
-  { value: 'score', label: 'Health Score', unit: '' },
+  { value: 'score', label: 'Health score', unit: '' },
   { value: 'sleepHours', label: 'Sleep', unit: 'h', targetKey: 'sleepTarget' },
   { value: 'steps', label: 'Steps', unit: '', targetKey: 'stepTarget' },
   { value: 'water', label: 'Water', unit: 'L', targetKey: 'waterTarget' },

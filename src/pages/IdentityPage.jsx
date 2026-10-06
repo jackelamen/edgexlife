@@ -240,7 +240,7 @@ export default function IdentityPage() {
           </div>
         )}
         <Link to="/review" className="btn btn-secondary btn-sm" style={{ marginTop: 12 }}>
-          Open Review
+          Open review
         </Link>
       </Card>
     </View>

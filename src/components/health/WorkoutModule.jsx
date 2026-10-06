@@ -31,7 +31,7 @@ import TrendChart from './TrendChart'
 const TABS = [
   { value: 'plan', label: 'Plan', icon: 'calendar_month' },
   { value: 'db', label: 'Database', icon: 'list_alt' },
-  { value: 'history', label: 'Session Log', icon: 'bar_chart' },
+  { value: 'history', label: 'Session log', icon: 'bar_chart' },
   { value: 'progress', label: 'Progress', icon: 'trending_up' },
 ]
 
@@ -121,21 +121,21 @@ export default function WorkoutModule() {
       <div className="flex items-start justify-between gap-4 flex-wrap" style={{ marginBottom: 24 }}>
         <div className="page-header" style={{ marginBottom: 0 }}>
           <div className="page-date">Training OS</div>
-          <h1 className="page-title">Workout Planner</h1>
+          <h1 className="page-title">Workout planner</h1>
         </div>
         <div className="flex gap-2 flex-wrap items-center">
           <button className="btn btn-secondary btn-sm" onClick={() => setWeekOffset((w) => w - 1)}>
             <Icon name="chevron_left" size={16} />
           </button>
           <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-2)', minWidth: 74, textAlign: 'center' }}>
-            {weekOffset === 0 ? 'This Week' : weekOffset === -1 ? 'Last Week'
-              : weekOffset === 1 ? 'Next Week' : `${weekOffset > 0 ? '+' : ''}${weekOffset} weeks`}
+            {weekOffset === 0 ? 'This week' : weekOffset === -1 ? 'Last week'
+              : weekOffset === 1 ? 'Next week' : `${weekOffset > 0 ? '+' : ''}${weekOffset} weeks`}
           </span>
           <button className="btn btn-secondary btn-sm" onClick={() => setWeekOffset((w) => w + 1)}>
             <Icon name="chevron_right" size={16} />
           </button>
           <button className="btn btn-primary btn-sm" onClick={() => goToSessionOrStart(null)}>
-            <Icon name="play_arrow" size={16} /> {session ? 'Resume Session' : 'Log Session'}
+            <Icon name="play_arrow" size={16} /> {session ? 'Resume session' : 'Log session'}
           </button>
         </div>
       </div>

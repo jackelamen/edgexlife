@@ -191,7 +191,7 @@ function MeditationOverlay({ photos, onClose }) {
       <div className="medit-vignette" />
       <div className={`medit-bar${hidden ? ' hidden-ui' : ''}`}>
         <div>
-          <div className="medit-title">Vision Images</div>
+          <div className="medit-title">Vision images</div>
           <div className="medit-hint">Move your mouse or tap to show controls</div>
         </div>
         <button className="medit-close" onClick={onClose}>

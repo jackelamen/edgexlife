@@ -477,7 +477,7 @@ export default function BreathTimer({ onComplete, suggestion }) {
           </button>
           <div className="fs-inner">
             <div style={{ fontSize: 13, fontWeight: 650, letterSpacing: '.14em', textTransform: 'uppercase', color: 'rgba(255,255,255,.55)' }}>
-              Meditation Timer
+              Meditation timer
             </div>
             {face(true)}
           </div>

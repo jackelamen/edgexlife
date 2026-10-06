@@ -6,6 +6,7 @@ import {
   PageHeader, Card, CardHead, StatCard, Badge, Tabs, Field, Empty, Loading,
   ErrorNote, Modal, CoachCard, Ring, ScoreRow, useConfirm, undoToast, ScaleField, milestoneToast,
 } from '../components/ui/Kit'
+import TrendChart from '../components/health/TrendChart'
 import { useAsync } from '../hooks/useAsync'
 import { useViewParam } from '../hooks/useViewParam'
 import {
@@ -33,10 +34,10 @@ import {
 // carries the chart along with what the data says about you.
 const VIEWS = [
   { value: 'today', label: 'Today' },
-  { value: 'checkin', label: 'Check In' },
-  { value: 'reset', label: 'Reset Tools' },
+  { value: 'checkin', label: 'Check in' },
+  { value: 'reset', label: 'Reset tools' },
   { value: 'meditate', label: 'Meditate' },
-  { value: 'inbox', label: 'Mental Load' },
+  { value: 'inbox', label: 'Mental load' },
   { value: 'journal', label: 'Journal' },
   { value: 'insights', label: 'Insights' },
 ]
@@ -278,7 +279,7 @@ function Dashboard({ latest, notes, todayCheckins, index, history, onChanged, on
           )}
         </Card>
         <Card>
-          <CardHead title={insight ? 'What your data says' : 'What Would Move It'}
+          <CardHead title={insight ? 'What your data says' : 'What would move it'}
             sub={insight ? 'Learned from your own check-ins and practices.' : 'The score points to a lever, not a grade.'} />
           {insight ? (
             <>
@@ -325,7 +326,7 @@ function Dashboard({ latest, notes, todayCheckins, index, history, onChanged, on
                 </div>
                 <div>
                   <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-2)' }}>
-                    {provenFor ? 'Works for you' : 'Suggested Reset'}
+                    {provenFor ? 'Works for you' : 'Suggested reset'}
                   </div>
                   <div style={{ fontSize: 13, fontWeight: 700 }}>{tool.title}</div>
                   {provenFor && (
@@ -747,7 +748,7 @@ function CheckinView({ date, entryId, onSaved, onDeleted, onNav }) {
               </button>
               <button className="btn btn-danger" onClick={remove}>
                 <Icon name={current && removeConfirm.isArmed(current.id) ? 'warning' : 'delete'} size={17} />
-                {current && removeConfirm.isArmed(current.id) ? 'Tap again to delete' : 'Delete This Entry'}
+                {current && removeConfirm.isArmed(current.id) ? 'Tap again to delete' : 'Delete this entry'}
               </button>
             </>
           )}
@@ -776,7 +777,7 @@ function CheckinView({ date, entryId, onSaved, onDeleted, onNav }) {
       <Card>
         <CardHead title="Preview" />
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <Ring score={preview} size={128} stroke={11} sub="clarity" />
+          <Ring score={preview} size={128} stroke={11} sub="clarity" onAccent={false} />
           <p style={{ fontSize: 12.5, textAlign: 'center', marginTop: 12, color: 'var(--text-3)' }}>
             {clarityLabel(preview)[1]}
           </p>
@@ -987,13 +988,13 @@ function MeditateView({ latest, notes, onLogged }) {
       </Card>
       <Card>
         <CardHead title="Session note" sub="Save after a session to build your practice history." />
-        <Field label="Practice Type">
+        <Field label="Practice type">
           <select value={practiceType} onChange={(e) => setPracticeType(e.target.value)}>
             {PRACTICE_TYPES.map((t) => <option key={t}>{t}</option>)}
           </select>
         </Field>
         <div style={{ marginTop: 12 }}>
-          <Field label="After State">
+          <Field label="After state">
             <select value={after} onChange={(e) => setAfter(e.target.value)}>
               <option value="">Choose</option>
               {AFTER_STATES.map((s) => <option key={s}>{s}</option>)}
@@ -1068,7 +1069,7 @@ function InboxView({ notes }) {
             <input type="text" value={text} placeholder="What is taking up space?"
               onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} />
           </Field>
-          <Field label="Convert To">
+          <Field label="Convert to">
             <select value={type} onChange={(e) => setType(e.target.value)}>
               {THOUGHT_TYPES.map((t) => <option key={t}>{t}</option>)}
             </select>
@@ -1222,7 +1223,7 @@ function JournalView({ notes, onEdit }) {
 /* ══════════════════ Trends ══════════════════ */
 
 const TREND_METRICS = [
-  { value: 'clarityScore', label: 'Clarity Score', max: 100, ticks: 4 },
+  { value: 'clarityScore', label: 'Clarity score', max: 100, ticks: 4 },
   { value: 'stress', label: 'Stress', max: 5, ticks: 5 },
   { value: 'mood', label: 'Mood', max: 5, ticks: 5 },
   { value: 'grounded', label: 'Grounded', max: 5, ticks: 5 },
@@ -1246,14 +1247,6 @@ function TrendsView() {
   }))
   const avg = vals.length ? vals.reduce((s, x) => s + x.val, 0) / vals.length : 0
 
-  // Bar colour is a performance read (good/short/risk), which is exactly
-  // what the reserved STATUS ramp is for — see lib/design.js rule 3.
-  function barColor(v) {
-    if (metric === 'stress') return v <= 2 ? STATUS.good.color : v <= 3 ? STATUS.short.color : STATUS.risk.color
-    const pct = v / meta.max
-    return pct >= 0.75 ? STATUS.good.color : pct >= 0.5 ? 'var(--accent)' : STATUS.short.color
-  }
-
   return (
     <>
       <Tabs value={metric} onChange={setMetric} options={TREND_METRICS} />
@@ -1263,38 +1256,13 @@ function TrendsView() {
         {checkins.loading ? <Loading /> : !vals.length ? (
           <Empty icon="query_stats" title="No check-ins yet" />
         ) : (
-          <div className="trend-chart-wrap">
-            <div className="trend-y-axis">
-              {Array.from({ length: meta.ticks + 1 }).map((_, i) => (
-                <div key={i} className="trend-y-tick">{Math.round(meta.max * (meta.ticks - i) / meta.ticks)}</div>
-              ))}
-            </div>
-            <div className="trend-grid-lines">
-              {Array.from({ length: meta.ticks + 1 }).map((_, i) => <div key={i} className="trend-grid-line" />)}
-            </div>
-            <div className="trend-bars">
-              {vals.map((x) => {
-                const pct = Math.max(4, Math.round((x.val / meta.max) * 100))
-                const d = new Date(x.date + 'T12:00:00')
-                const display = metric === 'clarityScore' ? Math.round(x.val) : x.val
-                return (
-                  <div key={x.date} className="trend-bar" style={{ height: `${pct}%`, background: barColor(x.val) }}>
-                    <div className="trend-bar-tip">{d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}: {display}</div>
-                    <span>{d.getDate()}</span>
-                  </div>
-                )
-              })}
-              <div className="trend-avg-line" style={{ bottom: `${(avg / meta.max) * 100}%` }}>
-                <div className="trend-avg-label">avg</div>
-              </div>
-            </div>
-            {vals.length >= 2 && (
-              <div className="trend-chart-footer-row">
-                <span>{pretty(vals[0].date)}</span>
-                <span>{pretty(vals[vals.length - 1].date)}</span>
-              </div>
-            )}
-          </div>
+          <TrendChart
+            average={false}
+            points={vals.map((x) => ({
+              label: new Date(`${x.date}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+              value: metric === 'clarityScore' ? Math.round(x.val) : x.val,
+            }))}
+          />
         )}
       </Card>
     </>

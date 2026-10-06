@@ -1033,7 +1033,7 @@ function GoalDetail({ goal, sprints, onChanged }) {
       )}
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-        <span className="form-section-label" style={{ marginBottom: 0 }}>Pulse Tasks</span>
+        <span className="form-section-label" style={{ marginBottom: 0 }}>Pulse tasks</span>
         <button className="btn btn-ghost btn-sm" onClick={() => setPicker('task')}><Icon name="link" size={14} /> Link</button>
       </div>
       {tasks.loading ? <Loading /> : !(tasks.data || []).length ? (
@@ -1176,7 +1176,7 @@ function GoalEditor({ goal, onClose, onSaved }) {
               else toast.success(goal?.id ? 'Goal updated' : 'Goal created')
               setG(null); onSaved(); onClose()
             } catch (e) { toast.error(e.message) } finally { setSaving(false) }
-          }}>{saving ? 'Saving…' : 'Save Goal'}</button>
+          }}>{saving ? 'Saving…' : 'Save goal'}</button>
         </>
       }>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -1184,7 +1184,7 @@ function GoalEditor({ goal, onClose, onSaved }) {
           <input value={cur.title || ''} autoFocus onChange={(e) => setG({ ...cur, title: e.target.value })} />
         </Field>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Life Area">
+          <Field label="Life area">
             <select value={cur.area} onChange={(e) => setG({ ...cur, area: e.target.value })}>
               {AREAS.map((a) => <option key={a} value={a}>{areaLabel(a)}</option>)}
             </select>
@@ -1540,14 +1540,14 @@ function CycleEditor({ sprint, cloneFrom, goals, seedGoalId, onClose, onSaved })
 
   return (
     <Modal open={open} onClose={() => { setS(null); onClose() }}
-      title={sprint?.id ? 'Edit Cycle' : cloneFrom ? 'Duplicate Cycle' : 'New Focus Cycle'} width={700}
+      title={sprint?.id ? 'Edit cycle' : cloneFrom ? 'Duplicate cycle' : 'New focus cycle'} width={700}
       footer={
         <>
           <button className="btn btn-secondary" onClick={() => { setS(null); onClose() }}>Cancel</button>
           <button className="btn btn-primary"
             disabled={saving || !cur.goal_id || (isQuickNew ? !quickTactic.text.trim() : !cur.name?.trim())}
             onClick={save}>
-            {saving ? 'Saving…' : 'Save Cycle'}
+            {saving ? 'Saving…' : 'Save cycle'}
           </button>
         </>
       }>
@@ -1574,7 +1574,7 @@ function CycleEditor({ sprint, cloneFrom, goals, seedGoalId, onClose, onSaved })
         )}
         <div className="grid grid-cols-2 gap-3">
           {(!isQuickNew || showName) ? (
-            <Field label="Cycle Name"><input autoFocus={isQuickNew} value={cur.name || ''} onChange={(e) => setS({ ...cur, name: e.target.value })} placeholder="Q3 Foundation Build" /></Field>
+            <Field label="Cycle name"><input autoFocus={isQuickNew} value={cur.name || ''} onChange={(e) => setS({ ...cur, name: e.target.value })} placeholder="Q3 Foundation Build" /></Field>
           ) : (
             <div style={{ display: 'flex', alignItems: 'center' }}>
               <button type="button" className="btn btn-ghost btn-sm" onClick={() => setShowName(true)}>
@@ -1603,14 +1603,14 @@ function CycleEditor({ sprint, cloneFrom, goals, seedGoalId, onClose, onSaved })
               to that week's Monday (snapToMonday). A mid-week start meant
               week 1 was really a 2-day week that no score could represent
               fairly — see the Scoring v2 note in lib/goals.js. */}
-          <Field label="Start Date" hint="Snaps to Monday. Cycles run Mon–Sun.">
+          <Field label="Start date" hint="Snaps to Monday. Cycles run Mon–Sun.">
             <input type="date" value={cur.start_date || ''}
               onChange={(e) => {
                 const start = snapToMonday(e.target.value)
                 setS({ ...cur, start_date: start, end_date: autoEndDate(start, cur.weeks || DEFAULT_CYCLE_LENGTH) })
               }} />
           </Field>
-          <Field label="End Date (auto)"><input type="date" value={cur.end_date || ''} readOnly style={{ opacity: .5 }} /></Field>
+          <Field label="End date (auto)"><input type="date" value={cur.end_date || ''} readOnly style={{ opacity: .5 }} /></Field>
         </div>
         {(!isQuickNew || showOutcome) ? (
           <Field label={`What does success look like by week ${cur.weeks || DEFAULT_CYCLE_LENGTH}?`}>
@@ -1772,7 +1772,7 @@ function RoadmapView({ goals, sprints }) {
             ))}
           </div>
         </div>
-        {activeGoals.map((g) => {
+        {activeGoals.map((g, gi) => {
           const mySprints = dated.filter((s) => s.goal_id === g.id)
           const color = areaColor(g.area)
           return (
@@ -1783,7 +1783,7 @@ function RoadmapView({ goals, sprints }) {
               </div>
               <div style={{ flex: 1, position: 'relative', minHeight: 48 }}>
                 <div className="roadmap-today-line" style={{ left: `${todayPct}%` }}>
-                  <span className="roadmap-today-label">Today</span>
+                  {gi === 0 && <span className="roadmap-today-label">Today</span>}
                 </div>
                 {!mySprints.length ? (
                   <span style={{ fontSize: 12, color: 'var(--text-3)', paddingTop: 14, display: 'block' }}>No cycles yet</span>
@@ -2003,7 +2003,7 @@ function RetroEditor({ sprint, onClose, onSaved }) {
               await saveSprint({ ...sprint, retro: cur })
               toast.success('Retro saved'); setR(null); onSaved(); onClose()
             } catch (e) { toast.error(e.message) } finally { setSaving(false) }
-          }}>{saving ? 'Saving…' : 'Save Retrospective'}</button>
+          }}>{saving ? 'Saving…' : 'Save retrospective'}</button>
         </>
       }>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
