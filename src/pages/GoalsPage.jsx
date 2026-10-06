@@ -87,7 +87,7 @@ export default function GoalsPage() {
       />
       <Tabs value={view} onChange={setView} options={VIEWS} />
 
-      {view === 'today' && <TodayView goals={goals} rollup={rollup} cycleData={cycleData} onStartCycle={() => { setView('cycles'); startCycle() }} />}
+      {view === 'today' && <TodayView goals={goals} rollup={rollup} cycleData={cycleData} onStartCycle={() => { setView('cycles'); startCycle() }} onOpenRetros={() => setView('retros')} />}
       {view === 'goals' && <GoalRoom goals={goals} rollup={rollup} cycleData={cycleData} onEdit={setEditGoal}
         onStartCycle={(goalId) => { setView('cycles'); startCycle(goalId) }}
         onOpenCycles={() => setView('cycles')} />}
@@ -116,7 +116,7 @@ function useLiveCycles({ sprints, phases, tactics }) {
 
 /* ══════════════════ Today ══════════════════ */
 
-function TodayView({ goals, rollup, cycleData, onStartCycle }) {
+function TodayView({ goals, rollup, cycleData, onStartCycle, onOpenRetros }) {
   const { live, forSprint } = useLiveCycles(cycleData)
   const active = (goals.data || []).filter((g) => g.status === 'active')
 
@@ -162,6 +162,14 @@ function TodayView({ goals, rollup, cycleData, onStartCycle }) {
 
   const hour = new Date().getHours()
   const greeting = hour < 5 ? 'Still up,' : hour < 12 ? 'Good morning,' : hour < 17 ? 'Good afternoon,' : 'Good evening,'
+  // Finished in the last two weeks with no retro yet. Older than that and a
+  // nudge on Today becomes nagging; the Retros tab still lists them.
+  const unclosed = (cycleData.sprints.data || []).filter((sp) => {
+    if (!sp.end_date || sp.end_date >= today() || sp.archived) return false
+    const rr = sp.retro || {}
+    if (rr.win || rr.lesson || rr.carry) return false
+    return (new Date(today()) - new Date(sp.end_date)) / 86400000 <= 14
+  })
   const todayFmt = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
 
   // A photo tagged to the featured goal's own life area, when one exists —
@@ -271,6 +279,20 @@ function TodayView({ goals, rollup, cycleData, onStartCycle }) {
           color={MODULES.goals.color} tint={MODULES.goals.tint} />
       </div>
 
+      {unclosed.length > 0 && (
+        <div className="cycle-complete" style={{ marginBottom: 14, borderRadius: 14, border: '1px solid var(--border)' }}>
+          <div className="cycle-complete-text">
+            <strong>{unclosed.length === 1 ? `${unclosed[0].name} is complete` : `${unclosed.length} cycles are complete`}</strong>
+            <small>Close {unclosed.length === 1 ? 'it' : 'them'} out with a retro while it is fresh.</small>
+          </div>
+          <div className="cycle-complete-actions">
+            <button className="btn btn-primary btn-sm" onClick={onOpenRetros}>
+              <Icon name="edit_note" size={15} /> Write the retro
+            </button>
+          </div>
+        </div>
+      )}
+
       {cycleData.sprints.loading ? (
         <Loading />
       ) : !live.length ? (
@@ -303,8 +325,14 @@ function TodayView({ goals, rollup, cycleData, onStartCycle }) {
 
 /* ══════════════════ Cycle card (shared by Today + Cycles) ══════════════════ */
 
-function CycleCard({ sprint, phases, tactics, goal, compact, sprintsAsync, outcomeData, onDelete, onEdit, onArchive, onDuplicate }) {
+function CycleCard({ sprint, phases, tactics, goal, compact, sprintsAsync, outcomeData, onDelete, onEdit, onArchive, onDuplicate, onRetro, onCompleteGoal }) {
   const [open, setOpen] = useState(!compact)
+  // A cycle whose end date has passed is finished, whether or not anyone
+  // closed it out. Previously nothing on the card said so: it kept the same
+  // face as a live one, with no way to write the retro from here.
+  const ended = Boolean(sprint.end_date && sprint.end_date < today())
+  const r = sprint.retro || {}
+  const retroWritten = Boolean(r.win || r.lesson || r.carry)
   const [week, setWeek] = useState(sprintCurrentWeek(sprint))
   const cw = sprintCurrentWeek(sprint)
   const totalWeeks = sprintWeeks(sprint)
@@ -429,6 +457,7 @@ function CycleCard({ sprint, phases, tactics, goal, compact, sprintsAsync, outco
         <div className="cycle-info">
           <div className="cycle-meta">
             {isSprintActive(sprint) && !sprint.archived && <Badge tone="green">Live</Badge>}
+            {ended && <Badge tone="blue">Complete</Badge>}
             {sprint.archived && <Badge tone="muted">Archived</Badge>}
             <span className="cycle-goal-link">{goal?.title || 'No goal'}</span>
           </div>
@@ -451,6 +480,35 @@ function CycleCard({ sprint, phases, tactics, goal, compact, sprintsAsync, outco
           </button>
         </div>
       </div>
+
+      {ended && (onRetro || onCompleteGoal) && (
+        <div className="cycle-complete">
+          <div className="cycle-complete-text">
+            <strong>Cycle complete</strong>
+            <small>
+              Ended {pretty(sprint.end_date)}.{' '}
+              {retroWritten ? 'Retro written.' : 'Take a few minutes to close it out with a retro.'}
+            </small>
+          </div>
+          <div className="cycle-complete-actions">
+            {onRetro && (
+              <button className="btn btn-primary btn-sm" onClick={onRetro}>
+                <Icon name="edit_note" size={15} /> {retroWritten ? 'Edit retro' : 'Write the retro'}
+              </button>
+            )}
+            {onCompleteGoal && goal?.status === 'active' && (
+              <button className="btn btn-secondary btn-sm" onClick={onCompleteGoal}>
+                <Icon name="flag" size={15} /> Mark goal complete
+              </button>
+            )}
+            {onArchive && !sprint.archived && (
+              <button className="btn btn-ghost btn-sm" onClick={onArchive}>
+                <Icon name="archive" size={15} /> Archive
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {outcomeData && (
         <CycleOutcome sprint={sprint} metrics={outcomeData.metrics.data} logs={outcomeData.logs.data}
@@ -1210,6 +1268,7 @@ function CyclesView({ goals, cycleData, cycleIntent }) {
   const { sprints, phases, tactics } = cycleData
   const [editing, setEditing] = useState(null)
   const [cloneFrom, setCloneFrom] = useState(null)
+  const [retroFor, setRetroFor] = useState(null)
   const [filter, setFilter] = useState('active')
   const confirm = useConfirm()
   const all = sprints.data || []
@@ -1276,6 +1335,14 @@ function CyclesView({ goals, cycleData, cycleIntent }) {
             return (
               <CycleCard key={s.id} sprint={s} phases={myPhases} tactics={myTactics} goal={goal}
                 sprintsAsync={sprints} outcomeData={cycleData} onEdit={() => setEditing(s)}
+                onRetro={() => setRetroFor(s)}
+                onCompleteGoal={async () => {
+                  try {
+                    await saveGoal({ ...goal, status: 'completed' })
+                    toast.success(`Goal completed: "${goal.title}"`, { duration: 4500 })
+                    goals.reload()
+                  } catch (e) { toast.error(e.message) }
+                }}
                 onDuplicate={() => duplicate(s)}
                 onArchive={async () => {
                   await setSprintArchived(s.id, !s.archived)
@@ -1291,6 +1358,7 @@ function CyclesView({ goals, cycleData, cycleIntent }) {
         </div>
       )}
 
+      <RetroEditor sprint={retroFor} onClose={() => setRetroFor(null)} onSaved={() => sprints.reload()} />
       <CycleEditor sprint={editing} cloneFrom={cloneFrom} goals={goals.data || []} onClose={closeEditor}
         seedGoalId={cycleIntent?.goalId}
         onSaved={() => { sprints.reload(); phases.reload(); tactics.reload() }} />
@@ -1813,7 +1881,9 @@ const RETRO_RATINGS = [['1', '😞'], ['2', '😐'], ['3', '🙂'], ['4', '💪'
 function RetrosView({ goals, sprints, cycleData }) {
   const [editing, setEditing] = useState(null)
   const t = today()
-  const finished = (sprints.data || []).filter((s) => s.end_date && s.end_date < t && !s.archived)
+  // Archived cycles count too: tucking one away before its retro was written
+  // used to make it vanish from here for good.
+  const finished = (sprints.data || []).filter((s) => s.end_date && s.end_date < t)
   const isWritten = (s) => { const r = s.retro || {}; return Boolean(r.win || r.lesson || r.carry) }
   // A cycle that just crossed its end date and has no retro yet is the one
   // genuine "you finished something" event in this whole module — it used
