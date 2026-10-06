@@ -5,7 +5,7 @@ import { View } from '../components/shell/Shell'
 import {
   Card, CardHead, PageHeader, StatCard, Badge, Tabs, Modal, Field, SectionLabel,
   Empty, Loading, ErrorNote, CoachCard, Ring, ScoreRow, DriverRow, useConfirm,
-  MetricLegend, StatusDots, DesignLegend, undoToast, ScaleField, milestoneToast,
+  StatusDots, undoToast, ScaleField, milestoneToast,
 } from '../components/ui/Kit'
 import { useAsync } from '../hooks/useAsync'
 import { useViewParam } from '../hooks/useViewParam'
@@ -51,7 +51,6 @@ export default function HealthPage() {
         <PageHeader
           kicker={new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
           title="EDGE Health"
-          sub="Build and protect a high Health Score."
           actions={
             // Opens the editor on today by default, but its own "Logging
             // for" field can retarget any day — "Edit Today"/"Log Today"
@@ -186,7 +185,6 @@ function TodayView({ settings, index, onNavFasting }) {
 
       <FastingStatusCard onNav={onNavFasting} />
 
-      <MetricLegend keys={['sleepHours', 'steps', 'water', 'nutrition', 'energy']} />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3" style={{ marginBottom: 14 }}>
         <StatCard metricKey="sleepHours" label="Sleep" pct={sleepPct}
@@ -257,8 +255,8 @@ function TodayView({ settings, index, onNavFasting }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         {weakest && (
           <CoachCard
-            kicker="What would move it"
-            title={`${weakest.label} is your weakest lever`}
+            kicker="Weakest area"
+            title={`${weakest.label} is holding your score down`}
             metricKey={weakest.key}
             chip={weakest.detail}
           >
@@ -268,7 +266,7 @@ function TodayView({ settings, index, onNavFasting }) {
 
         <Card>
           <CardHead
-            title="Today's Routines"
+            title="Today's routines"
             sub="The anchors you repeat."
             right={<Badge tone={done === list.length && list.length ? 'green' : 'blue'}>{done}/{list.length}</Badge>}
           />
@@ -656,7 +654,7 @@ function RoutinesView() {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4">
       <Card>
-        <CardHead title="Routine Library" sub="The anchors you tick off each day." />
+        <CardHead title="Routine library" sub="The anchors you tick off each day." />
         {routines.loading ? (
           <Loading />
         ) : !list.length ? (
@@ -798,7 +796,7 @@ function TrendsView({ settings, index }) {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <Card>
-                <CardHead title="What Is Driving It" sub="Weakest driver first." />
+                <CardHead title="What's driving it" sub="Weakest driver first." />
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
                   {drivers.map((d) => (
                     <DriverRow key={d.label} label={d.label} detail={d.detail} score={d.score} hitRate={d.hitRate} />
@@ -895,7 +893,6 @@ export function SettingsView({ settings }) {
       </button>
     </Card>
 
-    <DesignLegend />
     </div>
   )
 }

@@ -114,7 +114,7 @@ export const BREATH_PRESETS = [
     practiceType: 'Box Breathing 4-4-4-4', cyclic: true,
     use: ['Scattered, can\'t hold a thought', 'Before a hard conversation', 'Composure without sedation'],
     how: 'Four equal counts give attention a fixed thing to hold, and the equal inhale/exhale ratio steadies you without pushing as far toward sleepiness as the long-exhale patterns do.',
-    evidence: 'Long used in military and first-responder training as "tactical" or "combat" breathing. Its support comes from the general slow-breathing evidence rather than from studies showing the square pattern beats other slow patterns — no such study exists.',
+    evidence: 'Long used in military and first-responder training as "tactical" or "combat" breathing. Its support comes from the general slow-breathing evidence rather than from studies showing the square pattern beats other slow patterns, no such study exists.',
     phases: [
       { key: 'in', label: 'Inhale', seconds: 4, from: 0.12, to: 1.14 },
       { key: 'hold', label: 'Hold', seconds: 4, from: 1.14, to: 1.14 },
@@ -126,7 +126,7 @@ export const BREATH_PRESETS = [
     use: ['Winding down at night', 'The strongest downshift here', 'When a gentler pattern is not landing'],
     how: 'The exhale is double the inhale and the whole cycle is slow, which makes it the most strongly parasympathetic pattern in this list. The 7-count hold is also what makes it demanding.',
     evidence: 'Popularised by Dr Andrew Weil from pranayama practice. The extended-exhale mechanism is sound and small studies find acute effects on heart rate variability and anxiety, but the familiar claim that it puts you to sleep in a minute is popular rather than well-tested.',
-    caution: 'If the 7-count hold leaves you air-hungry or light-headed, that strain works against the point — shorten the hold or use 5-5-8-2 or the 2-minute pattern instead.',
+    caution: 'If the 7-count hold leaves you air-hungry or light-headed, that strain works against the point. Shorten the hold or use 5-5-8-2 or the 2-minute pattern instead.',
     phases: [
       { key: 'in', label: 'Inhale', seconds: 4, from: 0.12, to: 1.14 },
       { key: 'hold', label: 'Hold', seconds: 7, from: 1.14, to: 1.14 },
@@ -155,9 +155,9 @@ export const BREATH_PRESETS = [
   { id: 'wim-hof', label: 'Wim Hof Breathing', pattern: '30 breaths + hold', minutes: 10,
     practiceType: 'Wim Hof Breathing', cyclic: false,
     use: ['Flat, and wanting activation', 'Cold exposure training', 'Not for calming down'],
-    how: 'This one runs the opposite way to every other pattern here. Thirty fast full breaths blow off carbon dioxide, and that drop — not extra oxygen — is what lets the following breath-hold run so long before the urge to breathe arrives. It raises arousal and adrenaline rather than lowering them.',
-    evidence: 'The best-known study is Kox and colleagues (2014, PNAS), where trained practitioners showed an adrenaline rise and a blunted inflammatory response to an injected endotoxin. Real result, narrow claim: a small group of trained participants, testing the whole method — breathing, cold and mindset together — not this breathing on its own.',
-    caution: 'Sit or lie down, never in or near water, never in a bath or shower, never while driving or standing. Low carbon dioxide narrows blood flow to the brain, and fainting is a documented risk — the same mechanism behind shallow-water blackout, which is why water is the one absolute rule. Because it drives arousal up, it can also amplify a panicky state rather than settle it. Check with a clinician first if you are pregnant, or have epilepsy, a heart or blood-pressure condition, or a history of fainting.',
+    how: 'This one runs the opposite way to every other pattern here. Thirty fast full breaths blow off carbon dioxide, and that drop, not extra oxygen, is what lets the following breath-hold run so long before the urge to breathe arrives. It raises arousal and adrenaline rather than lowering them.',
+    evidence: 'The best-known study is Kox and colleagues (2014, PNAS), where trained practitioners showed an adrenaline rise and a blunted inflammatory response to an injected endotoxin. Real result, narrow claim: a small group of trained participants, testing the whole method, breathing, cold and mindset together, not this breathing on its own.',
+    caution: 'Sit or lie down, never in or near water, never in a bath or shower, never while driving or standing. Low carbon dioxide narrows blood flow to the brain, and fainting is a documented risk, the same mechanism behind shallow-water blackout, which is why water is the one absolute rule. Because it drives arousal up, it can also amplify a panicky state rather than settle it. Check with a clinician first if you are pregnant, or have epilepsy, a heart or blood-pressure condition, or a history of fainting.',
     phases: WIM_HOF_PHASES },
 ]
 
@@ -172,15 +172,15 @@ export const BREATH_PRESETS = [
    stronger would be a claim this has no basis to make. */
 const BREATH_BY_STATE = {
   Anxious: { id: 'two-minute',
-    why: 'Exhale longer than the inhale, and no long hold to fight — holds tend to add air hunger when you are already anxious.' },
+    why: 'Exhale longer than the inhale, and no long hold to fight; holds tend to add air hunger when you are already anxious.' },
   Overwhelmed: { id: 'five-five-eight-two',
     why: 'Same long-exhale idea, slower and with a rest at the bottom. If the noise is thoughts rather than arousal, a brain dump usually beats any of these.' },
   Restless: { id: 'sama',
-    why: 'A steady even rhythm at about six breaths a minute, with nothing to brace for — easier to settle into than a pattern with holds when you cannot sit still.' },
+    why: 'A steady even rhythm at about six breaths a minute, with nothing to brace for. Easier to settle into than a pattern with holds when you cannot sit still.' },
   Scattered: { id: 'box',
     why: 'Four equal counts give attention one fixed thing to hold, which is the part that helps when focus keeps sliding off.' },
   Flat: { id: 'wim-hof',
-    why: 'The only pattern here that raises arousal rather than lowering it. Read its cautions first — and if you would rather not have the intensity, Equal Breathing is the neutral choice.' },
+    why: 'The only pattern here that raises arousal rather than lowering it. Read its cautions first, and if you would rather not have the intensity, Equal Breathing is the neutral choice.' },
 }
 
 /* Regulated states get maintenance, not rescue — there is nothing to talk
@@ -196,7 +196,7 @@ export function suggestedBreath(state) {
   return {
     preset,
     why: state ? BREATH_STEADY_WHY
-      : 'No check-in yet today. Equal Breathing is the safe default — six breaths a minute, comfortable to hold for as long as you want to sit.',
+      : 'No check-in yet today. Equal Breathing is the safe default: six breaths a minute, comfortable to hold for as long as you want to sit.',
     state: state || null,
   }
 }

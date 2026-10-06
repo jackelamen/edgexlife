@@ -209,7 +209,6 @@ export default function ReviewPage() {
       <PageHeader
         kicker="Weekly review"
         title={prettyWeek(weekId)}
-        sub="What the week actually did, then what you make of it."
         actions={
           <div className="rv-weeknav">
             <button className="btn btn-secondary btn-sm" onClick={() => setWeekId(prevWeekId(weekId))}
@@ -527,7 +526,7 @@ function ReviewSide({ draft, summary, promised, showStats }) {
           {stats.map(([k, v, sub, isScore]) => (
             <div key={k} className="rvf-side-stat">
               <span>{k}<small>{sub}</small></span>
-              <b className="tnum" style={isScore && v != null ? { color: statusFor(v)?.color } : undefined}>{v ?? '—'}</b>
+              <b className="tnum" style={isScore && v != null ? { color: statusFor(v)?.color } : undefined}>{v ?? '--'}</b>
             </div>
           ))}
         </div>
@@ -632,7 +631,7 @@ function WeekStats({ s }) {
         <div key={t.k} className="rv-stat">
           <div className="rv-stat-v tnum"
             style={t.score && t.v != null ? { color: statusFor(t.v)?.color } : undefined}>
-            {t.v == null ? '—' : t.v}{t.v != null && t.unit ? <small>{t.unit}</small> : null}
+            {t.v == null ? '--' : t.v}{t.v != null && t.unit ? <small>{t.unit}</small> : null}
           </div>
           <div className="rv-stat-k">{t.k}</div>
           <div className="rv-stat-s">{t.sub}</div>
@@ -660,7 +659,7 @@ function HistoryView({ state, onOpen }) {
         <button key={r.week_id} className="rv-hist-row" onClick={() => onOpen(r.week_id)}>
           <span className="rv-hist-score tnum"
             style={{ color: r.score != null ? statusFor(r.score * 10)?.color : 'var(--text-3)' }}>
-            {r.score ?? '—'}
+            {r.score ?? '--'}
           </span>
           <span className="rv-hist-txt">
             <strong>{prettyWeek(r.week_id)}</strong>

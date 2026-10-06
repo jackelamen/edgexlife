@@ -122,7 +122,6 @@ export default function WorkoutModule() {
         <div className="page-header" style={{ marginBottom: 0 }}>
           <div className="page-date">Training OS</div>
           <h1 className="page-title">Workout Planner</h1>
-          <p className="page-sub">Plan your week, log every session, track progress.</p>
         </div>
         <div className="flex gap-2 flex-wrap items-center">
           <button className="btn btn-secondary btn-sm" onClick={() => setWeekOffset((w) => w - 1)}>
@@ -988,17 +987,17 @@ function SessionTab({ session, setSession, db, goals, plan, pastSessions, exerci
                     <div key={si} className="set-row">
                       <span className="set-num">{si + 1}</span>
                       <input className="set-input" inputMode="decimal" value={s.reps}
-                        placeholder={ghost?.reps ? String(ghost.reps) : '—'}
+                        placeholder={ghost?.reps ? String(ghost.reps) : '--'}
                         onChange={(e) => updateEx(i, {
                           sets: ex.sets.map((x, j) => j === si ? { ...x, reps: e.target.value } : x),
                         })} />
                       <input className="set-input" inputMode="decimal" value={s.weight}
-                        placeholder={ghost?.weight ? String(ghost.weight) : isBodyweight(ex.name) ? 'BW' : '—'}
+                        placeholder={ghost?.weight ? String(ghost.weight) : isBodyweight(ex.name) ? 'BW' : '--'}
                         onChange={(e) => updateEx(i, {
                           sets: ex.sets.map((x, j) => j === si ? { ...x, weight: e.target.value } : x),
                         })} />
                       <span className="tnum" style={{ fontSize: 12, fontWeight: 650, color: 'var(--text-3)', textAlign: 'center' }}>
-                        {Math.round((parseFloat(s.reps) || 0) * setLoadKg(ex.name, s.weight, bodyweightKg) * 10) / 10 || '—'}
+                        {Math.round((parseFloat(s.reps) || 0) * setLoadKg(ex.name, s.weight, bodyweightKg) * 10) / 10 || '--'}
                       </span>
                       <button className={`set-done-btn${s.done ? ' done' : ''}`}
                         onClick={() => updateEx(i, {
@@ -1162,7 +1161,7 @@ function DatabaseTab({ db, onSaved }) {
     <>
       <Card>
         <CardHead
-          title="Workout Database"
+          title="Workout database"
           sub="Edit the exercises used by the planner and session logger."
           right={
             <button className="btn btn-secondary btn-sm"
@@ -1207,7 +1206,7 @@ function DatabaseTab({ db, onSaved }) {
 
       <Card style={{ marginTop: 14 }}>
         <CardHead
-          title="Quick Templates"
+          title="Quick templates"
           sub="Exercises auto-filled onto a day in Plan when you pick its workout type."
           right={
             <button className="btn btn-secondary btn-sm"
@@ -1233,7 +1232,7 @@ function DatabaseTab({ db, onSaved }) {
             <SectionLabel>{templateType} template</SectionLabel>
             {!templateList.length && (
               <p style={{ fontSize: 12.5, color: 'var(--text-3)', marginBottom: 10 }}>
-                Nothing auto-fills for {templateType} yet — picking it in Plan opens with a blank exercise list.
+                Nothing auto-fills for {templateType} yet, picking it in Plan opens with a blank exercise list.
               </p>
             )}
             <ExerciseListEditor list={templateList} armPrefix={`tpl-${templateType}`} confirm={confirm}
@@ -1293,7 +1292,7 @@ function HistoryTab({ sessions, onEdit, onTab, bodyweightKg = 70, activeSessionI
     <>
       <Card style={{ marginBottom: 18 }}>
         <CardHead
-          title="Training Heatmap"
+          title="Training heatmap"
           sub="13-week activity · darker means more volume."
           right={
             <div style={{ display: 'flex', gap: 4, alignItems: 'center', fontSize: 10, fontWeight: 700, color: 'var(--text-3)' }}>
@@ -1322,7 +1321,7 @@ function HistoryTab({ sessions, onEdit, onTab, bodyweightKg = 70, activeSessionI
 
       <Card>
         <CardHead
-          title="Session History"
+          title="Session history"
           sub="Every logged session."
           right={
             <select value={filter} onChange={(e) => setFilter(e.target.value)} style={{ width: 140 }}>
@@ -1345,7 +1344,7 @@ function HistoryTab({ sessions, onEdit, onTab, bodyweightKg = 70, activeSessionI
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 650 }}>{s.date?.slice(5)}</div>
                     <small style={{ display: 'block', fontSize: 11, color: 'var(--text-3)', fontWeight: 600, marginTop: 1 }}>
-                      {s.durationSec ? fmtDuration(s.durationSec) : '—'}
+                      {s.durationSec ? fmtDuration(s.durationSec) : '--'}
                     </small>
                   </div>
                   <div>
@@ -1364,7 +1363,7 @@ function HistoryTab({ sessions, onEdit, onTab, bodyweightKg = 70, activeSessionI
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <div style={{ textAlign: 'right' }}>
                       <div className="tnum" style={{ fontSize: 13, fontWeight: 650 }}>
-                        {vol ? Math.round(vol).toLocaleString() : '—'}
+                        {vol ? Math.round(vol).toLocaleString() : '--'}
                       </div>
                       <small style={{ display: 'block', fontSize: 10, color: 'var(--text-3)', fontWeight: 700 }}>kg vol</small>
                     </div>
@@ -1868,7 +1867,7 @@ function ProgressTab({ sessions, exGoals, db, bodyweightKg = 70 }) {
                     {goal.exercise}{goalQualifier(goal) && <span style={{ color: 'var(--text-3)', fontWeight: 600 }}> · {goalQualifier(goal)}</span>}
                   </div>
                   <div style={{ fontSize: 11.5, color: 'var(--text-3)', fontWeight: 600 }}>
-                    {pretty(goal.startedAt)} &rarr; {achievedDate ? pretty(achievedDate) : '—'}
+                    {pretty(goal.startedAt)} &rarr; {achievedDate ? pretty(achievedDate) : '--'}
                   </div>
                 </div>
                 <Badge tone="green">
@@ -2139,8 +2138,8 @@ function ExerciseExplorer({ sessions, bodyweightKg = 70 }) {
               </div>
               <Badge tone="blue">
                 {byWeight
-                  ? (r.topWeight ? `${Math.round(r.topWeight)} kg top set` : '—')
-                  : (r.totalReps ? `${r.totalReps} reps total` : '—')}
+                  ? (r.topWeight ? `${Math.round(r.topWeight)} kg top set` : '--')
+                  : (r.totalReps ? `${r.totalReps} reps total` : '--')}
               </Badge>
             </div>
           ))}

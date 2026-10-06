@@ -141,7 +141,6 @@ export default function IdentityPage() {
       <PageHeader
         kicker="The reason the rest of xLife exists"
         title="Identity"
-        sub="Everything else in this app measures something. This is the standard the measuring is for."
       />
 
       {/* Rebuilt 2026-09-24. The olive .hero-card with a coverage Ring

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import toast from 'react-hot-toast'
 import Icon from './Icon'
-import { metric, statusFor, statusColor, METRICS, STATUS, DESIGN_RULES } from '../../lib/design'
+import { metric, statusFor, statusColor } from '../../lib/design'
 
 /*
   Component vocabulary for design system v3. The rules these components
@@ -14,13 +14,12 @@ import { metric, statusFor, statusColor, METRICS, STATUS, DESIGN_RULES } from '.
   never a decorative amount.
 */
 
-export function PageHeader({ kicker, title, sub, actions }) {
+export function PageHeader({ kicker, title, actions }) {
   return (
     <div className="flex items-start justify-between gap-4 flex-wrap" style={{ marginBottom: 28 }}>
       <div className="page-header" style={{ marginBottom: 0 }}>
         {kicker && <div className="page-date">{kicker}</div>}
         <h1 className="page-title">{title}</h1>
-        {sub && <p className="page-sub">{sub}</p>}
       </div>
       {actions && <div className="flex gap-2 flex-wrap items-center">{actions}</div>}
     </div>
@@ -64,90 +63,29 @@ export function CardHead({ title, sub, right }) {
  * which is correct for counts like "3 live cycles" — they aren't measured
  * against a target, so colouring them would be decoration.
  */
-export function StatCard({ label, value, sub, metricKey, pct, icon, color, tint }) {
+export function StatCard({ label, value, sub, metricKey, pct, color, tint }) {
   const m = metricKey ? metric(metricKey) : null
   const fillColor = color || m?.color
   const fillTint = tint || m?.tint
   const status = pct == null ? null : statusFor(pct)
-  const glyph = icon || m?.icon
 
   return (
     <div className="stat-card">
       {fillTint && pct != null && (
         <div className="tile-fill" style={{ height: `${Math.min(100, Math.max(0, pct))}%`, background: fillTint }} />
       )}
-      <div className="tile-top">
-        {glyph ? (
-          <div className="tile-ic" style={{ background: fillTint || 'var(--white-soft)' }}>
-            <Icon name={glyph} size={18} style={{ color: fillColor || 'var(--text-2)' }} />
-          </div>
-        ) : <span />}
-        {status && (
-          <span className="status-pill" style={{ background: status.color }}>{Math.round(pct)}%</span>
-        )}
+      <div className="stat-head">
+        <span className="stat-label">
+          {fillColor && <i className="stat-dot" style={{ background: fillColor }} />}
+          {label}
+        </span>
+        {status && <span className="stat-pct" style={{ color: status.color }}>{Math.round(pct)}%</span>}
       </div>
       <div className="tile-bot">
-        <div className="stat-label">{label}</div>
         <div className="stat-value tnum">{value ?? '--'}</div>
         {sub && <div className="stat-sub">{sub}</div>}
       </div>
     </div>
-  )
-}
-
-/** Colour legend. Renders the actual METRICS entries, so it can't drift. */
-export function MetricLegend({ keys }) {
-  const list = (keys || Object.keys(METRICS)).map((k) => ({ k, ...metric(k) }))
-  return (
-    <div className="legend">
-      <span className="legend-lbl">Colour = metric</span>
-      {list.map((m) => (
-        <span key={m.k} className="legend-item">
-          <span className="legend-swatch" style={{ background: m.color }} />
-          {m.label}
-        </span>
-      ))}
-    </div>
-  )
-}
-
-/**
- * The colour system, explained in the app. Rendered from DESIGN_RULES and
- * the live METRICS/STATUS objects in lib/design.js, so it physically cannot
- * describe a system different from the one the app is actually using.
- */
-export function DesignLegend() {
-  return (
-    <Card>
-      <CardHead title="How to read the colours" sub="The rules every screen follows." />
-
-      <div className="form-section-label">Metric colours</div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '9px 16px', marginBottom: 18 }}>
-        {Object.entries(METRICS).map(([k, m]) => (
-          <span key={k} className="legend-item">
-            <span className="legend-swatch" style={{ background: m.color }} />
-            {m.label}
-          </span>
-        ))}
-      </div>
-
-      <div className="form-section-label">Status colours (reserved)</div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '9px 16px', marginBottom: 18 }}>
-        {Object.entries(STATUS).map(([k, s]) => (
-          <span key={k} className="legend-item">
-            <span className="legend-swatch" style={{ background: s.color }} />
-            {s.label}
-          </span>
-        ))}
-      </div>
-
-      {DESIGN_RULES.map((r) => (
-        <div key={r.title} style={{ marginBottom: 12 }}>
-          <strong style={{ fontSize: 13, fontWeight: 650, display: 'block', marginBottom: 2 }}>{r.title}</strong>
-          <p style={{ fontSize: 12.5, color: 'var(--text-2)', lineHeight: 1.6 }}>{r.body}</p>
-        </div>
-      ))}
-    </Card>
   )
 }
 
@@ -264,7 +202,7 @@ export function Empty({ icon = 'inbox', title, children, action }) {
   return (
     <div className="empty">
       <div className="empty-icon">
-        {Glyph ? <Glyph size={22} style={{ color: 'var(--accent)' }} /> : <Icon name={icon} size={22} />}
+        {Glyph ? <Glyph size={26} style={{ color: 'var(--text-3)' }} /> : <Icon name={icon} size={26} />}
       </div>
       {title && <strong>{title}</strong>}
       {children && <span>{children}</span>}
@@ -348,11 +286,11 @@ export function Modal({ open, onClose, title, sub, children, footer, maxWidth = 
  * and takes the relevant metric's hue, so the advice is colour-linked to
  * the thing it's about.
  */
-export function CoachCard({ kicker = 'Takeaway', title, children, tone = 'soft', chip, chipIcon, metricKey }) {
+export function CoachCard({ kicker, title, children, tone = 'soft', chip, chipIcon, metricKey }) {
   const m = metricKey ? metric(metricKey) : null
   return (
     <div className={`coach-card ${tone}`}>
-      <div className="coach-kicker">{kicker}</div>
+      {kicker && <div className="coach-kicker">{kicker}</div>}
       <div className="coach-title">{title}</div>
       <p className="coach-copy">{children}</p>
       {chip && (

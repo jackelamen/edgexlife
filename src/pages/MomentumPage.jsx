@@ -76,7 +76,6 @@ export default function MomentumPage() {
       <PageHeader
         kicker="Pulse, xPM and xFocus, one lens"
         title="Momentum"
-        sub={`Is there real work behind each ${areaLabel('work')} goal right now, not a score, just what's actually moving.`}
       />
 
       <div className="hero-card hero-momentum" style={{ marginBottom: 14 }}>
@@ -106,15 +105,10 @@ export default function MomentumPage() {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5">
           {rows.map((r) => (
-            <Card key={r.goal.id} style={{ borderLeft: `3px solid ${MODULES.momentum.color}` }}>
+            <Card key={r.goal.id}>
               <CardHead
                 title={r.goal.title}
                 sub={r.goal.why}
-                right={
-                  <div className="tile-ic" style={{ background: MODULES.momentum.tint, color: MODULES.momentum.color }}>
-                    <Icon name="bolt" size={17} />
-                  </div>
-                }
               />
               {!r.hasWork ? (
                 <Empty icon="bolt" title="Nothing moving">

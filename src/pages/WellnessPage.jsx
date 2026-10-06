@@ -100,7 +100,6 @@ export default function WellnessPage() {
       <PageHeader
         kicker="Wellness"
         title={VIEWS.find((v) => v.value === view)?.label}
-        sub="The clarity and nervous-system layer of your Life OS."
         actions={
           <button className="btn btn-primary btn-sm" onClick={() => openCheckin(t, null)}>
             <Icon name="edit_note" size={15} /> Check in
@@ -268,7 +267,7 @@ function Dashboard({ latest, notes, todayCheckins, index, history, onChanged, on
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5" style={{ marginBottom: 18 }}>
         <Card>
-          <CardHead title="Score Breakdown"
+          <CardHead title="Score breakdown"
             right={<Badge tone="purple">{details ? confidenceLabel(latest) : 'No signal'}</Badge>} />
           {!details ? (
             <Empty icon="psychology" title="Check in to see what the score is responding to." />
@@ -303,7 +302,7 @@ function Dashboard({ latest, notes, todayCheckins, index, history, onChanged, on
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5" style={{ marginBottom: 18 }}>
         <Card>
-          <CardHead title="Your Plan" sub="State-aware moves for the next hour."
+          <CardHead title="Your plan" sub="State-aware moves for the next hour."
             right={<Badge tone={plan.badgeTone}>{plan.badge}</Badge>} />
           <CoachCard kicker={plan.kicker} title={plan.title} tone={plan.tone}>{plan.copy}</CoachCard>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
@@ -344,13 +343,13 @@ function Dashboard({ latest, notes, todayCheckins, index, history, onChanged, on
         </Card>
 
         <Card>
-          <CardHead title="Recent Check-Ins" sub="Last seven entries." />
+          <CardHead title="Recent check-ins" sub="Last seven entries." />
           <RecentCheckins onOpen={onOpenCheckin} />
         </Card>
       </div>
 
       <Card>
-        <CardHead title="Today's Journal" sub="The saved words from today's check-in, practice, and mental load." />
+        <CardHead title="Today's journal" sub="The saved words from today's check-in, practice, and mental load." />
         <MemoryTiles latest={latest} notes={notes} />
       </Card>
     </>
@@ -987,7 +986,7 @@ function MeditateView({ latest, notes, onLogged }) {
           onComplete={(r) => { setLast(r); setPracticeType(r.preset.practiceType) }} />
       </Card>
       <Card>
-        <CardHead title="Session Note" sub="Save after a session to build your practice history." />
+        <CardHead title="Session note" sub="Save after a session to build your practice history." />
         <Field label="Practice Type">
           <select value={practiceType} onChange={(e) => setPracticeType(e.target.value)}>
             {PRACTICE_TYPES.map((t) => <option key={t}>{t}</option>)}

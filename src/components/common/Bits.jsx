@@ -78,7 +78,7 @@ export function Stat({ label, value, unit, hint, live = false }) {
           className="lf-display text-[24px]"
           style={{ color: live ? 'var(--ochre)' : 'var(--ink)' }}
         >
-          {value ?? '—'}
+          {value ?? '--'}
         </span>
         {unit && value != null && (
           <span className="text-[12px]" style={{ color: 'var(--ink-3)' }}>{unit}</span>

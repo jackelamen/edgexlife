@@ -78,7 +78,6 @@ export default function GoalsPage() {
       <PageHeader
         kicker="Goals"
         title={activeView?.label}
-        sub={activeView?.sub}
         actions={
           <button className="btn btn-primary btn-sm" onClick={() => setEditGoal({})}>
             <Icon name="add" size={15} /> New goal
@@ -194,7 +193,7 @@ function TodayView({ goals, rollup, cycleData, onStartCycle, onOpenRetros }) {
         <div className={heroPhoto ? 'hero-photo-text' : undefined}>
           <div className="hero-greeting">{greeting} {todayFmt}</div>
           <div className="hero-title">
-            {!live.length ? 'Nothing in motion yet.' :
+            {!live.length ? 'No live cycle.' :
               todayTotals.total === 0 ? 'Nothing due today. Rest counts.' :
               todayTotals.done === todayTotals.total ? 'Clean day. Everything checked off.' :
               `${todayTotals.done} of ${todayTotals.total} actions done today.`}
@@ -265,7 +264,7 @@ function TodayView({ goals, rollup, cycleData, onStartCycle, onOpenRetros }) {
         {/* No pct here on purpose: today isn't over, so a red "0%" at
             06:00 is punishing you for a day you haven't had yet. The
             fraction already says everything true about right now. */}
-        <StatCard label="Today" value={todayTotals.total ? `${todayTotals.done}/${todayTotals.total}` : '—'}
+        <StatCard label="Today" value={todayTotals.total ? `${todayTotals.done}/${todayTotals.total}` : '--'}
           sub="due today" icon="today" color={MODULES.goals.color} tint={MODULES.goals.tint} />
         <StatCard label="Streak" value={streak} sub={`clean ${streak === 1 ? 'day' : 'days'} on this goal`} icon="local_fire_department"
           pct={streak > 0 ? streakPct : null} color={MODULES.goals.color} tint={MODULES.goals.tint} />
@@ -297,9 +296,9 @@ function TodayView({ goals, rollup, cycleData, onStartCycle, onOpenRetros }) {
         <Loading />
       ) : !live.length ? (
         <Card>
-          <Empty icon="rocket_launch" title="Nothing in motion yet"
-            action={<button className="btn btn-primary btn-sm" onClick={onStartCycle}>Start a Cycle</button>}>
-            Start a Focus Cycle (a week, a month, or the full 12) and your daily actions will show up here.
+          <Empty icon="rocket_launch" title="No live cycle"
+            action={<button className="btn btn-primary btn-sm" onClick={onStartCycle}>Start a cycle</button>}>
+            Start a focus cycle (a week, a month or the full 12 weeks) and today's actions will show up here.
           </Empty>
         </Card>
       ) : (
@@ -430,7 +429,7 @@ function CycleCard({ sprint, phases, tactics, goal, compact, sprintsAsync, outco
   }
 
   return (
-    <div className="cycle-card" style={{ borderLeftColor: areaColor(goal?.area) }}>
+    <div className="cycle-card">
       <div className="cycle-header">
         {/* onAccent defaults to true, meant for the ring sitting on a solid
             accent background (hero cards). This card is plain white, so
@@ -465,7 +464,7 @@ function CycleCard({ sprint, phases, tactics, goal, compact, sprintsAsync, outco
             {isSprintActive(sprint) && !sprint.archived && <Badge tone="green">Live</Badge>}
             {ended && <Badge tone="blue">Complete</Badge>}
             {sprint.archived && <Badge tone="muted">Archived</Badge>}
-            <span className="cycle-goal-link">{goal?.title || 'No goal'}</span>
+            <span className="cycle-goal-link"><i className="area-dot" style={{ background: areaColor(goal?.area) }} />{goal?.title || 'No goal'}</span>
           </div>
           <div className="cycle-name">{sprint.name}</div>
           {sprint.outcome && <p className="cycle-outcome-line">{sprint.outcome}</p>}
@@ -727,7 +726,7 @@ function GoalRoom({ goals, rollup, cycleData, onEdit, onStartCycle, onOpenCycles
         <StatCard label="Live cycles" value={liveCycles.length}
           sub={`${activeGoals.length - liveCycles.length} without one`} icon="loop" color={MODULES.goals.color} tint={MODULES.goals.tint} />
         <StatCard label="Commitments met"
-          value={avgExecution.total ? (avgExecution.pct != null ? `${avgExecution.pct}%` : `${avgExecution.done}/${avgExecution.total}`) : '—'}
+          value={avgExecution.total ? (avgExecution.pct != null ? `${avgExecution.pct}%` : `${avgExecution.done}/${avgExecution.total}`) : '--'}
           sub={avgExecution.pct != null ? `${avgExecution.done} of ${avgExecution.total} so far` : 'across live cycles'}
           icon="target" pct={avgExecution.pct} color={MODULES.goals.color} tint={MODULES.goals.tint} />
       </div>
@@ -782,7 +781,7 @@ function GoalRoom({ goals, rollup, cycleData, onEdit, onStartCycle, onOpenCycles
 
       {SHOW_SAVINGS && (
         <Card>
-          <CardHead title="Savings Targets" sub="From your Finance app, shown here, edited there." />
+          <CardHead title="Savings targets" sub="From your Finance app, shown here, edited there." />
           {savings.loading ? <Loading /> : !(savings.data || []).length ? (
             <Empty icon="savings" title="No savings goals yet" />
           ) : (
@@ -820,7 +819,7 @@ function GoalCard({ goal, roll, progress, time, goalSprints, onOutcomeChanged, h
   // was never designed to sit on top of an image.
   const photo = useGoalPhoto(goal)
   return (
-    <div className={`goal-card ${goal.area}`} style={{ borderLeftColor: areaColor(goal.area) }} onClick={onToggle}>
+    <div className={`goal-card ${goal.area}`} onClick={onToggle}>
       <div className="goal-grid-body" style={{ position: 'relative' }}>
         {photo && (
           <div aria-hidden style={{
@@ -1983,7 +1982,7 @@ function RetrosView({ goals, sprints, cycleData }) {
 const RetroBit = ({ label, text }) => (
   <div>
     <div className="form-section-label">{label}</div>
-    <p style={{ fontSize: 13, lineHeight: 1.55, color: text ? 'var(--text-2)' : 'var(--text-3)' }}>{text || '—'}</p>
+    <p style={{ fontSize: 13, lineHeight: 1.55, color: text ? 'var(--text-2)' : 'var(--text-3)' }}>{text || '--'}</p>
   </div>
 )
 

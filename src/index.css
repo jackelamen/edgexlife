@@ -31,38 +31,37 @@
   /* Tells the browser's own controls (time/date pickers, checkboxes,
      scrollbars) which theme to draw in; flipped in the dark blocks. */
   color-scheme: light;
-  /* v4 (2026-10): Geist replaces Bricolage as the UI face. Bricolage is kept
-     ONLY for the "xLife" wordmark (components/shell/Wordmark.jsx), which is
-     part of the logo. */
-  --font: 'Geist', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font: 'Instrument Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  /* Bricolage is the wordmark's face; it also sets headlines and every big
+     number, so the logo and the data share one voice. */
   --font-brand: 'Bricolage Grotesque', var(--font);
 
-  --bg: #f6f6f3;
+  --bg: #f3f4f4;
   --white: #ffffff;
-  --white-soft: #f1f1ed;
-  --text: #121211;
-  --text-2: #5b5a54;
-  --text-3: #75746d;
-  --border: #e8e7e1;
-  --border-med: #d9d8d0;
+  --white-soft: #eceeee;
+  --text: #101213;
+  --text-2: #4f5559;
+  --text-3: #6b7176;
+  --border: #e1e4e4;
+  --border-med: #d0d4d5;
   /* Fixed dark ink — NOT swapped in dark mode, unlike --text above. Used
      for surfaces that are dark in both themes (coach cards, tooltips). */
-  --ink: #141413;
+  --ink: #111315;
 
   /* Primary action + selected-tab fill. Ink in light, paper in dark: the
      old "always black" button vanished into a dark page. */
-  --btn-bg: #141413;
-  --btn-bg-hover: #2b2b28;
+  --btn-bg: #111315;
+  --btn-bg-hover: #2a2e31;
   --btn-fg: #ffffff;
 
   /* Navigation now follows the theme instead of being a fixed black slab.
      --sidebar-* names are kept so older references stay valid. */
-  --sidebar-bg: #fbfbf9;
+  --sidebar-bg: #f9fafa;
   --sidebar-line: var(--border);
-  --sidebar-hover: rgba(18, 18, 17, 0.05);
+  --sidebar-hover: rgba(16, 18, 19, 0.05);
   --sidebar-text: var(--text-2);
   --sidebar-text-hi: var(--text);
-  --glass: rgba(251, 251, 249, 0.82);
+  --glass: rgba(249, 250, 250, 0.82);
 
   /* Status ramp — RESERVED. Mirrors STATUS in lib/design.js.
      Never use these to identify a thing, only to report how it's doing. */
@@ -79,9 +78,9 @@
   --purple-rgb: 107, 63, 160;
 
   /* Depth is mostly hairline borders now; shadows are a whisper. */
-  --shadow-sm: 0 1px 2px rgba(18,18,17,.04);
-  --shadow: 0 1px 2px rgba(18,18,17,.04), 0 10px 28px -12px rgba(18,18,17,.10);
-  --shadow-lg: 0 2px 4px rgba(18,18,17,.05), 0 24px 56px -20px rgba(18,18,17,.22);
+  --shadow-sm: 0 1px 2px rgba(16,18,19,.04);
+  --shadow: 0 1px 2px rgba(16,18,19,.04), 0 10px 28px -12px rgba(16,18,19,.10);
+  --shadow-lg: 0 2px 4px rgba(16,18,19,.05), 0 24px 56px -20px rgba(16,18,19,.22);
   --radius-sm: 10px;
   --radius: 14px;
   --radius-lg: 18px;
@@ -126,20 +125,20 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --bg: #0d0d0c;
-    --white: #161615;
-    --white-soft: #1e1e1c;
-    --text: #f3f2ee;
-    --text-2: #b4b2a9;
-    --text-3: #918f86;
-    --border: #262624;
-    --border-med: #343431;
-    --btn-bg: #f3f2ee;
+    --bg: #0b0c0d;
+    --white: #141617;
+    --white-soft: #1c1f20;
+    --text: #eff1f1;
+    --text-2: #aeb3b6;
+    --text-3: #8b9195;
+    --border: #25282a;
+    --border-med: #34383a;
+    --btn-bg: #eff1f1;
     --btn-bg-hover: #ffffff;
-    --btn-fg: #121211;
-    --sidebar-bg: #111110;
+    --btn-fg: #101213;
+    --sidebar-bg: #0f1011;
     --sidebar-hover: rgba(255, 255, 255, 0.06);
-    --glass: rgba(17, 17, 16, 0.82);
+    --glass: rgba(15, 16, 17, 0.82);
     --accent-ink: color-mix(in srgb, var(--accent) 40%, #ffffff);
     --shadow-sm: 0 1px 2px rgba(0,0,0,.4);
     --shadow: 0 1px 2px rgba(0,0,0,.4), 0 12px 30px -12px rgba(0,0,0,.6);
@@ -148,20 +147,20 @@
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #0d0d0c;
-  --white: #161615;
-  --white-soft: #1e1e1c;
-  --text: #f3f2ee;
-  --text-2: #b4b2a9;
-  --text-3: #918f86;
-  --border: #262624;
-  --border-med: #343431;
-  --btn-bg: #f3f2ee;
+  --bg: #0b0c0d;
+  --white: #141617;
+  --white-soft: #1c1f20;
+  --text: #eff1f1;
+  --text-2: #aeb3b6;
+  --text-3: #8b9195;
+  --border: #25282a;
+  --border-med: #34383a;
+  --btn-bg: #eff1f1;
   --btn-bg-hover: #ffffff;
-  --btn-fg: #121211;
-  --sidebar-bg: #111110;
+  --btn-fg: #101213;
+  --sidebar-bg: #0f1011;
   --sidebar-hover: rgba(255, 255, 255, 0.06);
-  --glass: rgba(17, 17, 16, 0.82);
+  --glass: rgba(15, 16, 17, 0.82);
   --accent-ink: color-mix(in srgb, var(--accent) 40%, #ffffff);
   --shadow-sm: 0 1px 2px rgba(0,0,0,.4);
   --shadow: 0 1px 2px rgba(0,0,0,.4), 0 12px 30px -12px rgba(0,0,0,.6);
@@ -246,19 +245,21 @@ body {
   font-size: 14px;
   line-height: 1.5;
   min-height: 100vh;
-  font-feature-settings: 'ss01', 'cv11';
   text-rendering: optimizeLegibility;
 }
 ::selection { background: rgba(var(--accent-rgb), .22); }
 
-/* One family throughout. Geist is drawn for UI: even colour at small sizes,
-   and it stays crisp-but-calm at display sizes with a light touch on weight
-   and tight tracking — the old 800-weight headings were most of what read
-   as dated. */
+/* Instrument Sans for the interface; Bricolage Grotesque (below) for
+   headlines and big numbers. Light weights and tight tracking: the old
+   800-weight headings were most of what read as dated. */
 h1, h2, h3, h4, .page-title {
-  font-weight: 650;
-  letter-spacing: -0.028em;
+  font-weight: 600;
+  letter-spacing: -0.02em;
   line-height: 1.14;
+}
+h1, .page-title, .hero-h, .hero-title, .stat-value, .hero-stat-v, .practice-val, .score-ring-num,
+.cycle-name, .tc-tip-v, .insight-card strong, .north-star-txt, .id-quote, .coach-title {
+  font-family: var(--font-brand);
 }
 
 /* Icons are Phosphor SVGs (components/ui/Icon.jsx). The span carries the
@@ -349,16 +350,11 @@ h1, h2, h3, h4, .page-title {
 .sidebar-tag { color: var(--text-3); font-size: 12px; font-weight: 400; margin: 6px 0 0 40px; }
 
 .view { padding: 34px 40px 80px; max-width: 1200px; }
-/* Mounted per-route (see Page in App.jsx) so every navigation settles in. */
-.page-enter { animation: page-in .38s var(--ease) both; }
-@keyframes page-in { from { opacity: 0; transform: translateY(8px) } to { opacity: 1; transform: none } }
-@media (prefers-reduced-motion: reduce) { .page-enter { animation: none; } }
 .page-header { margin-bottom: 24px; }
 .page-date {
   font-size: 13px; font-weight: 500; color: var(--text-3); margin-bottom: 4px;
 }
-.page-title { font-size: 32px; font-weight: 650; letter-spacing: -0.032em; }
-.page-sub { font-size: 14.5px; color: var(--text-2); margin-top: 6px; }
+.page-title { font-size: 34px; font-weight: 600; letter-spacing: -0.03em; }
 
 /* ── Identity anchor ───────────────────────────────────────────
    Jack's identity statement (lib/identity.js), shown quietly on Today
@@ -369,30 +365,13 @@ h1, h2, h3, h4, .page-title {
    Small and unbolded on purpose — present daily without competing with
    the hero above/below it or curdling into wallpaper you stop reading. */
 .north-star {
-  display: flex; align-items: center; gap: 14px; margin: -8px 0 16px; padding: 14px 16px 14px 14px;
-  border-radius: var(--radius); border-left: 3px solid #c9962e; text-decoration: none; color: var(--text);
-  background: linear-gradient(90deg, rgba(201, 150, 46, .16), rgba(201, 150, 46, .04) 70%, transparent);
-  transition: background .2s;
+  display: block; margin: -4px 0 22px; padding: 0 0 22px; border-bottom: 1px solid var(--border);
+  text-decoration: none; color: var(--text);
 }
-.north-star:hover { background: linear-gradient(90deg, rgba(201, 150, 46, .22), rgba(201, 150, 46, .07) 70%, transparent); }
-.north-star-ic {
-  flex-shrink: 0; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center;
-  background: linear-gradient(135deg, #e3b54d, #b98524); color: #fff; box-shadow: 0 2px 6px rgba(168, 120, 28, .3);
-}
-.north-star-txt { flex: 1; min-width: 0; font-size: 15px; font-weight: 500; line-height: 1.55; letter-spacing: -.005em; }
-.north-star-txt small {
-  display: block; font-size: 12.5px; font-weight: 600;
-  color: #a8781c; margin-bottom: 2px;
-}
-.north-star-go { flex-shrink: 0; color: #a8781c; opacity: 0; transform: translateX(-4px); transition: opacity .2s, transform .2s; }
-.north-star:hover .north-star-go { opacity: 1; transform: none; }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .north-star-txt small, :root:not([data-theme="light"]) .north-star-go { color: #e3b54d; } }
-:root[data-theme="dark"] .north-star-txt small, :root[data-theme="dark"] .north-star-go { color: #e3b54d; }
-@media (max-width: 480px) {
-  .north-star { font-size: inherit; padding: 12px 12px 12px 12px; gap: 11px; align-items: flex-start; }
-  .north-star-txt { font-size: 14px; }
-  .north-star-go { display: none; }
-}
+.north-star small { display: block; font-size: 12.5px; font-weight: 500; color: var(--text-3); margin-bottom: 6px; }
+.north-star-txt { display: block; max-width: 62ch; font-size: 20px; font-weight: 500; line-height: 1.4; letter-spacing: -.012em; }
+.north-star:hover .north-star-txt { color: var(--accent-ink); }
+@media (max-width: 480px) { .north-star-txt { font-size: 17px; } }
 
 /* ── Loading skeleton — see Loading in components/ui/Kit.jsx ──── */
 .skeleton-stack { display: flex; flex-direction: column; gap: 10px; padding: 2px 0; }
@@ -439,7 +418,7 @@ h1, h2, h3, h4, .page-title {
 .settings-row:last-child { border-bottom: none; }
 .settings-row input[type=time] { padding: 9px 11px; }
 .chip {
-  display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 99px;
+  display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: 6px;
   font-size: 12px; font-weight: 600; background: var(--white-soft); color: var(--text-2);
 }
 .chip-good { background: var(--s-good-bg); color: var(--s-good); }
@@ -456,18 +435,15 @@ h1, h2, h3, h4, .page-title {
    .tile-fill's HEIGHT is the actual percent of target (quantity); the pill
    in the corner is the only status-coloured thing on it. */
 .stat-card {
-  background: var(--white); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 16px;
-  box-shadow: var(--shadow-sm); position: relative; overflow: hidden;
-  min-height: 132px; display: flex; flex-direction: column; justify-content: space-between;
-  transition: transform .2s var(--ease), box-shadow .2s var(--ease), border-color .2s;
+  background: var(--white); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 16px 18px;
+  position: relative; overflow: hidden;
+  min-height: 124px; display: flex; flex-direction: column; justify-content: space-between; gap: 18px;
 }
-.stat-card:hover { transform: translateY(-2px); box-shadow: var(--shadow); border-color: var(--border-med); }
-.tile-fill {
-  position: absolute; left: 0; right: 0; bottom: 0; opacity: .20;
-  transition: height .7s var(--ease);
-}
-.tile-top { display: flex; align-items: center; justify-content: space-between; position: relative; z-index: 1; }
-.tile-ic { width: 32px; height: 32px; border-radius: 10px; display: grid; place-items: center; }
+/* The fill height IS the percent of target, kept faint so the number leads. */
+.tile-fill { position: absolute; left: 0; right: 0; bottom: 0; opacity: .5; transition: height .7s var(--ease); }
+.stat-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; position: relative; z-index: 1; }
+.stat-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 7px; vertical-align: 1px; }
+.stat-pct { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
 
 /* Identity's per-thread "nothing tagged" row. Deliberately NOT the shared
    .empty block (48px padding, 48px icon) — that's sized for a whole card
@@ -479,12 +455,10 @@ h1, h2, h3, h4, .page-title {
 .thread-gap-row .icon { flex-shrink: 0; }
 .thread-gap-row .btn { margin-left: auto; }
 .tile-bot { position: relative; z-index: 1; }
-.stat-label { font-size: 13px; font-weight: 500; color: var(--text-2); }
-.stat-value { font-size: 28px; font-weight: 600; letter-spacing: -.03em; margin-top: 1px; font-variant-numeric: tabular-nums; }
+.stat-label { font-size: 13.5px; font-weight: 500; color: var(--text-2); }
+.stat-value { font-size: 30px; font-weight: 600; letter-spacing: -.03em; line-height: 1.05; font-variant-numeric: tabular-nums; }
 .stat-sub { font-size: 12.5px; color: var(--text-3); font-weight: 400; }
 
-/* Status pill — one of only three places green/amber/red are allowed. */
-.status-pill { font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 99px; color: #fff; font-variant-numeric: tabular-nums; }
 
 /* Legend strip: makes the colour system legible instead of decorative. */
 .legend {
@@ -498,18 +472,8 @@ h1, h2, h3, h4, .page-title {
 /* The module owns the hero outright — saturated, so you always know where
    you are. Soft blobs give it depth without a gradient. */
 .hero-card {
-  background:
-    radial-gradient(520px 260px at 92% -20%, rgba(255,255,255,.20), transparent 62%),
-    linear-gradient(135deg, var(--accent) 0%, var(--accent-grad-2) 125%);
-  border-radius: var(--radius-xl); overflow: hidden;
-  color: #fff; box-shadow: var(--shadow); position: relative;
-  border: 1px solid rgba(255,255,255,.10);
-}
-/* A soft, borderless light bloom replaces the old hard-edged circle. */
-.hero-card::before {
-  content: ''; position: absolute; width: 420px; height: 420px; border-radius: 50%;
-  background: radial-gradient(closest-side, rgba(255,255,255,.14), transparent);
-  top: -190px; right: -120px; pointer-events: none;
+  background: var(--accent); border-radius: var(--radius-xl); overflow: hidden;
+  color: #fff; position: relative;
 }
 .hero-content {
   position: relative; z-index: 1; padding: 28px 30px;
@@ -549,17 +513,7 @@ h1, h2, h3, h4, .page-title {
    #953ca4), matching BrandMark rather than the deep band in
    lib/design.js — the deep values go muddy on ink, which is the same
    documented exception BrandMark already takes. */
-.hero-mc-card {
-  background:
-    radial-gradient(760px 340px at 88% -25%, rgba(17,174,149,.26), transparent 60%),
-    radial-gradient(620px 340px at 104% 118%, rgba(149,60,164,.26), transparent 58%),
-    radial-gradient(560px 300px at 34% 150%, rgba(215,109,36,.16), transparent 62%),
-    linear-gradient(145deg, #11110f 0%, #181d23 50%, #26303a 100%);
-  border: 1px solid rgba(255,255,255,.08);
-}
-/* The stock hero's light bloom fights the glows above. */
-.hero-mc-card::before { display: none; }
-
+.hero-mc-card { background: #111315; border: 1px solid rgba(255,255,255,.08); }
 .hero-mc {
   position: relative; z-index: 1; padding: 26px 30px;
   display: grid; grid-template-columns: 1.25fr auto; gap: 18px 32px; align-items: center;
@@ -616,13 +570,14 @@ h1, h2, h3, h4, .page-title {
 }
 /* Each stat carries the hue of the system it came from — a 2px rule
    rather than a dot, so the four read as one instrument panel. */
-.hero-stat { padding-left: 11px; border-left: 2px solid rgba(255,255,255,.16); }
-.hero-stat[data-mod="health"] { border-left-color: #11ae95; }
-.hero-stat[data-mod="wellness"] { border-left-color: #953ca4; }
-.hero-stat[data-mod="goals"] { border-left-color: #d76d24; }
+.hero-stat { --dot: rgba(255,255,255,.35); }
+.hero-stat[data-mod="health"] { --dot: #11ae95; }
+.hero-stat[data-mod="wellness"] { --dot: #953ca4; }
+.hero-stat[data-mod="goals"] { --dot: #d76d24; }
 .hero-stat-v { font-size: 26px; font-weight: 600; letter-spacing: -.03em; line-height: 1.05; font-variant-numeric: tabular-nums; }
 .hero-stat-v small { font-size: 12.5px; font-weight: 500; opacity: .68; letter-spacing: 0; }
-.hero-stat-l { font-size: 12.5px; font-weight: 500; opacity: .62; margin-top: 4px; }
+.hero-stat-l { font-size: 12.5px; font-weight: 500; opacity: .75; margin-top: 4px; display: flex; align-items: center; gap: 7px; }
+.hero-stat-l::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--dot); flex-shrink: 0; }
 
 /* Practice row — deliberately not a metric tile. Meditation minutes are an
    activity with no target, so there's nothing honest to fill; giving it a
@@ -632,11 +587,7 @@ h1, h2, h3, h4, .page-title {
   display: flex; align-items: center; gap: 11px;
   background: var(--white); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 15px;
 }
-.practice-ic {
-  width: 32px; height: 32px; border-radius: 10px; flex-shrink: 0;
-  display: grid; place-items: center;
-  background: var(--accent-light); color: var(--accent);
-}
+.practice-ic { flex-shrink: 0; display: grid; place-items: center; color: var(--accent-ink); }
 .practice-lbl { font-size: 13px; font-weight: 600; color: var(--text-2); }
 .practice-sub { font-size: 12.5px; color: var(--text-3); font-weight: 400; }
 .practice-val { font-size: 22px; font-weight: 600; letter-spacing: -.03em; }
@@ -649,7 +600,6 @@ h1, h2, h3, h4, .page-title {
   text-decoration: none; letter-spacing: -.005em;
   transition: transform .15s var(--ease), box-shadow .15s, background .15s, border-color .15s, opacity .15s, color .15s;
 }
-.btn:active:not(:disabled) { transform: scale(.975); }
 .btn:disabled { opacity: .5; cursor: not-allowed; }
 .btn-primary {
   background: var(--btn-bg); color: var(--btn-fg);
@@ -676,15 +626,15 @@ h1, h2, h3, h4, .page-title {
 
 /* ── Badges, tabs, forms ───────────────────────────────────── */
 .badge {
-  display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px;
-  border-radius: 99px; font-size: 12px; font-weight: 600;
+  display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px;
+  border-radius: 6px; font-size: 12px; font-weight: 600;
 }
 .badge-blue { background: var(--accent-light); color: var(--accent-dark); }
 .badge-purple { background: var(--purple-light); color: var(--purple); }
 /* A small pulse for the one badge tone that means "you just finished" —
    Due today / Habits flip orange or blue to green on the last tick. Not
    on the other tones, which don't mark a completed moment. */
-.badge-green { background: var(--s-good-bg); color: var(--s-good); animation: badgePop .35s cubic-bezier(.34,1.56,.64,1) both; }
+.badge-green { background: var(--s-good-bg); color: var(--s-good); }
 @keyframes badgePop { 0% { transform: scale(.7); } 60% { transform: scale(1.12); } 100% { transform: scale(1); } }
 @media (prefers-reduced-motion: reduce) { .badge-green { animation: none; } }
 .badge-orange { background: var(--s-short-bg); color: var(--s-short); }
@@ -709,7 +659,7 @@ h1, h2, h3, h4, .page-title {
 .tab:hover:not(.active) { color: var(--text); }
 .tab.active {
   background: var(--white); color: var(--text); font-weight: 600;
-  box-shadow: 0 1px 2px rgba(18,18,17,.08), 0 0 0 1px var(--border);
+  box-shadow: 0 1px 2px rgba(16,18,19,.08), 0 0 0 1px var(--border);
 }
 
 .form-section-label {
@@ -740,7 +690,7 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
    family had no visible focus state at all — only inputs did, via the
    accent box-shadow above. `:focus-visible` keeps mouse clicks silent and
    only shows the ring for keyboard/AT navigation. */
-:where(button, a, [role=button], .tab, .check-row, .nav-item, .botnav-item, .system-panel):focus-visible {
+:where(button, a, [role=button], .tab, .check-row, .nav-item, .botnav-item, .sys-row):focus-visible {
   outline: 2px solid var(--accent); outline-offset: 2px;
 }
 
@@ -802,10 +752,6 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
 .dot.risk { background: var(--s-risk); }
 
 .coach-card { border-radius: var(--radius-lg); background: var(--ink); color: #fff; padding: 22px; position: relative; overflow: hidden; border: 1px solid rgba(255,255,255,.08); }
-.coach-card::before {
-  content: ''; position: absolute; width: 260px; height: 260px; border-radius: 50%;
-  background: radial-gradient(closest-side, var(--accent), transparent); opacity: .55; top: -110px; right: -90px; pointer-events: none;
-}
 .coach-card.soft, .coach-card.green, .coach-card.blue { background: var(--ink); }
 .coach-kicker {
   font-size: 13px; font-weight: 500;
@@ -836,11 +782,8 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
   padding: 48px 24px; text-align: center; color: var(--text-2);
   display: flex; flex-direction: column; align-items: center; gap: 10px;
 }
-.empty .empty-icon {
-  width: 48px; height: 48px; border-radius: 14px; background: var(--accent-dim);
-  display: flex; align-items: center; justify-content: center; margin-bottom: 4px;
-}
-.empty .empty-icon .icon { font-size: 22px; color: var(--accent); }
+.empty .empty-icon { display: flex; align-items: center; justify-content: center; margin-bottom: 2px; }
+.empty .empty-icon .icon { color: var(--text-3); }
 .empty strong { font-size: 15px; font-weight: 600; color: var(--text); display: block; }
 .empty span { font-size: 13px; line-height: 1.5; }
 
@@ -1050,12 +993,8 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
 
 .tc-grid { stroke: var(--border); stroke-width: 1; stroke-opacity: .9; }
 .tc-line { fill: none; stroke: var(--accent); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round;
-  stroke-dasharray: 1; stroke-dashoffset: 0; animation: tc-draw 1s var(--ease) both; }
+  }
 .tc-raw { fill: none; stroke: var(--accent); stroke-width: 1.25; stroke-opacity: .28; stroke-linecap: round; stroke-linejoin: round; }
-.tc-area { animation: tc-fade .9s ease both; }
-@keyframes tc-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
-@keyframes tc-fade { from { opacity: 0; } to { opacity: 1; } }
-@media (prefers-reduced-motion: reduce) { .tc-line, .tc-area { animation: none; } }
 .tc-target { stroke: var(--orange); stroke-width: 1.25; stroke-dasharray: 5 5; stroke-opacity: .8; }
 .tc-avg { stroke: var(--text-3); stroke-width: 1; stroke-dasharray: 2 5; stroke-opacity: .55; stroke-linecap: round; }
 
@@ -1111,15 +1050,13 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
 /* Settles in rather than just appearing when the alert list empties out —
    the one moment on Today that's purely good news deserves a beat more
    than a section silently swapping. */
-.all-clear-row { animation: allClearIn .4s cubic-bezier(.16,1,.3,1) both; }
-@keyframes allClearIn { from { opacity: 0; transform: translateY(-4px) scale(.98); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .all-clear-row { animation: none; } }
 
 .mob-fab {
   display: none; position: fixed; bottom: 24px; right: 20px;
   width: 56px; height: 56px; border-radius: 50%;
-  background: linear-gradient(135deg, var(--accent), var(--accent-grad-2));
-  border: none; box-shadow: 0 6px 20px rgba(var(--accent-rgb), .42);
+  background: var(--accent);
+  border: none; box-shadow: var(--shadow);
   cursor: pointer; z-index: 50; align-items: center; justify-content: center; color: #fff;
 }
 
@@ -1246,7 +1183,6 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
   .page-header { margin-bottom: 0; }
   .page-title { font-size: 25px; letter-spacing: -.03em; }
   .page-date { font-size: 10px; }
-  .page-sub { display: none; }
   .btn { padding: 10px 15px; font-size: 12.5px; }
   .btn-sm { padding: 8px 12px; font-size: 12px; }
 
@@ -1310,7 +1246,6 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
   .stat-value { font-size: 20px; }
   .stat-label { font-size: 9.5px; }
   .stat-sub { font-size: 9.5px; }
-  .tile-ic { width: 26px; height: 26px; border-radius: 8px; }
 
   .card-pad { padding: 14px; }
   .legend { border-radius: 15px; padding: 10px 13px; }
@@ -1329,14 +1264,7 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
   /* Three near-empty count cards side by side don't fit; stack them as
      rows, which is all a bare number needs anyway. */
   .stat-strip { grid-template-columns: 1fr; gap: 8px; margin-bottom: 12px; }
-  .stat-strip .stat-card {
-    min-height: 0; flex-direction: row; align-items: center;
-    justify-content: flex-start; gap: 12px; padding: 12px 14px;
-  }
-  .stat-strip .tile-top { display: contents; }
-  .stat-strip .tile-ic { order: 0; }
-  .stat-strip .tile-bot { order: 1; flex: 1; min-width: 0; }
-  .stat-strip .status-pill { order: 2; }
+  .stat-strip .stat-card { min-height: 0; gap: 10px; }
 
   /* Workout: the segmented tabs used flex:1 with no shrink limit, so
      "Session Log" pushed the row wider than the screen and the last tab
@@ -1400,28 +1328,29 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
   background: var(--white); border: 1px solid var(--border); border-radius: var(--radius);
   position: relative; overflow: hidden;
 }
-.alert-dot { position: absolute; left: 0; top: 0; bottom: 0; width: 4px; }
-.alert-ic { width: 34px; height: 34px; border-radius: 11px; display: grid; place-items: center; flex-shrink: 0; margin-left: 4px; }
+.alert-ic { display: grid; place-items: center; flex-shrink: 0; }
 .alert-text { flex: 1; min-width: 0; font-size: 14px; font-weight: 550; }
 
-/* Three systems side by side, each filled with its own module hue so the
-   row reads as "these are the three places things live". */
-.system-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-.system-panel {
-  border-radius: var(--radius-lg); padding: 18px 20px 16px; color: #fff;
-  text-decoration: none; display: block; position: relative; overflow: hidden;
-  box-shadow: var(--shadow-sm); border: 1px solid rgba(255,255,255,.10);
-  transition: transform .2s var(--ease), box-shadow .2s var(--ease);
+/* The three systems as one list: module mark, last touched, status, a way in. */
+.sys-list { padding: 4px 0; margin-bottom: 14px; }
+.sys-row {
+  display: grid; grid-template-columns: 14px 96px minmax(0, 1fr) auto 16px; align-items: center; gap: 12px;
+  padding: 14px 20px; color: var(--text); text-decoration: none; border-top: 1px solid var(--border);
+  transition: background .15s;
 }
-.system-panel::before {
-  content: ''; position: absolute; width: 260px; height: 260px; border-radius: 50%;
-  background: radial-gradient(closest-side, rgba(255,255,255,.16), transparent); top: -130px; right: -80px; pointer-events: none;
+.sys-row:first-child { border-top: 0; }
+.sys-row:hover { background: var(--white-soft); }
+.sys-mark { width: 10px; height: 10px; border-radius: 3px; }
+.sys-name { font-weight: 600; font-size: 14.5px; }
+.sys-last { color: var(--text-3); font-size: 13px; display: flex; align-items: center; gap: 7px; min-width: 0; }
+.sys-fresh { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.sys-foot { font-size: 13px; font-weight: 500; color: var(--text-2); text-align: right; }
+.sys-go { color: var(--text-3); }
+@media (max-width: 640px) {
+  .sys-row { grid-template-columns: 14px minmax(0, 1fr) 16px; row-gap: 2px; }
+  .sys-name { grid-column: 2; } .sys-go { grid-column: 3; grid-row: 1 / span 2; }
+  .sys-last { grid-column: 2; } .sys-foot { grid-column: 2; text-align: left; }
 }
-.system-panel:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
-.system-top { display: flex; align-items: center; justify-content: space-between; position: relative; z-index: 1; }
-.system-name { font-size: 13px; font-weight: 600; opacity: .85; }
-.system-fresh { width: 9px; height: 9px; border-radius: 50%; box-shadow: 0 0 0 3px rgba(255,255,255,.18); }
-.system-last { font-size: 12px; font-weight: 600; opacity: .72; position: relative; z-index: 1; }
 
 /* "Where to focus" rows (TodayPage FocusLever/FocusTrend). Slim rows
    on the card itself, divided by a hairline, rather than two tinted
@@ -1467,11 +1396,8 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
   display: flex; align-items: center; gap: 11px; padding: 11px 14px;
   background: var(--white-soft); border-radius: var(--radius-sm);
 }
-.goal-line-bar { width: 4px; height: 26px; border-radius: 99px; flex-shrink: 0; }
+.goal-line-bar { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 
-@media (max-width: 900px) {
-  .system-row { grid-template-columns: 1fr; }
-}
 
 /* ── Wellness ──────────────────────────────────────────────── */
 .pick-chips { display: flex; flex-wrap: wrap; gap: 7px; }
@@ -1490,8 +1416,8 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
 @media (max-width: 640px) { .fx-row { grid-template-columns: 1fr auto; } .fx-bar { grid-column: 1 / -1; order: 3; } }
 .reset-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
 .reset-card { padding: 15px; border: 1px solid var(--border); border-radius: 14px; background: var(--white); cursor: pointer; transition: transform .15s, border-color .15s, box-shadow .15s; }
-.reset-card:hover { transform: translateY(-1px); border-color: rgba(var(--accent-rgb), .28); box-shadow: var(--shadow-sm); }
-.reset-icon { width: 34px; height: 34px; border-radius: 10px; background: var(--accent-light); color: var(--accent); display: flex; align-items: center; justify-content: center; margin-bottom: 10px; }
+.reset-card:hover { border-color: var(--border-med); }
+.reset-icon { color: var(--accent-ink); display: flex; align-items: center; margin-bottom: 10px; }
 .script-list { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
 .script-line { padding: 10px 12px; border-radius: 12px; background: var(--white-soft); border: 1px solid var(--border); font-size: 13px; color: var(--text); }
 .mini-list { display: flex; flex-direction: column; gap: 10px; }
@@ -1658,17 +1584,9 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
    fixed dark-navy #0f0c29 with a stray teal-tinted overlay, neither of
    which belonged to Goals' clay hue. */
 .hero-banner {
-  background:
-    radial-gradient(520px 260px at 92% -20%, rgba(255,255,255,.20), transparent 62%),
-    linear-gradient(135deg, var(--accent) 0%, var(--accent-grad-2) 125%);
-  border: 1px solid rgba(255,255,255,.10);
+  background: var(--accent);
   border-radius: var(--radius-xl); padding: 28px 32px 26px;
   color: #fff; margin-bottom: 24px; position: relative; overflow: hidden;
-}
-.hero-banner::before {
-  content: ''; position: absolute; width: 420px; height: 420px; border-radius: 50%;
-  background: radial-gradient(closest-side, rgba(255,255,255,.14), transparent);
-  top: -190px; right: -120px; pointer-events: none;
 }
 .hero-banner > * { position: relative; z-index: 1; }
 
@@ -1949,11 +1867,10 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
    through its linked goal, so it should carry that area's colour too
    instead of being the one component in the module with no tie to the
    area-colour system. */
-/* A cycle belongs to a life area through its goal, so it carries that area's
-   colour on its left edge, exactly like .goal-card. */
+/* A cycle's life area shows as a small dot beside its goal name. */
 .cycle-card {
   background: var(--white); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm);
-  border: 1px solid var(--border); border-left-width: 4px; margin-bottom: 14px; overflow: hidden;
+  border: 1px solid var(--border); margin-bottom: 14px; overflow: hidden;
 }
 .cycle-header { padding: 20px 20px 16px; display: flex; align-items: flex-start; gap: 16px; }
 .cycle-info { flex: 1; min-width: 0; }
@@ -2001,7 +1918,7 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
 .goals-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 360px)); gap: 20px; }
 .goal-card {
   background: var(--white); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); border: 1px solid var(--border);
-  border-left-width: 4px; overflow: hidden; cursor: pointer; display: flex; flex-direction: column;
+  overflow: hidden; cursor: pointer; display: flex; flex-direction: column;
   transition: box-shadow .2s, border-color .2s; position: relative;
 }
 .goal-card:hover { box-shadow: var(--shadow); border-color: var(--border-med); }
@@ -2019,11 +1936,11 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
    ground rather than fighting an unpredictable photo. */
 .goal-cycle-strip {
   display: flex; align-items: center; gap: 10px; width: 100%; margin-bottom: 12px; padding: 7px 10px 7px 7px;
-  border-radius: 12px; background: rgba(255,255,255,.96); border: 1px solid rgba(20,20,15,.07);
-  box-shadow: 0 1px 3px rgba(20,20,15,.08); cursor: pointer; text-align: left; font-family: inherit;
+  border-radius: 12px; background: var(--white); border: 1px solid var(--border);
+  cursor: pointer; text-align: left; font-family: inherit;
   transition: box-shadow .15s, transform .15s;
 }
-.goal-cycle-strip:hover { box-shadow: 0 3px 10px rgba(20,20,15,.14); transform: translateY(-1px); }
+.goal-cycle-strip:hover { border-color: var(--border-med); }
 /* Shown in place of the score ring while there are too few elapsed
    commitment-days for a percentage to mean anything (MIN_RATE_SAMPLE in
    lib/goals.js) — a raw fraction is honest at low N where a percentage
@@ -2246,12 +2163,9 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
 .rv-due {
   display: flex; align-items: center; gap: 12px; margin-bottom: 14px;
   padding: 14px 16px; border-radius: var(--radius); color: #fff;
-  background: linear-gradient(135deg, #23456b, #33608f);
+  background: #23456b;
 }
-.rv-due-ic {
-  flex: none; width: 38px; height: 38px; border-radius: 12px; background: rgba(255,255,255,.16);
-  display: flex; align-items: center; justify-content: center;
-}
+.rv-due-ic { flex: none; display: flex; align-items: center; opacity: .85; }
 .rv-due-txt { flex: 1; min-width: 0; }
 .rv-due-txt strong { display: block; font-size: 14px; font-weight: 600; }
 .rv-due-txt small { display: block; font-size: 12px; opacity: .82; margin-top: 2px; }
@@ -2357,15 +2271,7 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
 /* ── Identity page (IdentityPage.jsx) ─────────────────────── */
 .id-hero {
   position: relative; overflow: hidden; border-radius: var(--radius-xl); padding: 34px 38px 30px; margin-bottom: 14px;
-  color: #2a1c04; box-shadow: 0 10px 30px rgba(140, 95, 15, .22);
-  background:
-    radial-gradient(700px 260px at 85% -20%, rgba(255, 244, 205, .75), transparent 60%),
-    radial-gradient(520px 260px at 0% 120%, rgba(150, 95, 10, .35), transparent 60%),
-    linear-gradient(135deg, #d9a93f 0%, #f0cb6b 42%, #c89232 72%, #a8741a 100%);
-}
-.id-hero::after {
-  content: ''; position: absolute; inset: 0; pointer-events: none;
-  background: linear-gradient(115deg, transparent 35%, rgba(255,255,255,.28) 48%, transparent 60%);
+  color: #241802; background: #d9a93f;
 }
 .id-hero > * { position: relative; z-index: 1; }
 .id-eyebrow { font-size: 12px; font-weight: 600; opacity: .7; margin-bottom: 14px; }
@@ -2510,7 +2416,7 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
 .rvf-statement {
   margin: 4px 0 18px; padding: 18px 22px; border-radius: 16px; color: #2a1c04;
   font-size: 17px; font-weight: 600; line-height: 1.45;
-  background: linear-gradient(135deg, #e3b54d 0%, #f3d27d 50%, #cf9a38 100%);
+  background: #e3b54d;
 }
 .rvf-prio { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
 .rvf-prio input { font-size: 15px; padding: 13px 15px; }
@@ -2593,7 +2499,7 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
 .phase-strip-week.now { color: var(--accent-ink); font-weight: 650; }
 .phase-strip-week.selected {
   background: var(--white); color: var(--text); font-weight: 600;
-  box-shadow: 0 1px 2px rgba(18,18,17,.08), 0 0 0 1px var(--border);
+  box-shadow: 0 1px 2px rgba(16,18,19,.08), 0 0 0 1px var(--border);
 }
 .phase-strip-week.now.selected { color: var(--accent-ink); }
 .phase-strip-week:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
@@ -2626,17 +2532,9 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
 /* Logo tile: a hairline ring keeps the dark mark legible on the dark theme. */
 .brandmark { border-radius: 22%; box-shadow: 0 0 0 1px rgba(255,255,255,.10), 0 1px 3px rgba(0,0,0,.22); }
 
-/* Login: a quiet stage lit by the three module hues (the logo's three bars),
-   with one raised card in the middle. */
-.login-bg {
-  min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px;
-  background:
-    radial-gradient(640px 420px at 12% 8%, rgba(215,109,36,.14), transparent 62%),
-    radial-gradient(640px 460px at 92% 18%, rgba(17,174,149,.14), transparent 62%),
-    radial-gradient(700px 480px at 50% 112%, rgba(149,60,164,.16), transparent 62%),
-    var(--bg);
-}
-.login-card { width: 100%; max-width: 400px; padding: 32px; box-shadow: var(--shadow-lg); animation: page-in .5s var(--ease) both; }
+/* Login: one raised card on the plain page. */
+.login-bg { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; background: var(--bg); }
+.login-card { width: 100%; max-width: 400px; padding: 32px; box-shadow: var(--shadow-lg); }
 
 /* Tile fills are light tints; at full strength on a dark card they read as
    grey slabs, so dark mode turns them down. */
@@ -2648,3 +2546,5 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
   .phase-milestone { flex-wrap: wrap; }
   .phase-milestone-body { flex: 1 1 calc(100% - 40px); }
 }
+
+.area-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 7px; vertical-align: 1px; }

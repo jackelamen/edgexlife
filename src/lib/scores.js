@@ -226,16 +226,16 @@ export function healthDetails(log, settings) {
 }
 
 export function healthLabel(score) {
-  if (score == null) return ['Log today to calculate your Health Score',
-    'Capture sleep, steps, hydration, energy, sleep quality, nutrition, and pain to see what needs attention.']
-  if (score >= 85) return ['High Health Score',
-    'Maintain the basics that created this: sleep, movement, water, steady energy, and low pain.']
-  if (score >= 70) return ['Build toward 85+',
-    'You are in a workable range. Raise the weakest lever before adding intensity.']
-  if (score >= 50) return ['Stabilize the score',
-    'Bias toward lighter training, better hydration, easier movement, and an earlier shutdown.']
-  return ['Recovery priority',
-    'The goal today is not a heroic score. Restore the basics so tomorrow has a better floor.']
+  if (score == null) return ['No log yet today',
+    'Log sleep, steps, water, energy, nutrition and pain to get today\'s score.']
+  if (score >= 85) return ['Holding at the top',
+    'Keep doing what is working: sleep, movement, water, steady energy, low pain.']
+  if (score >= 70) return ['Solid, with room to grow',
+    'Fix your weakest area before adding more training.']
+  if (score >= 50) return ['Below your best',
+    'Go lighter today: easier movement, more water, an earlier night.']
+  return ['A low day',
+    'Do the basics today so tomorrow starts higher.']
 }
 
 /** Weakest weighted component — drives the coach card. */
@@ -334,13 +334,13 @@ export function clarityDetails(c) {
 }
 
 export function clarityLabel(score) {
-  if (score == null) return ['Come back to center',
-    'Log mood, stress, clarity, and what is present to see your inner-state signal.']
-  if (score >= 85) return ['Clear and grounded',
-    'A good window for decision-making, creative work, and meaningful conversations.']
-  if (score >= 70) return ['Steady enough', 'Keep moving, but protect focus and reduce needless inputs.']
-  if (score >= 50) return ['A little noisy', 'Use a reset before asking more from yourself.']
-  return ['Nervous system first', 'Lower demands, create quiet, and take the next small stabilizing step.']
+  if (score == null) return ['No check-in yet',
+    'Log mood, stress and clarity to see where you are.']
+  if (score >= 85) return ['Clear',
+    'A good time for decisions, deep work and real conversations.']
+  if (score >= 70) return ['Steady', 'Keep going, protect your focus and cut extra inputs.']
+  if (score >= 50) return ['Noisy', 'Do a short reset before asking more of yourself.']
+  return ['Overloaded', 'Lower the demands, find some quiet and take one small step.']
 }
 
 export const MOOD_LABELS = { 1: 'Heavy', 2: 'Low', 3: 'Neutral', 4: 'Good', 5: 'Bright' }

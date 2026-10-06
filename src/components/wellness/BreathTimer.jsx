@@ -529,7 +529,7 @@ function PresetInfo({ preset }) {
 
       <p className="breath-disclaimer">
         General wellness information, not medical advice. Breathing practice is
-        not a treatment for a medical or psychiatric condition — if something
+        not a treatment for a medical or psychiatric condition, if something
         feels wrong, stop and breathe normally.
       </p>
     </div>

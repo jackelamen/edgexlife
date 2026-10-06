@@ -471,12 +471,8 @@ export default function TodayPage() {
             strip in Identity's own colour: stands out, but stays lighter
             than the hero below it so the two don't compete. */}
         <Link to="/identity" className="north-star">
-          <span className="north-star-ic"><Icon name="star" size={16} fill /></span>
-          <span className="north-star-txt">
-            <small>Who I'm becoming</small>
-            {IDENTITY_STATEMENT}
-          </span>
-          <Icon name="chevron_right" size={18} className="north-star-go" />
+          <small>Who I'm becoming</small>
+          <span className="north-star-txt">{IDENTITY_STATEMENT}</span>
         </Link>
 
         {/* Every other page has this; Today was the one page without it,
@@ -646,10 +642,10 @@ export default function TodayPage() {
              acknowledgement instead of the page silently going quiet. */}
       {allClear ? (
         <div className="alert-row all-clear-row today-order-alerts">
-          <div className="alert-ic" style={{ background: STATUS.good.bg }}>
-            <Icon name="check_circle" size={17} style={{ color: STATUS.good.color }} />
+          <div className="alert-ic">
+            <Icon name="check_circle" size={20} fill style={{ color: STATUS.good.color }} />
           </div>
-          <span className="alert-text">All caught up — nothing needs your attention right now.</span>
+          <span className="alert-text">All caught up. Nothing needs you right now.</span>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }} className="today-order-alerts">
@@ -660,9 +656,8 @@ export default function TodayPage() {
             return (
               <div key={i}>
                 <div className="alert-row">
-                  <span className="alert-dot" style={{ background: s.color }} />
-                  <div className="alert-ic" style={{ background: s.bg }}>
-                    <Icon name={al.icon} size={17} style={{ color: s.color }} />
+                  <div className="alert-ic">
+                    <Icon name={al.icon} size={20} style={{ color: s.color }} />
                   </div>
                   <span className="alert-text">{al.text}</span>
                   {quickable && (
@@ -694,21 +689,21 @@ export default function TodayPage() {
         </div>
       )}
 
-      {/* ── Three systems, each in its own module hue ── */}
-      <div className="system-row today-order-systems">
-        <SystemPanel
+      {/* ── The three systems: freshness and a way in, as one quiet list ── */}
+      <div className="card sys-list today-order-systems">
+        <SystemRow
           module="health" to="/health"
           lastLabel={lastHealthDate ? `Logged ${pretty(lastHealthDate)}` : 'Never logged'}
           age={healthAge}
           foot={healthScore != null ? healthLabel(healthScore)[0] : 'Log a day to start'}
         />
-        <SystemPanel
+        <SystemRow
           module="wellness" to="/wellness"
           lastLabel={lastCheckinDate ? `Checked in ${pretty(lastCheckinDate)}` : 'No check-in'}
           age={checkinAge}
           foot={lastCheckin?.state ? `Felt ${String(lastCheckin.state).toLowerCase()}` : 'Log how you are'}
         />
-        <SystemPanel
+        <SystemRow
           module="goals" to="/goals"
           lastLabel={`${liveCycles.length} live cycle${liveCycles.length === 1 ? '' : 's'}`}
           age={null}
@@ -739,7 +734,7 @@ export default function TodayPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
               {patterns.map((p) => (
                 <div key={p.key} className="alert-row">
-                  <div className="alert-ic" style={{ background: p.up ? STATUS.good.bg : STATUS.short.bg }}>
+                  <div className="alert-ic">
                     <Icon name={p.icon} size={17} style={{ color: p.up ? STATUS.good.color : STATUS.short.color }} />
                   </div>
                   <span className="alert-text">{p.text}</span>
@@ -749,7 +744,7 @@ export default function TodayPage() {
           </div>
         ) : !(patternHealth.loading || patternWellness.loading) && matchedDays >= 3 && (
           <p style={{ marginTop: 14, fontSize: 12, color: 'var(--text-3)' }}>
-            {matchedDays} days logged in both Health and Wellness so far — cross-system patterns will
+            {matchedDays} days logged in both Health and Wellness so far, cross-system patterns will
             show up here once one crosses the bar to report.
           </p>
         )}
@@ -786,29 +781,23 @@ export default function TodayPage() {
 }
 
 /**
- * One system's standing state. Takes the MODULE's hue (identity — same
- * colour as that module's own hero and nav item) and, where the data can go
- * stale, a freshness dot in the reserved status ramp.
+ * One system's standing state, as a row: the module's hue as a small mark,
+ * when it was last touched (with a freshness dot in the reserved status ramp
+ * where the data can go stale), and a way in.
  */
-function SystemPanel({ module, to, lastLabel, age, foot }) {
+function SystemRow({ module, to, lastLabel, age, foot }) {
   const m = MODULES[module]
   const fresh = age == null ? null : age <= 1 ? STATUS.good : age <= 4 ? STATUS.short : STATUS.risk
   return (
-    <Link to={to} className="system-panel" style={{ background: m.color }}>
-      <div className="system-top">
-        <span className="system-name">{m.label}</span>
-        {fresh && <span className="system-fresh" style={{ background: fresh.color }} />}
-      </div>
-      {/* The big score number that used to sit here was the same number
-          the hero rings above already show — and the ring version comes
-          with a trend delta, which this bare figure never had. Dropped
-          rather than duplicated; this panel's job is navigation and
-          freshness, not being a second scoreboard. */}
-      <div className="system-last" style={{ marginTop: 8 }}>{lastLabel}</div>
-      <div className="system-foot">
-        {foot}
-        <Icon name="arrow_forward" size={15} />
-      </div>
+    <Link to={to} className="sys-row">
+      <i className="sys-mark" style={{ background: m.color }} />
+      <span className="sys-name">{m.label}</span>
+      <span className="sys-last">
+        {fresh && <i className="sys-fresh" style={{ background: fresh.color }} />}
+        {lastLabel}
+      </span>
+      <span className="sys-foot">{foot}</span>
+      <Icon name="arrow_forward" size={15} className="sys-go" />
     </Link>
   )
 }
