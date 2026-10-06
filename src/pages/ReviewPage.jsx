@@ -10,9 +10,13 @@ import {
   fetchWeeklyReviews, saveWeeklyReview,
   fetchHealthLogs, fetchHealthSettings, fetchWellnessCheckins, fetchWellnessNotes,
   fetchWorkoutSessions, fetchHabitLogs, fetchSprints, fetchSprintPhases, fetchSprintTactics,
+  fetchGoalMetrics, fetchMetricLogs,
 } from '../lib/data'
 import { healthDetails, clarityDetails } from '../lib/scores'
-import { isSprintActive, sprintCurrentWeek, tacticWeekRows } from '../lib/goals'
+import { isSprintActive, sprintCurrentWeek, tacticWeekRows, commitmentRate, weekDayForDate } from '../lib/goals'
+import { flaggedTactics } from '../lib/outcomes'
+import PlanAdjust from '../components/goals/PlanAdjust'
+import CycleOutcome from '../components/goals/CycleOutcome'
 import { statusFor } from '../lib/design'
 import {
   REVIEW_PROMPTS, PLAN_PROMPTS, EMPTY_REVIEW, weekIdFor, weekRange, prevWeekId, nextWeekId,
@@ -74,6 +78,8 @@ export default function ReviewPage() {
   const sprints = useAsync((f) => fetchSprints({ force: f }))
   const phases = useAsync((f) => fetchSprintPhases({ force: f }))
   const tactics = useAsync((f) => fetchSprintTactics({ force: f }))
+  const metrics = useAsync((f) => fetchGoalMetrics({ force: f }))
+  const metricLogs = useAsync((f) => fetchMetricLogs({ force: f }))
 
   const saved = useMemo(
     () => (reviews.data || []).find((r) => r.week_id === weekId) || null,
@@ -166,6 +172,35 @@ export default function ReviewPage() {
     })
   }, [sprints.data, phases.data, tactics.data])
 
+  /* The outcome side of each live cycle, beside the adherence rows above:
+     metrics tied to the cycle with their pace, so the review argues about
+     both whether you did the work and whether it is working. */
+  const outcomes = useMemo(() => (sprints.data || [])
+    .filter((sp) => isSprintActive(sp) && !sp.archived)
+    .map((sp) => ({
+      sprint: sp,
+      rate: commitmentRate((phases.data || []).filter((p) => p.sprint_id === sp.id),
+        (tactics.data || []).filter((t) => t.sprint_id === sp.id), sp),
+    }))
+    .filter((o) => (metrics.data || []).some((m) => m.sprint_id === o.sprint.id)),
+  [sprints.data, phases.data, tactics.data, metrics.data])
+
+  /* Actions that missed the bar two weeks running, for a keep / change /
+     drop decision. Only offered for the week just closed or in progress:
+     a change to an old week would land too late to matter. */
+  const flagged = useMemo(() => (sprints.data || [])
+    .filter((sp) => isSprintActive(sp) && !sp.archived)
+    .flatMap((sp) => {
+      const slot = weekDayForDate(sp, weekId)
+      if (!slot) return []
+      if (slot.week + 1 < sprintCurrentWeek(sp)) return []
+      const ph = (phases.data || []).filter((p) => p.sprint_id === sp.id)
+      const tc = (tactics.data || []).filter((t) => t.sprint_id === sp.id)
+      return flaggedTactics(sp, (w) => tacticWeekRows(ph, tc, sp, w), slot.week)
+    }),
+  [sprints.data, phases.data, tactics.data, weekId])
+  const reloadPlan = () => { sprints.reload(); tactics.reload() }
+
   const loading = healthLogs.loading || checkins.loading || reviews.loading
   const isThisWeek = weekId === weekIdFor()
 
@@ -211,6 +246,9 @@ export default function ReviewPage() {
           draft={draft} edit={edit} dirty={dirty} busy={busy} saved={saved} onSave={save}
           summary={summary} inner={inner} loading={loading} lastWeek={lastWeek} lastWeekId={prevWeekId(weekId)}
           cycleRows={cycleRows} weekLabel={prettyWeek(weekId)}
+          outcomes={outcomes} flagged={flagged} weekId={weekId}
+          metrics={metrics.data} metricLogs={metricLogs.data}
+          onLogged={() => metricLogs.reload()} onPlanChanged={reloadPlan}
         />
       )}
     </View>
@@ -230,9 +268,10 @@ const SCORE_WORD = (n) => (n <= 3 ? 'Rough' : n <= 5 ? 'Mixed' : n <= 7 ? 'Solid
 const CORE = ['wins', 'challenges', 'learning']
 
 export function ReviewFlow({ step, setStep, draft, edit, dirty, busy, saved, onSave,
-  summary, inner, loading, lastWeek, lastWeekId, cycleRows, weekLabel }) {
+  summary, inner, loading, lastWeek, lastWeekId, cycleRows, weekLabel,
+  outcomes = [], flagged = [], weekId, metrics, metricLogs, onLogged, onPlanChanged }) {
   const promised = lastWeek && [lastWeek.priority_1, lastWeek.priority_2, lastWeek.priority_3].filter(Boolean)
-  const hasPromises = (promised && promised.length) || cycleRows.length
+  const hasPromises = (promised && promised.length) || cycleRows.length || outcomes.length || flagged.length
   const steps = [
     { id: 'look', label: 'The week', done: true },
     ...(inner && inner.checkins ? [{ id: 'inner', label: 'How you felt', done: true }] : []),
@@ -310,6 +349,23 @@ export function ReviewFlow({ step, setStep, draft, edit, dirty, busy, saved, onS
                 ))}
                 {lastWeek.protect && <div className="rvf-aside"><Icon name="shield" size={15} /> Protect: {lastWeek.protect}</div>}
                 {lastWeek.let_go && <div className="rvf-aside"><Icon name="do_not_disturb_on" size={15} /> Let go: {lastWeek.let_go}</div>}
+              </div>
+            )}
+            {outcomes.length > 0 && (
+              <div className="rvf-block">
+                <div className="rvf-label">Is it moving the number?</div>
+                {outcomes.map((o) => (
+                  <div key={o.sprint.id} style={{ marginBottom: 10 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-3)', marginBottom: 2 }}>{o.sprint.name}</div>
+                    <CycleOutcome sprint={o.sprint} metrics={metrics} logs={metricLogs} rate={o.rate} compact onLogged={onLogged} />
+                  </div>
+                ))}
+              </div>
+            )}
+            {flagged.length > 0 && (
+              <div className="rvf-block">
+                <div className="rvf-label">Under the bar two weeks running. Decide.</div>
+                <PlanAdjust items={flagged} weekId={weekId} onChanged={onPlanChanged} />
               </div>
             )}
             {cycleRows.length > 0 && (

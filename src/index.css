@@ -2459,3 +2459,66 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
   .rvf-statement { font-size: 14.5px; padding: 14px 16px; }
 }
 @media (prefers-reduced-motion: reduce) { .rvf-card { animation: none; } }
+
+/* ── Goals: outcome tracking (pace, milestones, goal progress) ───────────
+   Status colours below are the reserved ramp: they only ever report how a
+   number is doing, never identify a metric. */
+.goal-progress-track { position: relative; height: 8px; border-radius: 99px; overflow: visible; }
+.goal-progress-track > span { display: block; height: 100%; border-radius: 99px; transition: width .5s cubic-bezier(.4,0,.2,1); }
+.goal-progress-track > i { position: absolute; top: -3px; width: 2px; height: 14px; border-radius: 2px; transform: translateX(-1px); opacity: .85; }
+
+.cycle-outcome { border-top: 1px solid var(--border); padding: 14px 20px; display: flex; flex-direction: column; gap: 14px; }
+.cycle-outcome-label { font-size: 11px; font-weight: 700; color: var(--text-3); text-transform: uppercase; letter-spacing: .06em; }
+.cycle-outcome-empty { border-top: 1px solid var(--border); padding: 12px 20px; font-size: 12px; font-weight: 600; color: var(--text-3); display: flex; gap: 8px; align-items: flex-start; line-height: 1.45; }
+.cycle-outcome-row { display: flex; flex-direction: column; gap: 6px; }
+.cycle-outcome-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.cycle-outcome-head strong { font-size: 13.5px; }
+.cycle-outcome-vals { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; font-weight: 700; color: var(--text-2); }
+.cycle-outcome-vals .icon { color: var(--text-3); }
+.cycle-outcome-pace { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 800; }
+.cycle-outcome-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.cycle-outcome-track { position: relative; height: 8px; border-radius: 99px; background: var(--white-soft); }
+.cycle-outcome-fill { display: block; height: 100%; border-radius: 99px; transition: width .5s cubic-bezier(.4,0,.2,1); }
+.cycle-outcome-expected { position: absolute; top: -3px; width: 2px; height: 14px; background: var(--text); border-radius: 2px; transform: translateX(-1px); opacity: .7; }
+.cycle-outcome-sub { font-size: 11.5px; font-weight: 600; color: var(--text-3); }
+.cycle-outcome-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.cycle-outcome-actions input { width: 96px; font-size: 12.5px; padding: 5px 8px; }
+.cycle-outcome-chart { padding: 8px 10px 6px; border: 1px solid var(--border); border-radius: 12px; background: var(--white-soft); }
+.cycle-outcome-legend { display: flex; gap: 14px; font-size: 11px; font-weight: 700; color: var(--text-3); margin-top: 4px; }
+.cycle-outcome-legend i { display: inline-block; width: 16px; height: 0; border-top: 2.25px solid var(--text-2); vertical-align: middle; margin-right: 5px; }
+.cycle-outcome-legend i.dashed { border-top: 1.5px dashed var(--text-3); }
+.cycle-diagnosis { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; padding: 12px 14px; border-radius: 12px; background: var(--white-soft); }
+.cycle-diagnosis p { font-size: 12.5px; color: var(--text-2); line-height: 1.45; margin: 0; }
+
+.phase-strip { display: flex; flex-direction: column; gap: 12px; margin-bottom: 14px; }
+.phase-strip-track { display: flex; gap: 6px; }
+.phase-strip-phase { min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.phase-strip-name { font-size: 10.5px; font-weight: 800; color: var(--text-3); text-transform: uppercase; letter-spacing: .05em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.phase-strip-phase.current .phase-strip-name { color: var(--text); }
+.phase-strip-weeks { display: flex; gap: 3px; }
+.phase-strip-week { flex: 1; min-width: 0; height: 26px; border-radius: 7px; border: 0; cursor: pointer; font-size: 11px; font-weight: 800; color: #fff; background: var(--border-med); transition: transform .12s; }
+.phase-strip-week.future { background: var(--white-soft); color: var(--text-3); box-shadow: inset 0 0 0 1px var(--border); }
+.phase-strip-week:not([style]):not(.future) { color: var(--text-3); }
+.phase-strip-week.now { box-shadow: 0 0 0 2px var(--white), 0 0 0 3.5px var(--text); }
+.phase-strip-week.selected { transform: translateY(-2px); }
+.phase-strip-week:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.phase-milestones { display: flex; flex-direction: column; gap: 6px; }
+.phase-milestone { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--white); }
+.phase-milestone-body { flex: 1; min-width: 0; }
+.phase-milestone-body strong { font-size: 13px; display: block; }
+.phase-milestone-body small { font-size: 11.5px; color: var(--text-3); font-weight: 600; }
+.phase-milestone .badge { flex-shrink: 0; }
+@media (max-width: 600px) {
+  .phase-strip-week { height: 30px; }
+  .phase-milestone { flex-wrap: wrap; }
+}
+
+.plan-adjust { display: flex; flex-direction: column; gap: 8px; }
+.plan-adjust-item { border: 1px solid var(--border); border-radius: 12px; background: var(--white); padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+.plan-adjust-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.plan-adjust-head strong { font-size: 13.5px; flex: 1 1 200px; }
+.plan-adjust-head small { font-size: 11.5px; font-weight: 700; color: var(--text-3); }
+.plan-adjust-actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.plan-adjust-form { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.plan-adjust-form input[type="text"] { flex: 1 1 180px; }
+.plan-adjust-done { font-size: 12px; font-weight: 700; color: var(--text-2); display: inline-flex; align-items: center; gap: 6px; }

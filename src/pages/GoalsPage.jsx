@@ -31,6 +31,13 @@ import { useGoalPhoto } from '../lib/areaPhoto'
 import VisionBoard from '../components/goals/VisionBoard'
 import GoalPhotoPicker from '../components/goals/GoalPhotoPicker'
 import ExecutionHeatmap from '../components/goals/ExecutionHeatmap'
+import CycleOutcome from '../components/goals/CycleOutcome'
+import PhaseStrip from '../components/goals/PhaseStrip'
+import GoalProgress from '../components/goals/GoalProgress'
+import {
+  num, metricProgress, metricPace, fmtMetricValue, paceColor, PACE_LABEL,
+  goalProgress, goalTime, goalStanding, cycleOutcomeSummary,
+} from '../lib/outcomes'
 import { MODULES } from '../lib/design'
 import { IDENTITY_THREADS, identityThreadByKey } from '../lib/identity'
 
@@ -58,8 +65,12 @@ export default function GoalsPage() {
   const sprints = useAsync((f) => fetchSprints({ force: f }))
   const phases = useAsync((f) => fetchSprintPhases({ force: f }))
   const tactics = useAsync((f) => fetchSprintTactics({ force: f }))
+  // Outcome data rides along with the cycle data so every card that shows a
+  // cycle (Today, Cycles) and every goal card reads one shared copy.
+  const metrics = useAsync((f) => fetchGoalMetrics({ force: f }))
+  const logs = useAsync((f) => fetchMetricLogs({ force: f }))
 
-  const cycleData = { sprints, phases, tactics }
+  const cycleData = { sprints, phases, tactics, metrics, logs }
   const activeView = VIEWS.find((v) => v.value === view)
 
   return (
@@ -159,6 +170,16 @@ function TodayView({ goals, rollup, cycleData, onStartCycle }) {
   // additive, never a broken/empty state.
   const heroPhoto = useGoalPhoto(featured?.goal)
 
+  // The featured goal's outcome, set beside its time. Adherence is the
+  // headline above; this is the line that says whether the work is moving
+  // the thing it is for.
+  const featuredRoll = (rollup.data || []).find((r) => r.goal_id === featured?.goal?.id)
+  const featuredProgress = featured?.goal ? goalProgress({
+    goal: featured.goal, metrics: cycleData.metrics.data, logs: cycleData.logs.data,
+    sprints: cycleData.sprints.data, phases: cycleData.phases.data, roll: featuredRoll,
+  }) : null
+  const featuredTime = featured?.goal ? goalTime({ goal: featured.goal, sprints: cycleData.sprints.data }) : null
+
   return (
     <>
       <div className={`hero-banner${heroPhoto ? ' hero-banner-photo' : ''}`}>
@@ -194,6 +215,12 @@ function TodayView({ goals, rollup, cycleData, onStartCycle }) {
               {live.length > 1 ? 'Up next: ' : ''}<strong>{featured.sp.name}</strong>
               {featured.goal?.title ? ` · ${featured.goal.title}` : ''}
             </p>
+          )}
+          {featuredProgress && featuredProgress.pct != null && (
+            <div style={{ marginTop: 14, maxWidth: 360 }}>
+              <GoalProgress onPhoto progress={featuredProgress} time={featuredTime}
+                standing={goalStanding(featuredProgress, featuredTime)} />
+            </div>
           )}
         </div>
         {/* Photo confined to its own narrower panel rather than stretched
@@ -256,7 +283,7 @@ function TodayView({ goals, rollup, cycleData, onStartCycle }) {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <CycleCard key={featured.sp.id} sprint={featured.sp} phases={featured.phases} tactics={featured.tactics}
-            goal={featured.goal} compact={false} sprintsAsync={cycleData.sprints} />
+            goal={featured.goal} compact={false} sprintsAsync={cycleData.sprints} outcomeData={cycleData} />
           {rest.length > 0 && (
             <>
               <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.06em', marginTop: 2 }}>
@@ -264,7 +291,7 @@ function TodayView({ goals, rollup, cycleData, onStartCycle }) {
               </div>
               {rest.map((c) => (
                 <CycleCard key={c.sp.id} sprint={c.sp} phases={c.phases} tactics={c.tactics} goal={c.goal}
-                  compact sprintsAsync={cycleData.sprints} />
+                  compact sprintsAsync={cycleData.sprints} outcomeData={cycleData} />
               ))}
             </>
           )}
@@ -276,7 +303,7 @@ function TodayView({ goals, rollup, cycleData, onStartCycle }) {
 
 /* ══════════════════ Cycle card (shared by Today + Cycles) ══════════════════ */
 
-function CycleCard({ sprint, phases, tactics, goal, compact, sprintsAsync, onDelete, onEdit, onArchive, onDuplicate }) {
+function CycleCard({ sprint, phases, tactics, goal, compact, sprintsAsync, outcomeData, onDelete, onEdit, onArchive, onDuplicate }) {
   const [open, setOpen] = useState(!compact)
   const [week, setWeek] = useState(sprintCurrentWeek(sprint))
   const cw = sprintCurrentWeek(sprint)
@@ -425,8 +452,19 @@ function CycleCard({ sprint, phases, tactics, goal, compact, sprintsAsync, onDel
         </div>
       </div>
 
+      {outcomeData && (
+        <CycleOutcome sprint={sprint} metrics={outcomeData.metrics.data} logs={outcomeData.logs.data}
+          rate={rate} compact={compact} onLogged={() => outcomeData.logs.reload()} />
+      )}
+
       {open && (
         <div className="cycle-section">
+          {outcomeData && (
+            <PhaseStrip sprint={sprint} phases={phases} tactics={tactics}
+              metrics={outcomeData.metrics.data} logs={outcomeData.logs.data}
+              week={week} currentWeek={cw} onPick={setWeek}
+              onChanged={() => outcomeData.phases.reload()} />
+          )}
           <div className="cycle-section-title">
             <span>
               Week {week} of {totalWeeks}
@@ -561,7 +599,7 @@ function TacticRow({ tactic: t, checks, sprint, week, onToggleDay, onToggleXpw, 
 /* ══════════════════ Goal Room ══════════════════ */
 
 function GoalRoom({ goals, rollup, cycleData, onEdit, onStartCycle, onOpenCycles }) {
-  const { sprints, phases, tactics } = cycleData
+  const { sprints, phases, tactics, metrics, logs } = cycleData
   const [filter, setFilter] = useState('active')
   const [open, setOpen] = useState(null)
   const confirm = useConfirm()
@@ -656,6 +694,10 @@ function GoalRoom({ goals, rollup, cycleData, onEdit, onStartCycle, onOpenCycles
         <div className="goals-grid" style={{ marginBottom: 24 }}>
           {list.map((g) => (
             <GoalCard key={g.id} goal={g} roll={rollupBy[g.id]}
+              progress={goalProgress({ goal: g, metrics: metrics.data, logs: logs.data, sprints: sprints.data, phases: phases.data, roll: rollupBy[g.id] })}
+              time={goalTime({ goal: g, sprints: sprints.data })}
+              goalSprints={(sprints.data || []).filter((sp) => sp.goal_id === g.id && !sp.archived)}
+              onOutcomeChanged={() => { metrics.reload(); logs.reload(); phases.reload(); rollup.reload() }}
               hasCycle={(sprints?.data || []).some((s) => s.goal_id === g.id)}
               cycle={liveCycleFor(g.id)} onOpenCycle={onOpenCycles}
               onStartCycle={() => onStartCycle?.(g.id)}
@@ -701,7 +743,7 @@ function GoalRoom({ goals, rollup, cycleData, onEdit, onStartCycle, onOpenCycles
   )
 }
 
-function GoalCard({ goal, roll, hasCycle, cycle, onOpenCycle, onStartCycle, open, onToggle, onEdit, onDelete, armed }) {
+function GoalCard({ goal, roll, progress, time, goalSprints, onOutcomeChanged, hasCycle, cycle, onOpenCycle, onStartCycle, open, onToggle, onEdit, onDelete, armed }) {
   const iconFor = { health: 'favorite', work: 'work', family: 'diversity_3', personal: 'spa' }
   // A photo tagged to this goal's own life area, when one exists — see
   // lib/areaPhoto.js. Only the closed-card header (goal-grid-body) gets
@@ -762,6 +804,7 @@ function GoalCard({ goal, roll, hasCycle, cycle, onOpenCycle, onStartCycle, open
         ) : (
           <h3 style={{ fontSize: 16, fontWeight: 800, marginBottom: 12, lineHeight: 1.3, color: photo ? '#fff' : undefined }}>{goal.title}</h3>
         )}
+        <GoalProgress progress={progress} time={time} standing={goalStanding(progress, time)} onPhoto={Boolean(photo)} />
         {/* A brand-new goal used to just sit here with nothing to do next —
             the goal→cycle gap flagged in the critique. A goal with zero
             cycles gets an explicit next step instead of silence. */}
@@ -810,27 +853,18 @@ function GoalCard({ goal, roll, hasCycle, cycle, onOpenCycle, onStartCycle, open
         </div>
         </div>
       </div>
-      {open && <GoalDetail goal={goal} />}
+      {open && <GoalDetail goal={goal} sprints={goalSprints} onChanged={onOutcomeChanged} />}
     </div>
   )
 }
 
-// A bare "10000" next to a Currency metric or "target 80" next to a
-// Percentage one gives no unit at all, even though the type picker offers
-// both — this is the difference between a tracker and an instrument.
-function fmtMetricValue(type, val) {
-  if (val == null || val === '') return val
-  if (type === 'Currency') return `$${Number(val).toLocaleString()}`
-  if (type === 'Percentage') return `${val}%`
-  return val
-}
-
-function GoalDetail({ goal }) {
+function GoalDetail({ goal, sprints, onChanged }) {
   const metrics = useAsync((f) => fetchGoalMetrics({ force: f }))
   const logs = useAsync((f) => fetchMetricLogs({ force: f }))
   const tasks = useAsync((f) => fetchGoalTasks(goal.id, { force: f }), [goal.id])
   const habits = useAsync((f) => fetchHabits({ force: f }))
   const [metricOpen, setMetricOpen] = useState(false)
+  const [editingMetric, setEditingMetric] = useState(null)
   const [picker, setPicker] = useState(null)
   const [logDrafts, setLogDrafts] = useState({})
   const confirm = useConfirm()
@@ -848,27 +882,40 @@ function GoalDetail({ goal }) {
     if (raw === '' || raw == null || Number.isNaN(Number(raw))) { toast.error('Enter a number'); return }
     await logMetric(metricId, goal.id, today(), Number(raw))
     setLogDrafts((d) => { const n = { ...d }; delete n[metricId]; return n })
-    toast.success('Logged'); logs.reload()
+    toast.success('Logged'); logs.reload(); onChanged?.()
   }
 
   return (
     <div className="goal-detail-panel" onClick={(e) => e.stopPropagation()}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
         <span className="form-section-label" style={{ marginBottom: 0 }}>Metrics</span>
-        <button className="btn btn-ghost btn-sm" onClick={() => setMetricOpen(true)}><Icon name="add" size={14} /> Add</button>
+        <button className="btn btn-ghost btn-sm" onClick={() => { setEditingMetric(null); setMetricOpen(true) }}><Icon name="add" size={14} /> Add</button>
       </div>
       {!mine.length ? <p style={{ fontSize: 12.5, color: 'var(--text-3)' }}>No metrics yet.</p> : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
           {mine.map((m) => {
             const last = latestFor(m.id)
             const drafting = logDrafts[m.id] !== undefined
-            const pct = m.target && last ? Math.max(0, Math.min(100, (Number(last.value) / Number(m.target)) * 100)) : null
+            // Progress runs from the baseline to the target, so a metric
+            // that should go DOWN (weight, a 10k time) fills as it falls.
+            // Metrics saved before baselines existed count from 0, as before.
+            const startN = num(m.start_value)
+            const cur = last ? last.value : startN
+            const prog = metricProgress(m, cur)
+            const sp = (sprints || []).find((x) => x.id === m.sprint_id)
+            const pace = sp ? metricPace(m, logs.data, sp) : null
+            const color = pace && pace.status !== 'none' ? paceColor(pace) : undefined
             return (
               <div key={m.id} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 <div className="mini-item">
                   <div>
                     <strong>{m.name}</strong>
-                    <small>{m.type}{m.target ? ` · target ${fmtMetricValue(m.type, m.target)}` : ''}</small>
+                    <small>
+                      {m.type}
+                      {startN != null ? ` · from ${fmtMetricValue(m.type, startN)}` : ''}
+                      {m.target ? ` · target ${fmtMetricValue(m.type, m.target)}` : ''}
+                      {sp ? ` · ${sp.name}` : ''}
+                    </small>
                   </div>
                   {last && <Badge tone="green">{fmtMetricValue(m.type, last.value)}</Badge>}
                   {drafting ? (
@@ -894,17 +941,24 @@ function GoalDetail({ goal }) {
                       Log
                     </button>
                   )}
+                  <button className="btn btn-icon btn-sm" aria-label="Edit metric"
+                    onClick={() => { setEditingMetric(m); setMetricOpen(true) }}><Icon name="edit" size={13} /></button>
                   <button className={`btn btn-icon btn-sm${confirm.isArmed(m.id) ? ' btn-danger' : ''}`}
                     onClick={async () => {
                       if (!confirm.isArmed(m.id)) return confirm.arm(m.id)
-                      await deleteMetric(m.id); metrics.reload()
+                      await deleteMetric(m.id); metrics.reload(); onChanged?.()
                     }}><Icon name="delete" size={13} /></button>
                 </div>
-                {pct != null && (
+                {prog != null && (
                   <div className="score-meter" style={{ height: 6 }}>
-                    <span style={{ width: `${pct}%` }} />
+                    <span style={{ width: `${Math.round(prog * 100)}%`, background: color }} />
                   </div>
                 )}
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', fontSize: 11.5, fontWeight: 600, color: 'var(--text-3)' }}>
+                  {prog != null && <span>{Math.round(prog * 100)}% of the way</span>}
+                  {pace && pace.status !== 'none' && <span style={{ color, fontWeight: 800 }}>{PACE_LABEL[pace.status]}</span>}
+                  {startN == null && num(m.target) != null && <span>No start value, so progress counts from 0. Edit to set one.</span>}
+                </div>
               </div>
             )
           })}
@@ -938,33 +992,70 @@ function GoalDetail({ goal }) {
         </div>
       )}
 
-      <MetricEditor goalId={goal.id} open={metricOpen} onClose={() => setMetricOpen(false)} onSaved={() => metrics.reload()} />
+      <MetricEditor goalId={goal.id} metric={editingMetric} sprints={sprints} open={metricOpen}
+        onClose={() => { setMetricOpen(false); setEditingMetric(null) }}
+        onSaved={() => { metrics.reload(); onChanged?.() }} />
       <LinkPicker kind={picker} goalId={goal.id} onClose={() => setPicker(null)}
         onDone={() => { tasks.reload(); habits.reload() }} />
     </div>
   )
 }
 
-function MetricEditor({ goalId, open, onClose, onSaved }) {
-  const [m, setM] = useState({ name: '', type: 'Number', target: '' })
+const BLANK_METRIC = { name: '', type: 'Number', target: '', start_value: '', sprint_id: '' }
+
+function MetricEditor({ goalId, metric, sprints, open, onClose, onSaved }) {
+  const [m, setM] = useState(BLANK_METRIC)
+  const [saving, setSaving] = useState(false)
+  useEffect(() => {
+    if (!open) return
+    setM(metric ? {
+      name: metric.name, type: metric.type, target: metric.target ?? '',
+      start_value: metric.start_value ?? '', sprint_id: metric.sprint_id || '',
+    } : BLANK_METRIC)
+  }, [open, metric])
+
+  const target = num(m.target), start = num(m.start_value)
+  const hint = target == null ? null
+    : start == null ? `Counts from 0 up to ${m.target}. Set a start value if this should go down, or begin above 0.`
+    : start === target ? 'Start and target are the same, so there is nothing to move.'
+    : `${target > start ? 'Increase' : 'Decrease'} from ${m.start_value} to ${m.target}.`
+
   return (
-    <Modal open={open} onClose={onClose} title="Add metric" width={440} footer={
+    <Modal open={open} onClose={onClose} title={metric ? 'Edit metric' : 'Add metric'} width={460} footer={
       <>
         <button className="btn btn-secondary" onClick={onClose}>Cancel</button>
-        <button className="btn btn-primary" disabled={!m.name.trim()} onClick={async () => {
-          await saveMetric({ ...m, goal_id: goalId })
-          toast.success('Metric added'); setM({ name: '', type: 'Number', target: '' }); onSaved(); onClose()
-        }}>Add</button>
+        <button className="btn btn-primary" disabled={!m.name.trim() || saving} onClick={async () => {
+          setSaving(true)
+          try {
+            await saveMetric({ ...m, id: metric?.id, goal_id: goalId, sort_order: metric?.sort_order })
+            toast.success(metric ? 'Metric updated' : 'Metric added'); onSaved(); onClose()
+          } catch (e) { toast.error(e.message) } finally { setSaving(false) }
+        }}>{saving ? 'Saving…' : metric ? 'Save' : 'Add'}</button>
       </>
     }>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <Field label="Name"><input value={m.name} onChange={(e) => setM({ ...m, name: e.target.value })} placeholder="Monthly revenue" /></Field>
+        <Field label="Name"><input value={m.name} onChange={(e) => setM({ ...m, name: e.target.value })} placeholder="Body weight" /></Field>
         <Field label="Type">
           <select value={m.type} onChange={(e) => setM({ ...m, type: e.target.value })}>
             {METRIC_TYPES.map((t) => <option key={t}>{t}</option>)}
           </select>
         </Field>
-        <Field label="Target"><input value={m.target} onChange={(e) => setM({ ...m, target: e.target.value })} placeholder="e.g. 10000" /></Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Start value" hint="Where you are today.">
+            <input inputMode="decimal" value={m.start_value} onChange={(e) => setM({ ...m, start_value: e.target.value })} placeholder="e.g. 95" />
+          </Field>
+          <Field label="Target" hint="Where you want to end up.">
+            <input inputMode="decimal" value={m.target} onChange={(e) => setM({ ...m, target: e.target.value })} placeholder="e.g. 82" />
+          </Field>
+        </div>
+        {hint && <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-3)', marginTop: -4 }}>{hint}</p>}
+        <Field label="Cycle (optional)"
+          hint="Attach it to a cycle to get an expected-pace line from the start value to the target across that cycle.">
+          <select value={m.sprint_id} onChange={(e) => setM({ ...m, sprint_id: e.target.value })}>
+            <option value="">Not tied to a cycle</option>
+            {(sprints || []).map((sp) => <option key={sp.id} value={sp.id}>{sp.name}</option>)}
+          </select>
+        </Field>
       </div>
     </Modal>
   )
@@ -1034,6 +1125,20 @@ function GoalEditor({ goal, onClose, onSaved }) {
           <Field label="Status">
             <select value={cur.status} onChange={(e) => setG({ ...cur, status: e.target.value })}>
               {GOAL_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </Field>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Target date (optional)" hint="Shown against progress. Without one, the live cycle's end date is used.">
+            <input type="date" value={cur.target_date || ''}
+              onChange={(e) => setG({ ...cur, target_date: e.target.value || null })} />
+          </Field>
+          <Field label="Progress comes from" hint="Auto uses the first of metrics, milestones, then tasks that has data.">
+            <select value={cur.progress_mode || ''} onChange={(e) => setG({ ...cur, progress_mode: e.target.value || null })}>
+              <option value="">Auto</option>
+              <option value="metric">Metrics</option>
+              <option value="milestones">Phase milestones</option>
+              <option value="tasks">Linked tasks</option>
             </select>
           </Field>
         </div>
@@ -1130,7 +1235,8 @@ function CyclesView({ goals, cycleData, cycleIntent }) {
       phases: myPhases.length
         ? myPhases.map((p) => ({
             name: p.name, description: p.description || '',
-            tactics: myTactics.filter((t) => t.phase_id === p.id)
+            milestone_text: p.milestone_text || '',
+            tactics: myTactics.filter((t) => t.phase_id === p.id && !t.ended_week)
               .map((t) => ({ text: t.text, freq: t.freq || 'daily', days: t.days || [], times_per_week: t.times_per_week || 3 })),
           }))
         : DEFAULT_PHASES.map((p) => ({ ...p, tactics: [] })),
@@ -1169,7 +1275,7 @@ function CyclesView({ goals, cycleData, cycleIntent }) {
             const myTactics = (tactics.data || []).filter((x) => x.sprint_id === s.id)
             return (
               <CycleCard key={s.id} sprint={s} phases={myPhases} tactics={myTactics} goal={goal}
-                sprintsAsync={sprints} onEdit={() => setEditing(s)}
+                sprintsAsync={sprints} outcomeData={cycleData} onEdit={() => setEditing(s)}
                 onDuplicate={() => duplicate(s)}
                 onArchive={async () => {
                   await setSprintArchived(s.id, !s.archived)
@@ -1214,6 +1320,7 @@ function CycleEditor({ sprint, cloneFrom, goals, seedGoalId, onClose, onSaved })
   const removedTacticIds = useRef([])
   const existingPhases = useAsync((f) => fetchSprintPhases({ force: f }), [sprint?.id], { enabled: Boolean(sprint?.id) })
   const existingTactics = useAsync((f) => fetchSprintTactics({ force: f }), [sprint?.id], { enabled: Boolean(sprint?.id) })
+  const allMetrics = useAsync((f) => fetchGoalMetrics({ force: f }), [open], { enabled: open })
 
   // Quick setup: skip building three phases by hand and just ask for one
   // action, applied across the whole cycle. Only offered for brand-new,
@@ -1262,6 +1369,8 @@ function CycleEditor({ sprint, cloneFrom, goals, seedGoalId, onClose, onSaved })
     if (!mine.length) return
     setPhaseDrafts(mine.map((p) => ({
       id: p.id, name: p.name, description: p.description || '',
+      milestone_text: p.milestone_text || '', milestone_metric_id: p.milestone_metric_id || '',
+      milestone_target: p.milestone_target ?? '', milestone_done_on: p.milestone_done_on || null,
       tactics: (existingTactics.data || []).filter((t) => t.phase_id === p.id),
     })))
   }, [sprint?.id, existingPhases.data, existingTactics.data]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -1316,7 +1425,13 @@ function CycleEditor({ sprint, cloneFrom, goals, seedGoalId, onClose, onSaved })
       const id = sprint?.id || sprintId
       for (let pi = 0; pi < drafts.length; pi++) {
         const draft = drafts[pi]
-        const phaseId = draft.id || await savePhase({ sprint_id: id, phase_index: pi, name: draft.name, description: draft.description })
+        // Always upsert: this used to create phases only, so a renamed phase
+        // or a new milestone on an existing one would never have saved.
+        const phaseId = await savePhase({
+          id: draft.id, sprint_id: id, phase_index: pi, name: draft.name, description: draft.description,
+          milestone_text: draft.milestone_text, milestone_metric_id: draft.milestone_metric_id,
+          milestone_target: draft.milestone_target, milestone_done_on: draft.milestone_done_on,
+        })
         for (const t of draft.tactics) {
           if (!t.text?.trim()) continue
           await saveTactic({ ...t, id: t.id, phase_id: phaseId, sprint_id: id })
@@ -1466,6 +1581,31 @@ function CycleEditor({ sprint, cloneFrom, goals, seedGoalId, onClose, onSaved })
               <input value={phase.name} style={{ maxWidth: 160, fontSize: 13, fontWeight: 700 }}
                 onChange={(e) => { const n = [...phaseDrafts]; n[pi] = { ...n[pi], name: e.target.value }; setPhaseDrafts(n) }} />
             </div>
+            {(() => {
+              const goalMetrics = (allMetrics.data || []).filter((x) => x.goal_id === cur.goal_id && num(x.target) != null)
+              const setPhase = (patch) => { const n = [...phaseDrafts]; n[pi] = { ...n[pi], ...patch }; setPhaseDrafts(n) }
+              return (
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginBottom: 10 }}>
+                  <Icon name="flag" size={15} style={{ color: 'var(--text-3)' }} />
+                  <input style={{ flex: '1 1 180px' }} value={phase.milestone_text || ''}
+                    placeholder={`Milestone at the end of ${phase.name || 'this phase'} (optional)`}
+                    onChange={(e) => setPhase({ milestone_text: e.target.value })} />
+                  {goalMetrics.length > 0 && (
+                    <>
+                      <select style={{ width: 150 }} value={phase.milestone_metric_id || ''}
+                        onChange={(e) => setPhase({ milestone_metric_id: e.target.value, milestone_target: e.target.value ? phase.milestone_target : '' })}>
+                        <option value="">Tick off by hand</option>
+                        {goalMetrics.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+                      </select>
+                      {phase.milestone_metric_id && (
+                        <input type="number" inputMode="decimal" style={{ width: 80 }} placeholder="reach"
+                          value={phase.milestone_target ?? ''} onChange={(e) => setPhase({ milestone_target: e.target.value })} />
+                      )}
+                    </>
+                  )}
+                </div>
+              )
+            })()}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 8 }}>
               {phase.tactics.map((t, ti) => (
                 <div key={ti} style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -1494,6 +1634,17 @@ function CycleEditor({ sprint, cloneFrom, goals, seedGoalId, onClose, onSaved })
                           }}>{lbl[0]}</button>
                       ))}
                     </div>
+                  )}
+                  {(t.starts_week || t.ended_week) && (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      <Badge tone="muted">
+                        {t.starts_week && t.ended_week ? `Weeks ${t.starts_week}–${t.ended_week}`
+                          : t.ended_week ? `Ended after week ${t.ended_week}` : `From week ${t.starts_week}`}
+                      </Badge>
+                      {t.ended_week && (
+                        <button type="button" className="btn btn-ghost btn-xs" onClick={() => updateTactic(pi, ti, { ended_week: null })}>Restore</button>
+                      )}
+                    </span>
                   )}
                   <button className="btn btn-icon btn-sm" onClick={() => removeTactic(pi, ti)}><Icon name="close" size={13} /></button>
                 </div>
@@ -1697,6 +1848,9 @@ function RetrosView({ goals, sprints, cycleData }) {
                           {goal?.title ? `${goal.title} · ` : ''}ran {pretty(s.start_date)} → {pretty(s.end_date)}
                           {rate.total > 0 ? ` · met ${rate.done} of ${rate.total} commitments` : ''}.
                         </p>
+                        {cycleOutcomeSummary(s, cycleData?.metrics?.data, cycleData?.logs?.data).map((line, i) => (
+                          <p key={i} className="hero-copy" style={{ marginTop: 4 }}>{line}</p>
+                        ))}
                         <div className="hero-actions">
                           <button className="btn btn-primary" onClick={() => setEditing(s)}>
                             <Icon name="edit" size={16} /> Write the retro
@@ -1720,6 +1874,14 @@ function RetrosView({ goals, sprints, cycleData }) {
                     <CardHead title={s.name} sub={`${goal?.title || ''} · ended ${pretty(s.end_date)}`}
                       right={<button className="btn btn-ghost btn-sm" onClick={() => setEditing(s)}>
                         <Icon name="edit" size={14} /> Edit</button>} />
+                    {cycleOutcomeSummary(s, cycleData?.metrics?.data, cycleData?.logs?.data).length > 0 && (
+                      <div style={{ marginBottom: 12 }}>
+                        <div className="form-section-label">Outcome</div>
+                        {cycleOutcomeSummary(s, cycleData?.metrics?.data, cycleData?.logs?.data).map((line, i) => (
+                          <p key={i} style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.55 }}>{line}</p>
+                        ))}
+                      </div>
+                    )}
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       <RetroBit label="Biggest win" text={r.win} />
                       <RetroBit label="Biggest lesson" text={r.lesson} />

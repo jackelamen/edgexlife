@@ -135,7 +135,12 @@ export function tacticsForWeek(phases, tactics, week, sp) {
     })
     .map((p) => p.id)
   if (!phaseIds.length) return []
-  return tactics.filter((t) => phaseIds.includes(t.phase_id))
+  // starts_week / ended_week let the weekly review stop or swap an action
+  // mid-cycle: weeks outside its window simply never see it, so scored
+  // history stays exactly as it was. Every scoring path reads through here.
+  return tactics.filter((t) => phaseIds.includes(t.phase_id)
+    && (!t.starts_week || week >= t.starts_week)
+    && (!t.ended_week || week <= t.ended_week))
 }
 
 /** The stable identity used as a checks-object key — see saveTactic in data.js. */

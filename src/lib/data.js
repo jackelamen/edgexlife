@@ -51,7 +51,7 @@ export const TACTIC_FREQS = ['daily', 'weekly', 'xperweek', 'custom', 'onetime']
 
 export const fetchGoals = (o) => cachedQuery('goals', async () =>
   unwrap(await supabase.from('goals')
-    .select('id,title,area,why,status,identity_thread,featured,featured_photo_kind,featured_photo_ref,created_at,updated_at')
+    .select('id,title,area,why,status,identity_thread,featured,featured_photo_kind,featured_photo_ref,target_date,progress_mode,created_at,updated_at')
     .order('created_at', { ascending: false })), { ttlMs: TTL.goals, ...o })
 
 export async function saveGoal(goal) {
@@ -61,6 +61,7 @@ export async function saveGoal(goal) {
     featured: Boolean(goal.featured),
     featured_photo_kind: goal.featured_photo_kind || null,
     featured_photo_ref: goal.featured_photo_ref || null,
+    target_date: goal.target_date || null, progress_mode: goal.progress_mode || null,
     updated_at: new Date().toISOString(),
   }
   if (payload.featured) {
@@ -96,10 +97,12 @@ export async function saveVision(area, content) {
 
 export const fetchGoalMetrics = (o) => cachedQuery('goal-metrics', async () =>
   unwrap(await supabase.from('goal_metrics')
-    .select('id,goal_id,name,type,target,sort_order').order('sort_order')), { ttlMs: TTL.goals, ...o })
+    .select('id,goal_id,name,type,target,start_value,sprint_id,sort_order').order('sort_order')), { ttlMs: TTL.goals, ...o })
 
 export async function saveMetric(m) {
-  const payload = { goal_id: m.goal_id, name: m.name, type: m.type, target: m.target ?? null,
+  const blank = (v) => (v === '' || v == null ? null : v)
+  const payload = { goal_id: m.goal_id, name: m.name, type: m.type, target: blank(m.target),
+    start_value: blank(m.start_value), sprint_id: m.sprint_id || null,
     sort_order: m.sort_order ?? 0 }
   const { error } = m.id
     ? await supabase.from('goal_metrics').update(payload).eq('id', m.id)
@@ -195,17 +198,31 @@ export async function setSprintArchived(id, archived) {
 
 export const fetchSprintPhases = (o) => cachedQuery('sprint-phases', async () =>
   unwrap(await supabase.from('sprint_phases')
-    .select('id,sprint_id,phase_index,name,description').order('phase_index')), { ttlMs: TTL.goals, ...o })
+    .select('id,sprint_id,phase_index,name,description,milestone_text,milestone_metric_id,milestone_target,milestone_done_on').order('phase_index')), { ttlMs: TTL.goals, ...o })
 
 export async function savePhase(p) {
+  const blank = (v) => (v === '' || v == null ? null : v)
   const payload = { sprint_id: p.sprint_id, phase_index: p.phase_index, name: p.name,
-    description: p.description || null }
+    description: p.description || null,
+    milestone_text: p.milestone_text?.trim() || null,
+    milestone_metric_id: p.milestone_metric_id || null,
+    milestone_target: blank(p.milestone_target),
+    milestone_done_on: p.milestone_done_on || null }
   const { data, error } = p.id
     ? await supabase.from('sprint_phases').update(payload).eq('id', p.id).select('id').single()
     : await supabase.from('sprint_phases').insert({ ...payload, user_id: await uid() }).select('id').single()
   if (error) throw error
   invalidate('sprint-phases')
   return data.id
+}
+
+/** Manual milestone toggle. A dedicated narrow write, same reasoning as
+    setSprintArchived: ticking a milestone shouldn't re-send the whole phase. */
+export async function setMilestoneDone(phaseId, doneOn) {
+  const { error } = await supabase.from('sprint_phases')
+    .update({ milestone_done_on: doneOn || null }).eq('id', phaseId)
+  if (error) throw error
+  invalidate('sprint-phases')
 }
 
 export async function deletePhase(id) {
@@ -216,7 +233,7 @@ export async function deletePhase(id) {
 
 export const fetchSprintTactics = (o) => cachedQuery('sprint-tactics', async () =>
   unwrap(await supabase.from('sprint_tactics')
-    .select('id,local_id,phase_id,sprint_id,text,freq,days,times_per_week,sort_order')
+    .select('id,local_id,phase_id,sprint_id,text,freq,days,times_per_week,sort_order,starts_week,ended_week')
     .order('sort_order')), { ttlMs: TTL.goals, ...o })
 
 /**
@@ -229,7 +246,8 @@ export const fetchSprintTactics = (o) => cachedQuery('sprint-tactics', async () 
 export async function saveTactic(t) {
   const payload = { phase_id: t.phase_id, sprint_id: t.sprint_id, text: t.text,
     freq: t.freq || 'daily', days: t.days ?? null,
-    times_per_week: t.times_per_week ?? null, sort_order: t.sort_order ?? 0 }
+    times_per_week: t.times_per_week ?? null, sort_order: t.sort_order ?? 0,
+    starts_week: t.starts_week ?? null, ended_week: t.ended_week ?? null }
   if (t.id) {
     const { error } = await supabase.from('sprint_tactics').update(payload).eq('id', t.id)
     if (error) throw error
@@ -242,6 +260,39 @@ export async function saveTactic(t) {
     if (error) throw error
   }
   invalidate('sprint-tactics')
+}
+
+/** Stop an action after `week` without touching the weeks already scored —
+    the review's "drop it" decision. Deleting the row instead would erase its
+    history from the cycle's rate, which flatters a score by removing the
+    thing that was dragging it. */
+export async function endTactic(id, week) {
+  const { error } = await supabase.from('sprint_tactics').update({ ended_week: week }).eq('id', id)
+  if (error) throw error
+  invalidate('sprint-tactics')
+}
+
+/** Swap an action for a new version starting `fromWeek`: the old one ends
+    the week before, the new one begins, and both stay in the history. */
+export async function replaceTactic(oldTactic, next, fromWeek) {
+  await saveTactic({ ...next, id: undefined, phase_id: oldTactic.phase_id, sprint_id: oldTactic.sprint_id,
+    sort_order: oldTactic.sort_order, starts_week: fromWeek, ended_week: null })
+  await endTactic(oldTactic.id, fromWeek - 1)
+}
+
+/** Merge one review decision into sprints.reflections, touching only that
+    column. saveSprint would write the whole row from client state and can
+    clobber a checkbox tap that landed in between. */
+export async function saveSprintDecision(sprintId, weekId, tacticKey, decision) {
+  const { data, error: readErr } = await supabase.from('sprints').select('reflections').eq('id', sprintId).single()
+  if (readErr) throw readErr
+  const refl = data?.reflections || {}
+  const decisions = { ...(refl.decisions || {}) }
+  decisions[weekId] = { ...(decisions[weekId] || {}), [tacticKey]: { action: decision, at: new Date().toISOString() } }
+  const { error } = await supabase.from('sprints')
+    .update({ reflections: { ...refl, decisions }, updated_at: new Date().toISOString() }).eq('id', sprintId)
+  if (error) throw error
+  invalidate('sprints')
 }
 
 export async function deleteTactic(id) {
