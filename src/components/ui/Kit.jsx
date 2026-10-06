@@ -258,7 +258,7 @@ export function ScaleField({ label, value, onChange, low, high, min = 1, max = 5
 }
 
 export function Empty({ icon = 'inbox', title, children, action }) {
-  // Accepts a Material Symbols name, or a React component for the pages
+  // Accepts an icon name (see ui/Icon.jsx), or a React component for the pages
   // still on the older API.
   const Glyph = typeof icon === 'function' ? icon : null
   return (

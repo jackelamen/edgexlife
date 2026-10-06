@@ -261,16 +261,13 @@ h1, h2, h3, h4, .page-title {
   line-height: 1.14;
 }
 
-/* Material Symbols, same as the originals — filled variant marks active state */
+/* Icons are Phosphor SVGs (components/ui/Icon.jsx). The span carries the
+   size through font-size; the svg inside is 1em. */
 .icon {
-  font-family: 'Material Symbols Rounded';
-  font-variation-settings: 'FILL' 0, 'wght' 330, 'GRAD' 0, 'opsz' 24;
-  line-height: 1;
-  display: inline-block;
-  vertical-align: middle;
-  user-select: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  line-height: 1; vertical-align: middle; user-select: none; flex-shrink: 0;
 }
-.icon.fill { font-variation-settings: 'FILL' 1, 'wght' 380, 'GRAD' 0, 'opsz' 24; }
+.icon > svg { display: block; width: 1em; height: 1em; }
 .icon.spin { animation: icon-spin 1s linear infinite; }
 @keyframes icon-spin { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }
 
@@ -338,7 +335,6 @@ h1, h2, h3, h4, .page-title {
   content: ''; position: absolute; left: -14px; top: 9px; bottom: 9px; width: 3px;
   border-radius: 0 3px 3px 0; background: var(--accent);
 }
-.nav-item.active .icon { font-variation-settings: 'FILL' 1, 'wght' 380, 'GRAD' 0, 'opsz' 24; }
 .nav-kbd {
   margin-left: auto; font-family: inherit; font-size: 11px; font-weight: 500; color: var(--text-3);
   border: 1px solid var(--border-med); border-radius: 6px; padding: 1px 6px; background: var(--white);
@@ -1904,8 +1900,8 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
 .check-row.done .check-box { background: var(--accent); border-color: var(--accent); }
 /* The checkmark itself gets a small spring-pop rather than just appearing
    — the one animation most people on this app will trigger the most
-   (ticking a habit or cycle action). Material Symbols are a font glyph,
-   not a path, so a stroke draw-in isn't available; scale+fade reads as
+   (ticking a habit or cycle action). Icons are single SVG glyphs,
+   so a stroke draw-in isn't practical; scale+fade reads as
    the same "just landed" feeling. Plays whenever `.done` is newly present
    on the box, which covers both an actual tap and the row mounting
    already-done (a small synchronized flourish across the list on load,
@@ -2607,3 +2603,8 @@ input[type=checkbox] { width: auto; accent-color: var(--accent); }
     var(--bg);
 }
 .login-card { width: 100%; max-width: 400px; padding: 32px; box-shadow: var(--shadow-lg); animation: page-in .5s var(--ease) both; }
+
+/* Tile fills are light tints; at full strength on a dark card they read as
+   grey slabs, so dark mode turns them down. */
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .tile-fill { opacity: .11; } }
+:root[data-theme="dark"] .tile-fill { opacity: .11; }

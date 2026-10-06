@@ -7,7 +7,7 @@ import { useAuth } from '../../store/authStore'
 
 /*
   Sidebar: 252px, follows the theme (light/dark) with a hairline edge, section
-  labels, and Material Symbols that switch to their FILL variant when active.
+  labels, and Phosphor icons that switch to their filled weight when active.
   The module accent tints the active item via --accent-rgb.
 */
 
