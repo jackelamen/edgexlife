@@ -176,7 +176,7 @@ function TodayView({ settings, index, onNavFasting }) {
             <p className="hero-copy">{copy}</p>
             {streak > 1 && (
               <span className="badge badge-orange" style={{ marginTop: 10, width: 'fit-content' }}>
-                🔥 {streak} day logging streak
+                <Icon name="local_fire_department" size={14} fill /> {streak} day logging streak
               </span>
             )}
           </div>
@@ -526,7 +526,7 @@ function LogEditor({ date, settings, onClose, onSaved, onBodyweightSynced }) {
       // page opens on a streak that happens to equal a milestone.
       const dates = await fetchHealthIndex({ force: true })
       const hit = milestoneHit(currentStreak(dates))
-      if (hit) milestoneToast(`🔥 ${hit}-day logging streak!`)
+      if (hit) milestoneToast(`${hit}-day logging streak!`)
       else toast.success('Log saved')
       onSaved?.(); onClose()
     } catch (e) { toast.error(e.message) } finally { setSaving(false) }
@@ -785,9 +785,9 @@ function TrendsView({ settings, index }) {
             <div className="insight-card"><span>Hit rate</span><strong className="tnum">{hit != null ? hit + '%' : '--'}</strong><small>days at target</small></div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-[1.15fr_1fr] gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-[1.15fr_1fr] gap-4 items-start">
             <Card>
-              <CardHead title={meta.label} sub={`${rows.length} logged days`} />
+              <CardHead title={meta.label} sub={rows.length >= 14 ? `${rows.length} logged days · bold line is the 7-day average` : `${rows.length} logged days`} />
               <TrendChart
                 points={points}
                 target={target}

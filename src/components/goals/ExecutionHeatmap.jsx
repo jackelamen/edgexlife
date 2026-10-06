@@ -69,7 +69,7 @@ export default function ExecutionHeatmap({ sprint, phases, tactics }) {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, gap: 10, flexWrap: 'wrap' }}>
         <div className="streak-chart-title" style={{ marginBottom: 0 }}>Every commitment, by day</div>
         {flex.total > 0 && (
-          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)' }}>
+          <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-3)' }}>
             Weekly targets · {flex.met} of {flex.total} met
           </span>
         )}
@@ -86,7 +86,7 @@ export default function ExecutionHeatmap({ sprint, phases, tactics }) {
           {Array.from({ length: weeks }).map((_, wi) => (
             <text key={wi} x={LABEL_W + wi * (CELL + GAP) + CELL / 2} y={HEADER_H - 4}
               textAnchor="middle" fontSize="8.5" fontWeight={wi + 1 === cw ? '800' : '700'}
-              fill={wi + 1 === cw ? '#0ea5e9' : 'var(--text-3)'}>
+              fill={wi + 1 === cw ? 'var(--accent)' : 'var(--text-3)'}>
               {wi + 1}
             </text>
           ))}
@@ -107,10 +107,10 @@ export default function ExecutionHeatmap({ sprint, phases, tactics }) {
                       {cell.total ? `: ${cell.done} of ${cell.total} done` :
                         cell.state === 'future' ? ': upcoming' : ': nothing due'}
                     </title>
-                    <rect x={x} y={y} width={CELL} height={CELL} rx={4}
+                    <rect x={x} y={y} width={CELL} height={CELL} rx={5}
                       fill={fill || 'var(--white-soft)'}
                       opacity={fill ? (cell.state === 'none' ? .34 : 1) : cell.state === 'future' ? .45 : .8}
-                      stroke={cell.isToday ? '#0ea5e9' : 'transparent'} strokeWidth={cell.isToday ? 2 : 0} />
+                      stroke={cell.isToday ? 'var(--accent)' : 'transparent'} strokeWidth={cell.isToday ? 2 : 0} />
                   </g>
                 )
               })}

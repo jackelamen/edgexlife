@@ -2,12 +2,12 @@
 import { dateKey } from './dates'
 
 export const WK_TYPES = [
-  { id: 'Strength', label: 'Strength', em: '🏋️' },
-  { id: 'Cardio', label: 'Cardio', em: '🏃' },
-  { id: 'Mobility', label: 'Mobility', em: '🧘' },
-  { id: 'HIIT', label: 'HIIT', em: '⚡' },
-  { id: 'Sport', label: 'Sport', em: '🏅' },
-  { id: 'Other', label: 'Other', em: '💪' },
+  { id: 'Strength', label: 'Strength', em: '🏋️', icon: 'fitness_center' },
+  { id: 'Cardio', label: 'Cardio', em: '🏃', icon: 'exercise' },
+  { id: 'Mobility', label: 'Mobility', em: '🧘', icon: 'self_improvement' },
+  { id: 'HIIT', label: 'HIIT', em: '⚡', icon: 'bolt' },
+  { id: 'Sport', label: 'Sport', em: '🏅', icon: 'workspace_premium' },
+  { id: 'Other', label: 'Other', em: '💪', icon: 'favorite' },
 ]
 
 export const DEFAULT_EXERCISE_DB = {

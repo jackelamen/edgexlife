@@ -29,6 +29,7 @@ import { isReviewWindow, reviewTargetWeekId, prettyWeek } from '../lib/review'
 import { IDENTITY_STATEMENT, identityThreadByKey } from '../lib/identity'
 import IntentionCard from '../components/today/IntentionCard'
 import { isHabitDueToday } from '../lib/habits'
+import { smoothPath } from '../lib/chart'
 
 /*
   Mission control.
@@ -500,7 +501,6 @@ export default function TodayPage() {
              below the header isn't also the thing standing between you
              and today's checklist. */}
       <div className="hero-card hero-mc-card today-order-hero" style={{ marginBottom: 14 }}>
-        <HeroEdge />
         <div className="hero-mc">
           <div className="hero-mc-main">
             <div className="hero-eyebrow">{greeting}, Jack</div>
@@ -944,13 +944,14 @@ function FocusTrend({ points }) {
   const min = Math.min(...smooth) - 4, max = Math.max(...smooth) + 4
   const x = (i) => (i / Math.max(1, smooth.length - 1)) * w
   const y = (v) => pad + (1 - (v - min) / Math.max(1, max - min)) * (h - pad * 2)
-  const line = smooth.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join(' ')
+  const line = smoothPath(smooth.map((v, i) => [x(i), y(v)]))
   const area = `${line} L${w} ${h} L0 ${h} Z`
   return (
     <div className="focus-trend">
       <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} aria-hidden="true">
-        <path d={area} fill="var(--focus-hue)" opacity=".12" />
-        <path d={line} fill="none" stroke="var(--focus-hue)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        <path d={area} fill="var(--focus-hue)" opacity=".10" />
+        <path d={line} fill="none" stroke="var(--focus-hue)" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round" />
+        <circle cx={x(smooth.length - 1)} cy={y(smooth[smooth.length - 1])} r="6" fill="var(--focus-hue)" opacity=".18" />
         <circle cx={x(smooth.length - 1)} cy={y(smooth[smooth.length - 1])} r="3" fill="var(--focus-hue)" />
       </svg>
       <span className={`focus-delta is-${tone}`}>{words}<small> · 30 days</small></span>
@@ -995,24 +996,3 @@ function HeroStat({ mod, value, unit, label }) {
   )
 }
 
-/*
-  The brand mark's three bars — one per life-system — scaled up and bled
-  off the card's right edge as texture. Geometry is copied verbatim from
-  components/shell/BrandMark.jsx (and therefore from
-  public/icons/favicon.svg); if that mark is ever redrawn, redraw this
-  from the same source.
-
-  Using the logo as the hero's ornament rather than a generic blob is what
-  gives Mission control an identity of its own: every other hero in the
-  app is a flat module colour, and this one wears the mark that means
-  "all three systems at once".
-*/
-function HeroEdge() {
-  return (
-    <svg className="hero-edge" viewBox="0 0 48 48" aria-hidden="true" focusable="false">
-      <polygon points="9.89,11.70 28.44,11.70 25.21,17.75 9.89,17.75" fill="#d76d24" />
-      <polygon points="9.89,20.98 33.27,20.98 30.05,27.02 9.89,27.02" fill="#11ae95" />
-      <polygon points="9.89,30.25 38.11,30.25 34.89,36.30 9.89,36.30" fill="#953ca4" />
-    </svg>
-  )
-}

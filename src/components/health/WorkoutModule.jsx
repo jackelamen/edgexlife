@@ -313,7 +313,7 @@ function PlanTab({ plan, weekOffset, db, goals, sessions, onStart, bodyweightKg 
                   <span className="add-hint">Rest</span>
                 ) : day ? (
                   <>
-                    <span className="wt-icon">{type?.em || '💪'}</span>
+                    <span className="wt-icon"><Icon name={type?.icon || 'fitness_center'} size={18} /></span>
                     <span className="wt-name">{day.type}</span>
                     {day.exercises?.length > 0 && (
                       <span className="wt-meta">{day.exercises.length} ex</span>
@@ -526,7 +526,7 @@ function DayModal({ date, plan, effectiveByDate, db, allDates, sessions = [], on
         {WK_TYPES.map((t) => (
           <button key={t.id} className={`wt-type-btn${type === t.id ? ' selected' : ''}`}
             onClick={() => selectType(t.id)}>
-            <span className="em">{t.em}</span>{t.label}
+            <span className="em"><Icon name={t.icon} size={22} /></span>{t.label}
           </button>
         ))}
       </div>
@@ -876,7 +876,7 @@ function SessionTab({ session, setSession, db, goals, plan, pastSessions, exerci
 
       <div className="session-type-row">
         <select value={session.type} onChange={(e) => set({ type: e.target.value })} style={{ fontSize: 13, padding: '8px 10px' }}>
-          {WK_TYPES.map((t) => <option key={t.id} value={t.id}>{t.em} {t.label}</option>)}
+          {WK_TYPES.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
         </select>
         <input type="date" value={session.date} onChange={(e) => set({ date: e.target.value })}
           style={{ fontSize: 13, padding: '8px 10px' }} />
@@ -947,7 +947,7 @@ function SessionTab({ session, setSession, db, goals, plan, pastSessions, exerci
                     const qualifier = goalQualifier(g)
                     return (
                       <Badge key={g.id} tone="blue">
-                        🎯 {Math.round(best)}{unit} → {Math.round(g.target)}{unit}{qualifier ? ` ${qualifier}` : ''} · {Math.round(pct)}%
+                        <Icon name="target" size={13} /> {Math.round(best)}{unit} → {Math.round(g.target)}{unit}{qualifier ? ` ${qualifier}` : ''} · {Math.round(pct)}%
                       </Badge>
                     )
                   })}
@@ -1223,7 +1223,7 @@ function DatabaseTab({ db, onSaved }) {
               {WK_TYPES.map((t) => (
                 <button key={t.id} className={`db-bodypart-btn${t.id === templateType ? ' active' : ''}`}
                   onClick={() => setTemplateType(t.id)}>
-                  {t.em} {t.label}
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}><Icon name={t.icon} size={15} />{t.label}</span>
                   <span style={{ fontSize: 11, opacity: .7 }}>{(templates[t.id] || []).length}</span>
                 </button>
               ))}
@@ -1350,7 +1350,7 @@ function HistoryTab({ sessions, onEdit, onTab, bodyweightKg = 70, activeSessionI
                   </div>
                   <div>
                     <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 5 }}>
-                      {type?.em} {s.type}
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Icon name={type?.icon || 'fitness_center'} size={15} />{s.type}</span>
                     </div>
                     <div className="sl-chips">
                       {(s.exercises || []).slice(0, 4).map((e, i) => (
@@ -1669,7 +1669,7 @@ function ProgressTab({ sessions, exGoals, db, bodyweightKg = 70 }) {
       const next = [25, 50, 75].find((m) => pct >= m && !hit.has(m))
       if (!next || milestoneInFlight.current.has(goal.id)) continue
       milestoneInFlight.current.add(goal.id)
-      toast.success(`${goal.exercise}: ${next}% of the way there 💪`)
+      toast.success(`${goal.exercise}: ${next}% of the way there`)
       saveExerciseGoal({ ...goal, milestonesHit: [...hit, next] })
         .then(() => exGoals.reload())
         .catch(() => {})
@@ -1681,7 +1681,7 @@ function ProgressTab({ sessions, exGoals, db, bodyweightKg = 70 }) {
     try {
       await saveExerciseGoal({ ...goal, celebratedAt: new Date().toISOString() })
       exGoals.reload()
-      toast.success('Goal reached! 🎉')
+      toast.success('Goal reached!')
     } catch (e) { toast.error(e.message) }
   }
 
@@ -1799,7 +1799,7 @@ function ProgressTab({ sessions, exGoals, db, bodyweightKg = 70 }) {
                       {GOAL_MODES.find((m) => m.value === goal.mode)?.label} &middot; since {pretty(goal.startedAt)} &middot; day {daysIn}
                     </div>
                     <div style={{ fontSize: 11.5, fontWeight: 700, marginTop: 3, color: daysSincePR != null && daysSincePR >= 14 ? 'var(--orange)' : 'var(--text-2)' }}>
-                      {daysSincePR == null ? `No PR yet · day ${daysIn} on this goal` : daysSincePR === 0 ? 'New PR today 🔥' : `Last PR ${daysSincePR}d ago`}
+                      {daysSincePR == null ? `No PR yet · day ${daysIn} on this goal` : daysSincePR === 0 ? 'New PR today' : `Last PR ${daysSincePR}d ago`}
                     </div>
                   </div>
                 </div>
@@ -1847,7 +1847,7 @@ function ProgressTab({ sessions, exGoals, db, bodyweightKg = 70 }) {
                       {Math.round(pct)}% of the way from {Math.round(goal.startingValue || 0)}{unit} to {Math.round(goal.target)}{unit}
                     </div>
                     <div style={{ fontSize: 11, color: daysSincePR != null && daysSincePR >= 14 ? 'var(--orange)' : 'var(--text-3)', fontWeight: 700, marginTop: 3 }}>
-                      {daysSincePR == null ? `No PR yet · day ${daysIn} on this goal` : daysSincePR === 0 ? 'New PR today 🔥' : `Last PR ${daysSincePR}d ago`}
+                      {daysSincePR == null ? `No PR yet · day ${daysIn} on this goal` : daysSincePR === 0 ? 'New PR today' : `Last PR ${daysSincePR}d ago`}
                     </div>
                   </Card>
                 )

@@ -348,6 +348,13 @@ function CycleCard({ sprint, phases, tactics, goal, compact, sprintsAsync, outco
   const weekRows = tacticWeekRows(phases, tactics, sprint, week)
   const weekDone = weekRows.reduce((n, r) => n + r.done, 0)
   const weekPossible = weekRows.reduce((n, r) => n + r.possible, 0)
+  // Where we are in the cycle's calendar, for the time bar and the chips.
+  const dayMs = 86400000
+  const toDay = (iso) => Math.round(new Date(`${iso}T00:00:00`).getTime() / dayMs)
+  const spanDays = sprint.start_date && sprint.end_date ? Math.max(1, toDay(sprint.end_date) - toDay(sprint.start_date) + 1) : 0
+  const elapsedDays = spanDays ? Math.max(0, Math.min(spanDays, toDay(today()) - toDay(sprint.start_date) + 1)) : 0
+  const timePct = spanDays ? Math.round((elapsedDays / spanDays) * 100) : 0
+  const daysLeft = spanDays && !ended ? Math.max(0, spanDays - elapsedDays) : null
 
   // Optimistic, same pattern as TodayPage's toggleAction: write the new
   // week_checks into sprintsAsync's own cache before the network call
@@ -424,7 +431,7 @@ function CycleCard({ sprint, phases, tactics, goal, compact, sprintsAsync, outco
   }
 
   return (
-    <div className="cycle-card" style={{ borderLeftColor: areaColor(goal?.area) }}>
+    <div className="cycle-card" style={{ '--cycle-hue': areaColor(goal?.area) }}>
       <div className="cycle-header">
         {/* onAccent defaults to true, meant for the ring sitting on a solid
             accent background (hero cards). This card is plain white, so
@@ -436,7 +443,7 @@ function CycleCard({ sprint, phases, tactics, goal, compact, sprintsAsync, outco
         <div className="cycle-ring-section" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}
           title={`Commitment rate: ${rate.done} of ${rate.total} commitments met on days that have fully elapsed`}>
           {rate.pct != null ? (
-            <Ring score={rate.pct} size={72} stroke={7} sub="rate" onAccent={false} />
+            <Ring score={rate.pct} size={88} stroke={8} sub="rate" onAccent={false} />
           ) : (
             // Too few elapsed commitment-days for a percentage to mean
             // anything yet — show the raw count rather than a number one
@@ -462,10 +469,14 @@ function CycleCard({ sprint, phases, tactics, goal, compact, sprintsAsync, outco
             <span className="cycle-goal-link">{goal?.title || 'No goal'}</span>
           </div>
           <div className="cycle-name">{sprint.name}</div>
-          {sprint.outcome && <p style={{ fontSize: 12.5, color: 'var(--text-2)' }}>{sprint.outcome}</p>}
-          <div style={{ fontSize: 11.5, color: 'var(--text-3)', marginTop: 4 }}>
-            {sprint.start_date || '—'} → {sprint.end_date || '—'}
-            {rate.total > 0 && ` · ${rate.done} of ${rate.total} commitments met`}
+          {sprint.outcome && <p className="cycle-outcome-line">{sprint.outcome}</p>}
+          <div className="cycle-chips">
+            {sprint.start_date && sprint.end_date && (
+              <span className="cycle-chip"><Icon name="calendar_month" size={14} />{prettyShort(sprint.start_date)} to {prettyShort(sprint.end_date)}</span>
+            )}
+            <span className="cycle-chip"><Icon name="target" size={14} />{ended ? `${totalWeeks} weeks` : `Week ${cw} of ${totalWeeks}`}</span>
+            {rate.total > 0 && <span className="cycle-chip"><Icon name="check_circle" size={14} />{rate.done} of {rate.total} met</span>}
+            {daysLeft != null && <span className="cycle-chip"><Icon name="schedule" size={14} />{daysLeft === 0 ? 'Last day' : `${daysLeft} ${daysLeft === 1 ? 'day' : 'days'} left`}</span>}
           </div>
         </div>
         <div className="cycle-actions">
@@ -476,10 +487,16 @@ function CycleCard({ sprint, phases, tactics, goal, compact, sprintsAsync, outco
           {onEdit && <button className="btn btn-icon btn-sm" onClick={onEdit}><Icon name="edit" size={15} /></button>}
           {onDelete && <button className="btn btn-icon btn-sm" onClick={onDelete}><Icon name="delete" size={15} /></button>}
           <button className={`cycle-toggle-btn${open ? ' open' : ''}`} onClick={() => setOpen(!open)}>
-            <Icon name={open ? 'expand_less' : 'expand_more'} size={16} /> {open ? 'Collapse' : 'Expand'}
+            <Icon name={open ? 'expand_less' : 'expand_more'} size={16} /><span className="cycle-toggle-label">{open ? 'Collapse' : 'Expand'}</span>
           </button>
         </div>
       </div>
+
+      {spanDays > 0 && (
+        <div className="cycle-time" title={`${timePct}% of the cycle has elapsed`}>
+          <span style={{ width: `${timePct}%` }} />
+        </div>
+      )}
 
       {ended && (onRetro || onCompleteGoal) && (
         <div className="cycle-complete">
@@ -526,8 +543,8 @@ function CycleCard({ sprint, phases, tactics, goal, compact, sprintsAsync, outco
           <div className="cycle-section-title">
             <span>
               Week {week} of {totalWeeks}
-              <span style={{ fontWeight: 600, color: 'var(--text-3)', marginLeft: 8, fontSize: 11 }}>
-                · {weekPossible === 0 ? 'nothing due yet' : `${weekDone} of ${weekPossible} done so far`}
+              <span className="cycle-week-sub">
+                {weekPossible === 0 ? 'nothing due yet' : `${weekDone} of ${weekPossible} done so far`}
               </span>
             </span>
             <div style={{ display: 'flex', gap: 4 }}>
@@ -546,7 +563,7 @@ function CycleCard({ sprint, phases, tactics, goal, compact, sprintsAsync, outco
           {!weekTactics.length ? (
             <Empty icon="target" title="No actions in this phase yet" />
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div className="tactic-list">
               {weekTactics.map((t) => (
                 <TacticRow key={t.id} tactic={t} checks={checks} sprint={sprint} week={week}
                   onToggleDay={(d) => toggle(t, d)}
@@ -571,11 +588,11 @@ function TacticRow({ tactic: t, checks, sprint, week, onToggleDay, onToggleXpw, 
   const anySwapped = isCustom && effDays.some((d, i) => d !== (t.days || [])[i])
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div className="tactic-row">
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
         <div style={{ minWidth: 0, flex: '1 1 220px' }}>
-          <div style={{ fontSize: 13.5, fontWeight: 700 }}>{t.text}</div>
-          <div style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div className="tactic-text">{t.text}</div>
+          <div className="tactic-meta">
             {t.freq === 'xperweek' ? `${xpwDoneCount(t, checks)}/${n} this week` :
               isCustom ? effDays.map((d) => DAY_LABELS[d]).join(', ') :
               t.freq}
@@ -1163,7 +1180,7 @@ function GoalEditor({ goal, onClose, onSaved }) {
             try {
               const justCompleted = goal?.id && goal.status !== 'completed' && cur.status === 'completed'
               await saveGoal({ ...cur, id: goal?.id })
-              if (justCompleted) toast.success(`🎉 Goal completed: "${cur.title}"`, { duration: 4500 })
+              if (justCompleted) toast.success(`Goal completed: "${cur.title}"`, { duration: 4500 })
               else toast.success(goal?.id ? 'Goal updated' : 'Goal created')
               setG(null); onSaved(); onClose()
             } catch (e) { toast.error(e.message) } finally { setSaving(false) }
@@ -1912,7 +1929,7 @@ function RetrosView({ goals, sprints, cycleData }) {
                   <div key={s.id} className="hero-card" style={{ background: areaColor(goal?.area) || 'var(--accent)' }}>
                     <div className="hero-content">
                       <div>
-                        <div className="hero-eyebrow">Cycle complete 🎉</div>
+                        <div className="hero-eyebrow">Cycle complete</div>
                         <div className="hero-h" style={{ fontSize: 26 }}>{s.name}</div>
                         <p className="hero-copy">
                           {goal?.title ? `${goal.title} · ` : ''}ran {pretty(s.start_date)} → {pretty(s.end_date)}

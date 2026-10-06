@@ -199,7 +199,7 @@ function Dashboard({ latest, notes, todayCheckins, index, history, onChanged, on
             <p style={{ color: 'rgba(255,255,255,.68)', maxWidth: 560 }}>{copy}</p>
             {streak > 1 && (
               <span className="badge badge-orange" style={{ marginTop: 4, width: 'fit-content' }}>
-                🔥 {streak} day check-in streak{longest > streak ? ` · ${longest}-day best` : ''}
+                <Icon name="local_fire_department" size={14} fill /> {streak} day check-in streak{longest > streak ? ` · ${longest}-day best` : ''}
               </span>
             )}
           </div>
@@ -545,7 +545,7 @@ function CheckinView({ date, entryId, onSaved, onDeleted, onNav }) {
       if (isNew) {
         const rows = await fetchWellnessIndex({ force: true })
         const hit = milestoneHit(currentStreak(rows.map((r) => r.date)))
-        if (hit) milestoneToast(`🔥 ${hit}-day check-in streak!`)
+        if (hit) milestoneToast(`${hit}-day check-in streak!`)
         else toast.success('Wellness check-in saved')
       } else {
         toast.success('Wellness check-in updated')

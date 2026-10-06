@@ -58,7 +58,7 @@ export default function PhaseStrip({ sprint, phases, tactics, metrics, logs, wee
                   return (
                     <button key={w} type="button"
                       className={`phase-strip-week${w === week ? ' selected' : ''}${w === currentWeek ? ' now' : ''}${future ? ' future' : ''}`}
-                      style={st ? { background: st.color } : undefined}
+                      style={st ? { background: st.bg, color: st.color } : undefined}
                       title={pct != null ? `Week ${w}: ${pct}%` : `Week ${w}`}
                       aria-label={`Week ${w}${pct != null ? `, ${pct} percent` : ''}`}
                       onClick={() => onPick(w)}>

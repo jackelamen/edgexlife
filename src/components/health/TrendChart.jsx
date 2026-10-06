@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
+import { smoothPath, rollingMean } from '../../lib/chart'
 
 /*
   Trend chart: one series over time, drawn 1:1 in real pixels.
@@ -13,11 +14,18 @@ import { useEffect, useRef, useState } from 'react'
 
   Public API unchanged: points = [{ label, value|null }], plus optional
   target, unit, format.
+
+  Look (v4): the line is a smooth monotone curve, not straight segments.
+  With ~2 weeks of logs or more, the bold line is a 7-day rolling average
+  and the raw daily values sit faintly behind it, so the picture shows
+  direction instead of day-to-day jitter. The hover tooltip still reports
+  the real logged value for that day.
 */
 export default function TrendChart({ points = [], target = null, unit = '', height, format }) {
   const wrapRef = useRef(null)
   const [w, setW] = useState(0)
   const [hoverX, setHoverX] = useState(null)
+  const gid = useId().replace(/:/g, '')
 
   useEffect(() => {
     const el = wrapRef.current
@@ -54,10 +62,10 @@ export default function TrendChart({ points = [], target = null, unit = '', heig
   // Left gutter widens for long y labels ("14,000") so they never clip
   // past the card edge, which the old fixed 34px gutter did.
   const yLabelChars = Math.max(...ticks.map((t) => fmt(t).length))
-  const PAD_L = Math.round(16 + yLabelChars * 6.4 + 8)
-  const PAD_R = 18
-  const PAD_T = 16
-  const PAD_B = 26
+  const PAD_L = Math.round(10 + yLabelChars * 7 + 8)
+  const PAD_R = 14
+  const PAD_T = 14
+  const PAD_B = 28
   const plotW = Math.max(40, W - PAD_L - PAD_R)
   const plotH = Math.max(40, H - PAD_T - PAD_B)
   const yMin = ticks[0]
@@ -69,9 +77,16 @@ export default function TrendChart({ points = [], target = null, unit = '', heig
   const y = (v) => PAD_T + (1 - (v - yMin) / (yMax - yMin || 1)) * plotH
 
   const idx = points.map((p, i) => ({ ...p, i })).filter((p) => p.value != null)
-  const line = idx.map((p, k) => `${k ? 'L' : 'M'}${x(p.i).toFixed(1)},${y(p.value).toFixed(1)}`).join(' ')
   const last = idx[idx.length - 1]
-  const area = `${line} L${x(last.i).toFixed(1)},${(H - PAD_B).toFixed(1)} L${x(idx[0].i).toFixed(1)},${(H - PAD_B).toFixed(1)} Z`
+  // Enough logs to smooth: bold = 7-day mean, raw = faint context.
+  const smoothed = idx.length >= 14
+  const means = smoothed ? rollingMean(idx.map((p) => p.value), 7) : null
+  const mainPts = idx.map((p, k) => [x(p.i), y(means ? means[k] : p.value)])
+  const line = smoothPath(mainPts)
+  const rawLine = smoothed ? smoothPath(idx.map((p) => [x(p.i), y(p.value)])) : null
+  const baseY = H - PAD_B
+  const area = `${line} L${x(last.i).toFixed(1)},${baseY.toFixed(1)} L${x(idx[0].i).toFixed(1)},${baseY.toFixed(1)} Z`
+  const endY = mainPts[mainPts.length - 1][1]
 
   // 4-ish evenly spaced date labels, first and last always included.
   const labelCount = Math.min(idx.length, Math.max(2, Math.floor(plotW / 120)))
@@ -99,8 +114,8 @@ export default function TrendChart({ points = [], target = null, unit = '', heig
     <div ref={wrapRef} className="trend-chart" style={{ position: 'relative' }}>
       <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{ display: 'block', maxWidth: '100%' }}>
         <defs>
-          <linearGradient id="tcArea" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.16" />
+          <linearGradient id={`tcArea${gid}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.24" />
             <stop offset="100%" stopColor="var(--accent)" stopOpacity="0" />
           </linearGradient>
         </defs>
@@ -113,21 +128,22 @@ export default function TrendChart({ points = [], target = null, unit = '', heig
         ))}
 
         <line className="tc-avg" x1={PAD_L} x2={W - PAD_R} y1={y(avg)} y2={y(avg)} />
-        <text className="tc-avg-lbl" x={PAD_L + 2} y={y(avg)} dy={y(avg) < PAD_T + 14 ? '1.1em' : '-0.5em'}>
+        <text className="tc-avg-lbl" x={PAD_L + 4} y={y(avg)} dy={y(avg) < PAD_T + 14 ? '1.3em' : '-0.6em'}>
           avg {fmt(avg)}
         </text>
 
         {target != null && (
           <>
             <line className="tc-target" x1={PAD_L} x2={W - PAD_R} y1={y(target)} y2={y(target)} />
-            <text className="tc-target-lbl" x={W - PAD_R} y={y(target)} dy="-0.5em" textAnchor="end">
+            <text className="tc-target-lbl" x={W - PAD_R - 4} y={y(target)} dy="-0.6em" textAnchor="end">
               target {fmt(target)}
             </text>
           </>
         )}
 
-        <path d={area} fill="url(#tcArea)" />
-        <path className="tc-line" d={line} vectorEffect="non-scaling-stroke" />
+        <path key={`a${line}`} className="tc-area" d={area} fill={`url(#tcArea${gid})`} />
+        {rawLine && <path className="tc-raw" d={rawLine} />}
+        <path key={`l${line}`} className="tc-line" d={line} pathLength="1" />
 
         {xLabelIdx.map((p) => (
           <text key={p.i} className="tc-xtick" x={clamp(x(p.i), PAD_L, W - PAD_R)} y={H - 8}
@@ -136,11 +152,17 @@ export default function TrendChart({ points = [], target = null, unit = '', heig
           </text>
         ))}
 
-        {!hover && <circle className="tc-end-dot" cx={x(last.i)} cy={y(last.value)} r="3.5" />}
+        {!hover && (
+          <>
+            <circle className="tc-end-halo" cx={x(last.i)} cy={endY} r="9" />
+            <circle className="tc-end-dot" cx={x(last.i)} cy={endY} r="4" />
+          </>
+        )}
 
         {hover && (
           <>
             <line className="tc-focus" x1={x(hover.i)} x2={x(hover.i)} y1={PAD_T} y2={H - PAD_B} />
+            <circle className="tc-focus-halo" cx={x(hover.i)} cy={y(hover.value)} r="10" />
             <circle className="tc-focus-dot" cx={x(hover.i)} cy={y(hover.value)} r="4.5" />
           </>
         )}
