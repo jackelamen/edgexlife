@@ -2882,3 +2882,59 @@ input[type=datetime-local], input[type=date], input[type=time] { min-width: 0; m
   .fast-history .card-head p { display: none; }
 }
 @media (max-width: 1023px) { .fast-actions .btn { grid-column: 1 / -1; } }
+
+/* ── Cycle editor ──────────────────────────────────────────────────
+   Desktop keeps its side-by-side rows. On a phone each row stacks or
+   re-flows so no field is narrower than a thumb or a date. */
+.ce-mode { display: inline-flex; gap: 2px; padding: 3px; background: var(--white-soft); border: 1px solid var(--border); border-radius: 12px; margin-bottom: 8px; }
+.ce-mode button { border: 0; background: transparent; padding: 8px 16px; border-radius: 9px; font-family: inherit; font-size: 14px; font-weight: 500; color: var(--text-2); cursor: pointer; }
+.ce-mode button.on { background: var(--white); color: var(--text); font-weight: 600; box-shadow: 0 1px 2px rgba(16,18,19,.08), 0 0 0 1px var(--border); }
+.ce-note { font-size: 12.5px; color: var(--text-3); line-height: 1.45; }
+.ce-faint { color: var(--text-3); font-weight: 400; }
+.ce-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.ce-name-link { display: flex; align-items: center; }
+.ce-dates { display: grid; grid-template-columns: 1fr 1fr 1.3fr; gap: 12px; align-items: start; }
+.ce-end { align-self: end; min-height: 44px; display: flex; align-items: center; flex-wrap: wrap; font-size: 13.5px; color: var(--text-2); line-height: 1.4; }
+.ce-end strong { color: var(--text); font-weight: 600; margin-left: 4px; }
+.ce-end .ce-faint::before { content: ' · '; }
+.ce-action { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.ce-action .ce-text { flex: 1 1 200px; }
+.ce-action .ce-freq { width: 110px; }
+.ce-action .ce-num { width: 56px; }
+
+@media (max-width: 1023px) {
+  .ce-mode { display: flex; width: 100%; }
+  .ce-mode button { flex: 1; min-height: 44px; font-size: 15px; }
+  .ce-row2 { grid-template-columns: 1fr; gap: 14px; }
+  .ce-row2 > :nth-child(2) { order: -1; }
+  .ce-name-link .btn { padding-left: 0; }
+  .ce-faint { display: inline; }
+
+  .ce-dates { grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; }
+  .ce-end { grid-column: 1 / -1; min-height: 0; margin-top: -2px; display: block; font-size: 13px; }
+  .ce-end .ce-faint { display: block; margin-top: 2px; }
+  .ce-end .ce-faint::before { content: none; }
+
+  .ce-action { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+  .ce-action .ce-text { grid-column: 1 / -1; flex: none; }
+  .ce-action .ce-freq { width: 100% !important; grid-column: 1; }
+  .ce-action .ce-freq:last-child { grid-column: 1 / -1; }
+  .ce-action .ce-num { width: 84px !important; grid-column: 2; }
+
+  .ce-phase { padding: 14px !important; }
+  .ce-phase-head input { flex: 1; max-width: none !important; }
+  .ce-milestone { display: grid !important; grid-template-columns: auto minmax(0, 1fr); gap: 8px !important; }
+  .ce-milestone .ce-m-text { grid-column: 2; width: 100%; flex: none !important; }
+  .ce-milestone .ce-m-metric, .ce-milestone .ce-m-reach { grid-column: 1 / -1; width: 100% !important; }
+
+  .ce-tactic { display: grid !important; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px !important; padding: 12px 0; border-top: 1px solid var(--border); }
+  .ce-tactic:first-child { border-top: 0; padding-top: 0; }
+  .ce-tactic .ce-t-text { grid-column: 1 / -1; grid-row: 1; flex: none !important; }
+  .ce-tactic .ce-t-freq { grid-column: 1; grid-row: 2; width: 100% !important; }
+  .ce-tactic .ce-t-num { grid-column: 2; grid-row: 2; width: 80px !important; }
+  .ce-tactic .ce-t-del { grid-column: 3; grid-row: 2; }
+  .ce-tactic .ce-days { grid-column: 1 / -1; grid-row: 3; display: flex; gap: 4px !important; }
+  .ce-tactic .ce-days .btn { flex: 1; min-width: 0; padding: 0; }
+  .ce-tactic .ce-t-badge { grid-column: 1 / -1; grid-row: 4; }
+  .ce-phase .ce-add { width: 100%; min-height: 44px; }
+}

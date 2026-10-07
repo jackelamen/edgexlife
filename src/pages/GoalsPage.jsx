@@ -1559,26 +1559,24 @@ function CycleEditor({ sprint, cloneFrom, goals, seedGoalId, onClose, onSaved })
         )}
         {!sprint?.id && !cloneFrom && (
           <div>
-            <div className="flex gap-1" style={{ background: 'var(--white-soft)', borderRadius: 999, padding: 3, width: 'fit-content', marginBottom: 6 }}>
-              <button type="button" className={`btn btn-sm ${quickMode ? 'btn-primary' : 'btn-ghost'}`}
-                style={{ borderRadius: 999 }} onClick={() => setQuickMode(true)}>Quick</button>
-              <button type="button" className={`btn btn-sm ${!quickMode ? 'btn-primary' : 'btn-ghost'}`}
-                style={{ borderRadius: 999 }} onClick={() => setQuickMode(false)}>Full (phases)</button>
+            <div className="ce-mode" role="tablist" aria-label="Setup style">
+              <button type="button" role="tab" aria-selected={quickMode} className={quickMode ? 'on' : ''} onClick={() => setQuickMode(true)}>Quick</button>
+              <button type="button" role="tab" aria-selected={!quickMode} className={!quickMode ? 'on' : ''} onClick={() => setQuickMode(false)}>Full (phases)</button>
             </div>
-            <p style={{ fontSize: 11.5, color: 'var(--text-3)', fontWeight: 600 }}>
+            <p className="ce-note">
               {quickMode
                 ? `One action, applied across all ${cur.weeks || DEFAULT_CYCLE_LENGTH} week${(cur.weeks || DEFAULT_CYCLE_LENGTH) === 1 ? '' : 's'}. Switch to Full anytime to break it into phases.`
                 : 'Build out Foundation, Build, and Peak phases with their own actions up front.'}
             </p>
           </div>
         )}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="ce-row2">
           {(!isQuickNew || showName) ? (
             <Field label="Cycle name"><input autoFocus={isQuickNew} value={cur.name || ''} onChange={(e) => setS({ ...cur, name: e.target.value })} placeholder="Q3 Foundation Build" /></Field>
           ) : (
-            <div style={{ display: 'flex', alignItems: 'center' }}>
+            <div className="ce-name-link">
               <button type="button" className="btn btn-ghost btn-sm" onClick={() => setShowName(true)}>
-                <Icon name="edit" size={13} /> Name it myself <span style={{ color: 'var(--text-3)', fontWeight: 500 }}>(otherwise auto-named)</span>
+                <Icon name="edit" size={13} /> Name it myself <span className="ce-faint">(auto-named otherwise)</span>
               </button>
             </div>
           )}
@@ -1589,7 +1587,7 @@ function CycleEditor({ sprint, cloneFrom, goals, seedGoalId, onClose, onSaved })
             </select>
           </Field>
         </div>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="ce-dates">
           <Field label="Length">
             <select value={cur.weeks || DEFAULT_CYCLE_LENGTH}
               onChange={(e) => {
@@ -1603,14 +1601,17 @@ function CycleEditor({ sprint, cloneFrom, goals, seedGoalId, onClose, onSaved })
               to that week's Monday (snapToMonday). A mid-week start meant
               week 1 was really a 2-day week that no score could represent
               fairly — see the Scoring v2 note in lib/goals.js. */}
-          <Field label="Start date" hint="Snaps to Monday. Cycles run Mon–Sun.">
+          <Field label="Start date">
             <input type="date" value={cur.start_date || ''}
               onChange={(e) => {
                 const start = snapToMonday(e.target.value)
                 setS({ ...cur, start_date: start, end_date: autoEndDate(start, cur.weeks || DEFAULT_CYCLE_LENGTH) })
               }} />
           </Field>
-          <Field label="End date (auto)"><input type="date" value={cur.end_date || ''} readOnly style={{ opacity: .5 }} /></Field>
+          <div className="ce-end">
+            {cur.end_date ? <>Ends <strong>{pretty(cur.end_date)}</strong></> : null}
+            <span className="ce-faint">Cycles run Monday to Sunday, so the start snaps to a Monday.</span>
+          </div>
         </div>
         {(!isQuickNew || showOutcome) ? (
           <Field label={`What does success look like by week ${cur.weeks || DEFAULT_CYCLE_LENGTH}?`}>
@@ -1625,11 +1626,11 @@ function CycleEditor({ sprint, cloneFrom, goals, seedGoalId, onClose, onSaved })
         {quickMode && !sprint?.id ? (
           <>
             <Field label={quickTactic.freq === 'onetime' ? 'What needs to get done?' : 'What will you do, and how often?'}>
-              <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-                <input style={{ flex: '1 1 200px' }} value={quickTactic.text}
+              <div className="ce-action">
+                <input className="ce-text" value={quickTactic.text}
                   placeholder={quickTactic.freq === 'onetime' ? 'e.g. Book the dentist appointment' : 'e.g. Go for a run'}
                   onChange={(e) => setQuickTactic({ ...quickTactic, text: e.target.value })} />
-                <select style={{ width: 110 }} value={quickTactic.freq}
+                <select className="ce-freq" value={quickTactic.freq}
                   onChange={(e) => setQuickTactic({ ...quickTactic, freq: e.target.value })}>
                   <option value="daily">Daily</option>
                   <option value="xperweek">×/week</option>
@@ -1637,12 +1638,12 @@ function CycleEditor({ sprint, cloneFrom, goals, seedGoalId, onClose, onSaved })
                   <option value="onetime">One-time</option>
                 </select>
                 {quickTactic.freq === 'xperweek' && (
-                  <input type="number" min={1} max={7} style={{ width: 56 }} value={quickTactic.times_per_week || 3}
+                  <input type="number" inputMode="numeric" className="ce-num" min={1} max={7} value={quickTactic.times_per_week || 3}
                     onChange={(e) => setQuickTactic({ ...quickTactic, times_per_week: Number(e.target.value) })} />
                 )}
               </div>
             </Field>
-            <p style={{ fontSize: 11.5, color: 'var(--text-3)', fontWeight: 600, marginTop: -8 }}>
+            <p className="ce-note" style={{ marginTop: -6 }}>
               {quickTactic.freq === 'onetime'
                 ? 'A one-off task, not a repeating habit. Check it off once, any time before the cycle ends.'
                 : 'You can add more actions or split this into phases anytime: edit the cycle and switch to Full setup.'}
@@ -1652,8 +1653,8 @@ function CycleEditor({ sprint, cloneFrom, goals, seedGoalId, onClose, onSaved })
           <>
         <div className="form-section-label">Phases &amp; Weekly Actions</div>
         {phaseDrafts.map((phase, pi) => (
-          <div key={pi} className="card-inner" style={{ padding: 14, borderRadius: 12, border: '1px solid var(--border)', background: 'var(--white-soft)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+          <div key={pi} className="card-inner ce-phase" style={{ padding: 14, borderRadius: 12, border: '1px solid var(--border)', background: 'var(--white-soft)' }}>
+            <div className="ce-phase-head" style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
               <Badge tone={phaseBadge(pi).tone}>{phaseBadge(pi).label}</Badge>
               <input value={phase.name} style={{ maxWidth: 160, fontSize: 13, fontWeight: 700 }}
                 onChange={(e) => { const n = [...phaseDrafts]; n[pi] = { ...n[pi], name: e.target.value }; setPhaseDrafts(n) }} />
@@ -1662,20 +1663,20 @@ function CycleEditor({ sprint, cloneFrom, goals, seedGoalId, onClose, onSaved })
               const goalMetrics = (allMetrics.data || []).filter((x) => x.goal_id === cur.goal_id && num(x.target) != null)
               const setPhase = (patch) => { const n = [...phaseDrafts]; n[pi] = { ...n[pi], ...patch }; setPhaseDrafts(n) }
               return (
-                <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginBottom: 10 }}>
+                <div className="ce-milestone" style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginBottom: 10 }}>
                   <Icon name="flag" size={15} style={{ color: 'var(--text-3)' }} />
-                  <input style={{ flex: '1 1 180px' }} value={phase.milestone_text || ''}
-                    placeholder={`Milestone at the end of ${phase.name || 'this phase'} (optional)`}
+                  <input className="ce-m-text" style={{ flex: '1 1 180px' }} value={phase.milestone_text || ''}
+                    placeholder="Phase milestone (optional)"
                     onChange={(e) => setPhase({ milestone_text: e.target.value })} />
                   {goalMetrics.length > 0 && (
                     <>
-                      <select style={{ width: 150 }} value={phase.milestone_metric_id || ''}
+                      <select className="ce-m-metric" style={{ width: 150 }} value={phase.milestone_metric_id || ''}
                         onChange={(e) => setPhase({ milestone_metric_id: e.target.value, milestone_target: e.target.value ? phase.milestone_target : '' })}>
                         <option value="">Tick off by hand</option>
                         {goalMetrics.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
                       </select>
                       {phase.milestone_metric_id && (
-                        <input type="number" inputMode="decimal" style={{ width: 80 }} placeholder="reach"
+                        <input type="number" inputMode="decimal" className="ce-m-reach" style={{ width: 80 }} placeholder="reach"
                           value={phase.milestone_target ?? ''} onChange={(e) => setPhase({ milestone_target: e.target.value })} />
                       )}
                     </>
@@ -1685,10 +1686,10 @@ function CycleEditor({ sprint, cloneFrom, goals, seedGoalId, onClose, onSaved })
             })()}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 8 }}>
               {phase.tactics.map((t, ti) => (
-                <div key={ti} style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-                  <input style={{ flex: '1 1 160px' }} value={t.text} placeholder="Action text"
+                <div key={ti} className="ce-tactic" style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <input className="ce-t-text" style={{ flex: '1 1 160px' }} value={t.text} placeholder="Action text"
                     onChange={(e) => updateTactic(pi, ti, { text: e.target.value })} />
-                  <select style={{ width: 110 }} value={t.freq} onChange={(e) => updateTactic(pi, ti, { freq: e.target.value })}>
+                  <select className="ce-t-freq" style={{ width: 110 }} value={t.freq} onChange={(e) => updateTactic(pi, ti, { freq: e.target.value })}>
                     <option value="daily">Daily</option>
                     <option value="weekly">Weekly</option>
                     <option value="xperweek">×/week</option>
@@ -1696,11 +1697,11 @@ function CycleEditor({ sprint, cloneFrom, goals, seedGoalId, onClose, onSaved })
                     <option value="onetime">One-time</option>
                   </select>
                   {t.freq === 'xperweek' && (
-                    <input type="number" min={1} max={7} style={{ width: 56 }} value={t.times_per_week || 3}
+                    <input type="number" inputMode="numeric" className="ce-t-num" min={1} max={7} style={{ width: 56 }} value={t.times_per_week || 3}
                       onChange={(e) => updateTactic(pi, ti, { times_per_week: Number(e.target.value) })} />
                   )}
                   {t.freq === 'custom' && (
-                    <div style={{ display: 'flex', gap: 3 }}>
+                    <div className="ce-days" style={{ display: 'flex', gap: 3 }}>
                       {DAY_LABELS.map((lbl, d) => (
                         <button key={d} type="button" className="btn btn-xs"
                           style={(t.days || []).includes(d) ? { background: 'var(--accent)', color: '#fff', borderColor: 'var(--accent)' } : undefined}
@@ -1713,7 +1714,7 @@ function CycleEditor({ sprint, cloneFrom, goals, seedGoalId, onClose, onSaved })
                     </div>
                   )}
                   {(t.starts_week || t.ended_week) && (
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    <span className="ce-t-badge" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                       <Badge tone="muted">
                         {t.starts_week && t.ended_week ? `Weeks ${t.starts_week}–${t.ended_week}`
                           : t.ended_week ? `Ended after week ${t.ended_week}` : `From week ${t.starts_week}`}
@@ -1723,11 +1724,11 @@ function CycleEditor({ sprint, cloneFrom, goals, seedGoalId, onClose, onSaved })
                       )}
                     </span>
                   )}
-                  <button className="btn btn-icon btn-sm" onClick={() => removeTactic(pi, ti)}><Icon name="close" size={13} /></button>
+                  <button className="btn btn-icon btn-sm ce-t-del" aria-label="Remove action" onClick={() => removeTactic(pi, ti)}><Icon name="close" size={13} /></button>
                 </div>
               ))}
             </div>
-            <button className="btn btn-ghost btn-xs" onClick={() => addTactic(pi)}><Icon name="add" size={14} /> Add action</button>
+            <button className="btn btn-secondary btn-xs ce-add" onClick={() => addTactic(pi)}><Icon name="add" size={14} /> Add action</button>
           </div>
         ))}
           </>
