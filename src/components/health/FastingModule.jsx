@@ -6,10 +6,10 @@ import { useAsync } from '../../hooks/useAsync'
 import { fetchFastingSessions, saveFastingSession, deleteFastingSession, newId } from '../../lib/data'
 import {
   FAST_METHODS, methodLabel, isActive, elapsedMs, progressPct, formatDuration,
-  weekStreak, thisWeekCount, longestFast, toLocalInputValue, fromLocalInputValue,
-  targetHoursFor,
+  weekStreak, thisWeekCount, toLocalInputValue, fromLocalInputValue,
+  targetHoursFor, weeklySeries, recentFasts, usualWeekday,
 } from '../../lib/fasting'
-import { pretty } from '../../lib/dates'
+import { pretty, prettyShort, dateKey } from '../../lib/dates'
 import { FAST_STAGES, EVIDENCE, stageIndexAt, hoursToNextStage, stageRangeLabel } from '../../lib/fastingStages'
 import { metric } from '../../lib/design'
 
@@ -142,7 +142,7 @@ export default function FastingModule() {
 
       <FastingStages session={activeSession} />
 
-      <WeeklyStats sessions={list} />
+      <FastRhythm sessions={list} />
 
       <Card className="fast-history">
         <CardHead title="Fasting history" sub="Completed fasts, most recent first. Tap one to edit or delete it."
@@ -356,7 +356,7 @@ export function FastingStatusCard({ onNav }) {
           {lastDone ? `Last fast ${formatDuration(elapsedMs(lastDone))} · ${methodLabel(lastDone.method)}` : 'No fasts logged yet'}
         </div>
         <div className="fs-line2">
-          {wkCount >= 1 ? `${wkCount} this week · ${streak}-week streak` : 'None yet this week · tap to start one'}
+          {wkCount >= 1 ? `Done this week${streak >= 2 ? ` · ${streak} weeks in a row` : ''}` : (streak >= 2 ? `${streak} weeks in a row · none yet this week` : 'None yet this week · tap to start one')}
         </div>
       </div>
       <Badge tone={wkCount >= 1 ? 'green' : 'muted'}>{wkCount >= 1 ? 'On track' : 'Start one'}</Badge>
@@ -631,43 +631,88 @@ function StartFastCard({ onStart }) {
   )
 }
 
-/* ── Weekly stats ─────────────────────────────────────────── */
+/* ── Weekly rhythm ────────────────────────────────────────────
+   Built for a habit that may be once a week as easily as daily, so it
+   leans on "which weeks had a fast" rather than a streak that one quiet
+   week would wipe out. */
 
-function WeeklyStats({ sessions }) {
-  const wkCount = useMemo(() => thisWeekCount(sessions), [sessions])
+const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+const daysAgoLabel = (iso) => {
+  const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000)
+  return d <= 0 ? 'today' : d === 1 ? 'yesterday' : `${d} days ago`
+}
+
+function FastRhythm({ sessions }) {
+  const weeks = useMemo(() => weeklySeries(sessions, 12), [sessions])
+  const recent = useMemo(() => recentFasts(sessions, 8), [sessions])
   const streak = useMemo(() => weekStreak(sessions), [sessions])
-  const longest = useMemo(() => longestFast(sessions), [sessions])
-  const m = metric('fasting')
+  const usual = useMemo(() => usualWeekday(sessions), [sessions])
+
+  const done = sessions.filter((x) => x.endedAt)
+  const lastDone = [...done].sort((a, b) => new Date(b.endedAt) - new Date(a.endedAt))[0] || null
+  const longest = [...done].sort((a, b) => elapsedMs(b) - elapsedMs(a))[0] || null
+  const running = sessions.find(isActive) || null
+  const now = weeks[weeks.length - 1]
+  const weeksWith = weeks.filter((w) => w.count > 0).length
+  // Scale bars to the longest week shown, but never so tight that a normal fast looks tiny.
+  const maxMs = Math.max(24 * 3600000, ...weeks.map((w) => w.longestMs))
+
+  let thisValue, thisSub
+  if (now.count > 0) {
+    thisValue = formatDuration(now.longestMs)
+    thisSub = now.count > 1 ? `Done, ${now.count} fasts` : 'Done this week'
+  } else if (running) {
+    thisValue = 'Running'
+    thisSub = `Started ${WEEKDAYS[new Date(running.startedAt).getDay()]}`
+  } else {
+    thisValue = 'Not yet'
+    thisSub = usual != null ? `Your usual day is ${WEEKDAYS[usual]}`
+      : lastDone ? `Last fast ${daysAgoLabel(lastDone.endedAt)}` : 'No fast logged yet'
+  }
 
   return (
-    /* Two up on a phone rather than one: three single-column cards spent
-       320px of scroll on three short numbers. Three across doesn't fit —
-       "36h 42m" at this type size overflows a ~100px column on a 360px
-       phone — so the two bare counts pair off and the duration, the one
-       that actually needs the width, takes the full row underneath. */
-    <div className="grid grid-cols-2 lg:grid-cols-3 gap-3.5" style={{ marginBottom: 14 }}>
-      <div className="row" style={rowStyle}>
-        <span className="k" style={kStyle}>This week</span>
-        <span className="v" style={vStyle}>{wkCount}</span>
-        <span style={subStyle}>{wkCount >= 1 ? 'goal met, at least 1' : 'goal is at least 1'}</span>
+    <Card style={{ marginBottom: 14 }} className="rhythm">
+      <CardHead title="Your rhythm" sub="One bar per week, most recent on the right." />
+
+      <div className="rh-weeks" role="img"
+        aria-label={`Fasting over the last ${weeks.length} weeks: ${weeksWith} weeks with a fast`}>
+        {weeks.map((w) => (
+          <div key={w.key} className={`rh-col${w.current ? ' now' : ''}`}
+            title={`Week of ${prettyShort(w.key)}: ${w.count ? `${formatDuration(w.longestMs)}${w.hit ? ', hit target' : ', under target'}` : 'no fast'}`}>
+            {w.count
+              ? <i className={`rh-bar${w.hit ? ' hit' : ''}`} style={{ height: `${Math.max(16, Math.round((w.longestMs / maxMs) * 100))}%` }} />
+              : <i className={`rh-empty${w.current ? ' open' : ''}`} />}
+          </div>
+        ))}
       </div>
-      <div className="row" style={rowStyle}>
-        <span className="k" style={kStyle}>Week streak</span>
-        <span className="v" style={{ ...vStyle, color: streak > 0 ? m.color : 'inherit' }}>{streak}</span>
-        <span style={subStyle}>{streak > 0 ? 'consecutive weeks' : 'complete one this week to start'}</span>
+      <div className="rh-axis"><span>{prettyShort(weeks[0].key)}</span><span>This week</span></div>
+      <div className="rh-legend">
+        <span><i className="rh-key hit" />Hit target</span>
+        <span><i className="rh-key" />Under target</span>
+        <span><i className="rh-key none" />No fast</span>
       </div>
-      <div className="row col-span-2 lg:col-span-1" style={rowStyle}>
-        <span className="k" style={kStyle}>Longest fast</span>
-        <span className="v" style={vStyle}>{longest ? formatDuration(longest) : '--'}</span>
-        <span style={subStyle}>all-time</span>
+
+      <div className="rh-stats">
+        <div><span>This week</span><strong>{thisValue}</strong><small>{thisSub}</small></div>
+        <div>
+          <span>Consistency</span>
+          <strong>{weeksWith} of {weeks.length}</strong>
+          <small>{streak >= 2 ? `${streak} weeks in a row` : 'weeks with a fast'}</small>
+        </div>
+        <div>
+          <span>Average fast</span>
+          <strong>{recent ? formatDuration(recent.avgMs) : '--'}</strong>
+          <small>{recent ? `${recent.hits} of ${recent.count} hit target` : 'last 8 fasts'}</small>
+        </div>
+        <div>
+          <span>Longest fast</span>
+          <strong>{longest ? formatDuration(elapsedMs(longest)) : '--'}</strong>
+          <small>{longest ? pretty(dateKey(new Date(longest.startedAt))) : 'all-time'}</small>
+        </div>
       </div>
-    </div>
+    </Card>
   )
 }
-const rowStyle = { background: 'var(--white)', border: '1px solid var(--border)', borderRadius: 14, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 3 }
-const kStyle = { fontSize: 13, fontWeight: 500, color: 'var(--text-2)' }
-const vStyle = { fontSize: 28, fontWeight: 600, letterSpacing: '-.03em', fontFamily: 'var(--font-brand)', lineHeight: 1.1 }
-const subStyle = { fontSize: 12.5, color: 'var(--text-3)', fontWeight: 400 }
 
 /* ── History row ──────────────────────────────────────────── */
 
@@ -685,7 +730,7 @@ function FastRow({ session, onEdit }) {
         <span>{methodLabel(session.method)}</span>
       </span>
       <span className="fr-meta">
-        {pretty(session.startedAt.slice(0, 10))}
+        {pretty(dateKey(new Date(session.startedAt)))}
         <i className={`fr-dot${hit ? ' hit' : ''}`} />{hit ? 'Hit target' : 'Under target'}
       </span>
       {session.notes && <span className="fr-note">{session.notes}</span>}

@@ -66,10 +66,11 @@ export function formatDuration(ms) {
 export const sessionWeekKey = (session) => iso(weekMonday(new Date(session.startedAt)))
 
 /**
- * Consecutive weeks (including this one) with at least one *completed*
- * fast, walking backward from the current week. An in-progress fast counts
- * for the week it started in once it ends, not before — a streak shouldn't
- * hinge on a fast you haven't finished yet.
+ * Consecutive weeks with at least one *completed* fast. The current week is
+ * given grace: if you have not fasted yet this week it is simply still open,
+ * so the count starts from last week instead of reading 0 on a Wednesday for
+ * someone who fasts on weekends. It only breaks once a week has fully passed
+ * with no fast. An in-progress fast counts once it ends, not before.
  */
 export function weekStreak(sessions, today = new Date()) {
   const doneWeeks = new Set(
@@ -77,11 +78,60 @@ export function weekStreak(sessions, today = new Date()) {
   )
   let streak = 0
   let cursor = weekMonday(today)
+  if (!doneWeeks.has(iso(cursor))) cursor.setDate(cursor.getDate() - 7)
   while (doneWeeks.has(iso(cursor))) {
     streak += 1
     cursor = new Date(cursor); cursor.setDate(cursor.getDate() - 7)
   }
   return streak
+}
+
+/**
+ * The last `n` weeks (oldest first, current week last), each with how many
+ * completed fasts started in it, the longest one, and whether any of them
+ * met its own target. Powers the weekly rhythm strip, which reads the same
+ * for someone who fasts once a week as for someone who fasts daily.
+ */
+export function weeklySeries(sessions, n = 12, today = new Date()) {
+  const done = sessions.filter((s) => s.endedAt)
+  const thisMonday = weekMonday(today)
+  return Array.from({ length: n }, (_, i) => {
+    const monday = new Date(thisMonday)
+    monday.setDate(monday.getDate() - (n - 1 - i) * 7)
+    const key = iso(monday)
+    const inWeek = done.filter((s) => sessionWeekKey(s) === key)
+    const longestMs = inWeek.reduce((m, s) => Math.max(m, elapsedMs(s)), 0)
+    const hit = inWeek.some((s) => {
+      const t = targetHoursFor(s)
+      return t && elapsedMs(s) / 3600000 >= t
+    })
+    return { key, monday, count: inWeek.length, longestMs, hit, current: i === n - 1 }
+  })
+}
+
+/** Average length and target-hit count over the most recent `n` completed fasts. */
+export function recentFasts(sessions, n = 8) {
+  const recent = sessions.filter((s) => s.endedAt)
+    .sort((a, b) => new Date(b.startedAt) - new Date(a.startedAt)).slice(0, n)
+  if (!recent.length) return null
+  const hits = recent.filter((s) => {
+    const t = targetHoursFor(s)
+    return t && elapsedMs(s) / 3600000 >= t
+  }).length
+  const avgMs = recent.reduce((sum, s) => sum + elapsedMs(s), 0) / recent.length
+  return { count: recent.length, hits, avgMs }
+}
+
+/** The weekday (0 = Sunday) you most often start a fast, or null until there are enough to say. */
+export function usualWeekday(sessions, min = 3, sample = 12) {
+  const days = sessions.filter((s) => s.endedAt)
+    .sort((a, b) => new Date(b.startedAt) - new Date(a.startedAt)).slice(0, sample)
+    .map((s) => new Date(s.startedAt).getDay())
+  if (days.length < min) return null
+  const tally = {}
+  days.forEach((d) => { tally[d] = (tally[d] || 0) + 1 })
+  const [day, count] = Object.entries(tally).sort((a, b) => b[1] - a[1])[0]
+  return count >= 2 ? Number(day) : null
 }
 
 /** Completed fasts whose start falls in the current week. */
