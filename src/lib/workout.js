@@ -45,6 +45,26 @@ export const WORKOUT_TEMPLATES_KEY = '__workoutTemplates'
 // second reserved key, toggled per exercise in the Database tab. Absent
 // until first toggled, in which case the curated defaults below apply.
 export const BODYWEIGHT_KEY = '__bodyweight'
+// Named, reusable workouts ("Push day A") live in the same blob under a third
+// reserved key: [{ id, name, type, exercises: [{ name, sets, reps, weight }] }].
+// Separate from the per-type Quick templates above, which only auto-fill a
+// list of exercise names when a workout type is picked.
+export const CUSTOM_TEMPLATES_KEY = '__customTemplates'
+export const customTemplates = (db) => (Array.isArray(db?.[CUSTOM_TEMPLATES_KEY]) ? db[CUSTOM_TEMPLATES_KEY] : [])
+
+/** Normalise an exercise list for saving: trimmed names, whole-number sets in
+    1-12, reps/weight kept as the strings typed. Rows with no name are dropped
+    (a blank "Exercise" row used to be saved as a real, nameless exercise). */
+export function cleanExercises(list) {
+  return (list || [])
+    .map((ex) => ({
+      name: String(ex?.name ?? '').trim(),
+      sets: Math.min(12, Math.max(1, Math.round(Number(ex?.sets)) || 3)),
+      reps: ex?.reps == null ? '' : String(ex.reps).trim(),
+      weight: ex?.weight == null ? '' : String(ex.weight).trim(),
+    }))
+    .filter((ex) => ex.name)
+}
 export const bodypartKeys = (db) => Object.keys(db).filter((k) => !k.startsWith('__'))
 
 /* Exercises where the meaningful "getting stronger" signal is reps, not

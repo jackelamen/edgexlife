@@ -2966,3 +2966,55 @@ input[type=datetime-local], input[type=date], input[type=time] { min-width: 0; m
   .rh-stats > div:nth-child(n+3) { border-top: 1px solid var(--border); margin-top: 12px; }
   .rhythm .card-head p { display: none; }
 }
+
+/* ── Workout planner: exercise editor, templates ─────────────────── */
+.tpl-load { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
+.tpl-load select { flex: 1; min-width: 0; font-size: 13.5px; padding: 9px 10px; }
+.btn.armed { background: var(--s-risk-bg); color: var(--s-risk); border-color: transparent; }
+.ex-editor { margin-bottom: 4px; }
+.ex-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+.ex-edit { background: var(--white-soft); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px; display: flex; flex-direction: column; gap: 10px; }
+.ex-edit-top { display: flex; gap: 8px; align-items: center; }
+.ex-edit .ex-name { flex: 1; min-width: 0; font-size: 14.5px; font-weight: 550; padding: 9px 11px; }
+.ex-tools { display: flex; gap: 4px; flex-shrink: 0; }
+.ex-edit-nums { display: grid; grid-template-columns: auto 1fr 1fr; gap: 10px; align-items: end; }
+.ex-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.ex-field > span { font-size: 12px; font-weight: 500; color: var(--text-3); }
+.ex-field input { padding: 8px 10px; font-size: 14px; }
+.ex-stepper { display: inline-flex; align-items: center; background: var(--white); border: 1px solid var(--border-med); border-radius: var(--radius-sm); height: 38px; }
+.ex-stepper button { width: 36px; height: 100%; border: 0; background: transparent; font-size: 18px; line-height: 1; color: var(--text-2); cursor: pointer; font-family: inherit; }
+.ex-stepper button:disabled { opacity: .3; cursor: default; }
+.ex-stepper strong { min-width: 22px; text-align: center; font-size: 15px; font-variant-numeric: tabular-nums; }
+.tpl-save { margin: 6px 0 2px; }
+.tpl-save-form { display: flex; gap: 8px; align-items: center; }
+.tpl-save-form input { flex: 1; min-width: 0; padding: 8px 10px; font-size: 14px; }
+.rest-toggle { display: flex; align-items: center; gap: 10px; margin-top: 14px; cursor: pointer; font-size: 14px; font-weight: 550; color: var(--text-2); }
+.rest-toggle input { width: 18px; height: 18px; }
+.day-clear { margin-right: auto; }
+.tpl-head { display: grid; grid-template-columns: 1.5fr 1fr; gap: 12px; margin-bottom: 14px; }
+.tpl-list { display: flex; flex-direction: column; }
+.tpl-item { display: flex; align-items: center; gap: 12px; padding: 14px 0; border-top: 1px solid var(--border); }
+.tpl-item:first-child { border-top: 0; padding-top: 4px; }
+.tpl-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.tpl-main strong { font-size: 15.5px; font-weight: 600; }
+.tpl-main span { font-size: 13px; color: var(--text-2); }
+.tpl-main small { font-size: 12.5px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tpl-actions { display: flex; gap: 6px; flex-shrink: 0; }
+@media (max-width: 1023px) {
+  .exercise-picker { grid-template-columns: 1fr 1fr; }
+  .exercise-picker .btn { grid-column: 1 / -1; width: 100%; }
+  .exercise-picker select { font-size: 16px; padding: 11px 12px; }
+  .ex-edit-nums { grid-template-columns: auto 1fr 1fr; }
+  .ex-stepper { height: 44px; }
+  .ex-stepper button { width: 40px; }
+  .ex-field input { padding: 11px 10px; }
+  .tpl-head { grid-template-columns: 1fr; }
+  .tpl-item { align-items: flex-start; }
+  .modal-foot .day-clear { flex: none; padding-left: 12px; padding-right: 12px; }
+}
+@media (max-width: 1023px) {
+  .ex-tools { gap: 2px; }
+  .ex-tools .btn-icon { width: 34px; height: 44px; border-radius: 9px; }
+  .ex-edit .ex-name { font-size: 16px; }
+  .modal-foot .btn { white-space: nowrap; padding-left: 12px; padding-right: 12px; }
+}

@@ -14,6 +14,7 @@ import {
 import {
   WK_TYPES, DEFAULT_EXERCISE_DB, WK_TEMPLATES, bodypartLabel, bodypartKeys, WORKOUT_TEMPLATES_KEY,
   BODYWEIGHT_KEY, bodyweightList, syncBodyweightExercises, isBodyweight,
+  CUSTOM_TEMPLATES_KEY, customTemplates, cleanExercises,
   DAY_SHORT, weekDates, sessionVolume, sessionSetCount, fmtDuration,
   parseWorkoutCSV, WORKOUT_CSV_TEMPLATE, isBodyweightExercise, setLoadKg,
 } from '../../lib/workout'
@@ -85,9 +86,11 @@ export default function WorkoutModule() {
   const healthGoals = (goals.data || []).filter((g) => g.area === 'health' && g.status === 'active')
   const bodyweightKg = healthSettings.data?.bodyweightKg ?? 70
 
-  function startSession(dateStr, blank = false) {
+  // `dayOverride` lets the day planner start from what is on screen: its edits
+  // are saved asynchronously, so plan.data may not hold them yet.
+  function startSession(dateStr, blank = false, dayOverride = null) {
     const date = dateStr || today()
-    const day = blank ? null : plan.data?.[date]
+    const day = blank ? null : (dayOverride || plan.data?.[date])
     setSession({
       id: 'sess-' + Date.now(),
       date,
@@ -111,9 +114,9 @@ export default function WorkoutModule() {
   // (timer running, sets logged), that silently wiped it and forced a full
   // re-entry, with the elapsed time gone for good. Now they just take you
   // back to the session that's already open instead of starting a new one.
-  function goToSessionOrStart(dateStr, blank = false) {
+  function goToSessionOrStart(dateStr, blank = false, dayOverride = null) {
     if (session) { setTab('log'); return }
-    startSession(dateStr, blank)
+    startSession(dateStr, blank, dayOverride)
   }
 
   return (
@@ -146,6 +149,7 @@ export default function WorkoutModule() {
         <PlanTab
           plan={plan} weekOffset={weekOffset} db={db} goals={healthGoals}
           sessions={sessions.data || []} onStart={goToSessionOrStart} bodyweightKg={bodyweightKg}
+          onDbSaved={() => dbRaw.reload()}
         />
       )}
       {tab === 'log' && (
@@ -201,7 +205,7 @@ function sessionToPlanDay(session, existing) {
 
 /* ═══════════════ Plan ═══════════════ */
 
-function PlanTab({ plan, weekOffset, db, goals, sessions, onStart, bodyweightKg = 70 }) {
+function PlanTab({ plan, weekOffset, db, goals, sessions, onStart, onDbSaved, bodyweightKg = 70 }) {
   const [editDate, setEditDate] = useState(null)
   const [importPreview, setImportPreview] = useState(null) // { days, errors } | null
   const [importing, setImporting] = useState(false)
@@ -372,7 +376,8 @@ function PlanTab({ plan, weekOffset, db, goals, sessions, onStart, bodyweightKg 
         allDates={dates}
         sessions={sessions}
         onClose={() => setEditDate(null)}
-        onStart={(d) => { setEditDate(null); onStart(d) }}
+        onDbSaved={onDbSaved}
+        onStart={(d, day) => { setEditDate(null); onStart(d, false, day) }}
       />
 
       <ImportPreviewModal preview={importPreview} importing={importing}
@@ -420,7 +425,105 @@ function ImportPreviewModal({ preview, importing, onClose, onConfirm }) {
   )
 }
 
-function DayModal({ date, plan, effectiveByDate, db, allDates, sessions = [], onClose, onStart }) {
+/* ── Exercise editor (shared by the day planner and the template editor) ──
+   Pick from the exercise database, or type any name; each exercise carries
+   sets, reps and weight targets. */
+function ExerciseEditor({ exercises, onChange, db }) {
+  const parts = bodypartKeys(db)
+  const [bodypart, setBodypart] = useState(parts[0] || 'Chest')
+  const [pickRaw, setPick] = useState('')
+  const list = db[bodypart] || []
+  // A <select> shows its first option when nothing is chosen, so the value
+  // has to fall back to it as well. It used to be '' until the body part was
+  // changed, which made "Add" silently do nothing while the box looked filled.
+  const pick = list.includes(pickRaw) ? pickRaw : (list[0] || '')
+  const allNames = useMemo(() => [...new Set(parts.flatMap((k) => db[k] || []))].sort(), [db]) // eslint-disable-line react-hooks/exhaustive-deps
+  const listRef = useRef(null)
+  const [focusNew, setFocusNew] = useState(false)
+
+  useEffect(() => {
+    if (!focusNew) return
+    listRef.current?.querySelector('.ex-edit:last-child .ex-name')?.focus()
+    setFocusNew(false)
+  }, [focusNew, exercises.length])
+
+  const set = (i, patch) => onChange(exercises.map((x, j) => (j === i ? { ...x, ...patch } : x)))
+  const move = (i, dir) => {
+    const j = i + dir
+    if (j < 0 || j >= exercises.length) return
+    const next = exercises.slice();
+    [next[i], next[j]] = [next[j], next[i]]
+    onChange(next)
+  }
+  const sets = (ex) => Math.min(12, Math.max(1, Number(ex.sets) || 3))
+
+  return (
+    <div className="ex-editor">
+      <div className="exercise-picker">
+        <select value={bodypart} onChange={(e) => { setBodypart(e.target.value); setPick('') }} aria-label="Body part">
+          {parts.map((k) => <option key={k} value={k}>{bodypartLabel(k)}</option>)}
+        </select>
+        <select value={pick} onChange={(e) => setPick(e.target.value)} aria-label="Exercise">
+          {list.map((x) => <option key={x} value={x}>{x}</option>)}
+        </select>
+        <button type="button" className="btn btn-secondary btn-sm" disabled={!pick}
+          onClick={() => onChange([...exercises, { name: pick, sets: 3, reps: '', weight: '' }])}>
+          <Icon name="library_add" size={15} /> Add
+        </button>
+      </div>
+      <datalist id="ex-names">{allNames.map((n) => <option key={n} value={n} />)}</datalist>
+
+      <div className="ex-list" ref={listRef}>
+        {exercises.map((ex, i) => (
+          <div key={i} className="ex-edit">
+            <div className="ex-edit-top">
+              <input className="ex-name" list="ex-names" value={ex.name} placeholder="Exercise name"
+                onChange={(e) => set(i, { name: e.target.value })} />
+              <div className="ex-tools">
+                <button type="button" className="btn btn-icon btn-sm" disabled={i === 0} onClick={() => move(i, -1)}
+                  aria-label="Move up" title="Move up"><Icon name="arrow_upward" size={15} /></button>
+                <button type="button" className="btn btn-icon btn-sm" disabled={i === exercises.length - 1} onClick={() => move(i, 1)}
+                  aria-label="Move down" title="Move down"><Icon name="arrow_downward" size={15} /></button>
+                <button type="button" className="btn btn-icon btn-sm" onClick={() => onChange(exercises.filter((_, j) => j !== i))}
+                  aria-label="Remove exercise" title="Remove"><Icon name="close" size={15} /></button>
+              </div>
+            </div>
+            <div className="ex-edit-nums">
+              <div className="ex-field">
+                <span>Sets</span>
+                <div className="ex-stepper">
+                  <button type="button" aria-label="Fewer sets" disabled={sets(ex) <= 1} onClick={() => set(i, { sets: sets(ex) - 1 })}>−</button>
+                  <strong>{sets(ex)}</strong>
+                  <button type="button" aria-label="More sets" disabled={sets(ex) >= 12} onClick={() => set(i, { sets: sets(ex) + 1 })}>+</button>
+                </div>
+              </div>
+              <label className="ex-field">
+                <span>Reps</span>
+                <input value={ex.reps ?? ''} inputMode="text" placeholder="e.g. 8-10"
+                  onChange={(e) => set(i, { reps: e.target.value })} />
+              </label>
+              <label className="ex-field">
+                <span>Weight (kg)</span>
+                <input value={ex.weight ?? ''} inputMode="decimal" placeholder="optional"
+                  onChange={(e) => set(i, { weight: e.target.value })} />
+              </label>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {!exercises.length && (
+        <p className="ce-note" style={{ marginBottom: 8 }}>No exercises yet. Pick one above, load a template, or add your own.</p>
+      )}
+      <button type="button" className="btn btn-secondary btn-sm"
+        onClick={() => { onChange([...exercises, { name: '', sets: 3, reps: '', weight: '' }]); setFocusNew(true) }}>
+        <Icon name="add" size={15} /> Add your own exercise
+      </button>
+    </div>
+  )
+}
+
+function DayModal({ date, plan, effectiveByDate, db, allDates, sessions = [], onClose, onStart, onDbSaved }) {
   const open = Boolean(date)
   // Prefill from the REAL plan if one exists, otherwise from whatever was
   // actually logged that day (effectiveByDate) — so opening a day that was
@@ -432,31 +535,27 @@ function DayModal({ date, plan, effectiveByDate, db, allDates, sessions = [], on
   const [exercises, setExercises] = useState([])
   const [notes, setNotes] = useState('')
   const [rest, setRest] = useState(false)
-  const [bodypart, setBodypart] = useState('Chest')
-  const [pick, setPick] = useState('')
   const [copyFrom, setCopyFrom] = useState('')
+  const [tplPick, setTplPick] = useState('')
+  const [replaceArmed, setReplaceArmed] = useState(false)
+  const [savingTpl, setSavingTpl] = useState(false)
+  const [tplName, setTplName] = useState('')
+  const [busy, setBusy] = useState(false)
 
   // Re-seed whenever a different day is opened.
   useEffect(() => {
     if (!open) return
     setType(existing?.type || null)
-    setExercises(existing?.exercises || [])
+    setExercises((existing?.exercises || []).map((x) => (typeof x === 'string' ? { name: x, sets: 3, reps: '', weight: '' } : { ...x })))
     setNotes(existing?.notes || '')
     setRest(Boolean(existing?.rest))
-    setBodypart('Chest')
-    setPick('')
-    setCopyFrom('')
+    setCopyFrom(''); setTplPick(''); setReplaceArmed(false); setSavingTpl(false); setTplName('')
   }, [open, date]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  const list = db[bodypart] || []
-  useEffect(() => { setPick(list[0] || '') }, [bodypart]) // eslint-disable-line react-hooks/exhaustive-deps
 
   /* Copy sources: any day in the last 7 days with a real plan or a
      logged session, plus whatever else is on the current week grid.
-     Was previously limited to the on-screen week, so a session done
-     last Thursday disappeared from the list the moment you flipped to
-     next week. Most recent first, labelled with the actual date since
-     the list can now span weeks. */
+     Most recent first, labelled with the actual date since the list can
+     span weeks. */
   const copySources = useMemo(() => {
     if (!open) return []
     const anchor = date || today()
@@ -475,43 +574,89 @@ function DayModal({ date, plan, effectiveByDate, db, allDates, sessions = [], on
       .sort((a, b) => b.date.localeCompare(a.date))
   }, [open, date, allDates, plan.data, sessions])
 
+  // Starter lists (per workout type, edited in the Database tab) fall back to
+  // the built-ins until a customised DB is ever saved.
+  const starters = db[WORKOUT_TEMPLATES_KEY] || WK_TEMPLATES
+  const custom = customTemplates(db)
+
   function selectType(id) {
     setType(id)
-    // Templates edited in the Database tab live at db.__workoutTemplates,
-    // same JSON blob as the bodypart lists (see DatabaseTab) — no schema
-    // change needed since that blob was already an arbitrary object.
-    // Falls back to the built-in WK_TEMPLATES until a customized DB is
-    // ever saved, same fallback shape db itself already uses.
-    const templates = db.__workoutTemplates || WK_TEMPLATES
-    if (!exercises.length && templates[id]?.length) {
-      setExercises(templates[id].map((name) => ({ name, sets: 3, reps: '', weight: '' })))
+    if (!exercises.length && starters[id]?.length) {
+      setExercises(starters[id].map((name) => ({ name, sets: 3, reps: '', weight: '' })))
     }
   }
 
-  // Same reorder move as SessionTab's moveEx, ported here so a planned
-  // day's exercise order can be fixed before the workout, not just
-  // mid-session — the plan is what "Copy from another day" and Start
-  // Session Now both seed from, so this order is the one that actually
-  // ends up in front of you.
-  function moveExercise(i, dir) {
-    const j = i + dir
-    if (j < 0 || j >= exercises.length) return
-    const next = exercises.slice()
-    ;[next[i], next[j]] = [next[j], next[i]]
-    setExercises(next)
+  function loadTemplate() {
+    if (!tplPick) return
+    let nextEx = []; let nextType = null
+    if (tplPick.startsWith('tpl:')) {
+      const t = custom.find((x) => x.id === tplPick.slice(4))
+      if (!t) return
+      nextEx = (t.exercises || []).map((e) => ({ ...e })); nextType = t.type
+    } else {
+      const id = tplPick.slice(5)
+      nextEx = (starters[id] || []).map((name) => ({ name, sets: 3, reps: '', weight: '' })); nextType = id
+    }
+    // Loading over a list you've already built is destructive, so it takes a second tap.
+    if (exercises.length && !replaceArmed) { setReplaceArmed(true); return }
+    setExercises(nextEx)
+    if (nextType) setType(nextType)
+    setReplaceArmed(false); setTplPick('')
+    toast.success('Template loaded')
   }
 
-  async function save() {
+  async function saveAsTemplate() {
+    const clean = cleanExercises(exercises)
+    if (!clean.length) { toast.error('Add at least one exercise first'); return }
+    const name = tplName.trim() || `${type || 'Workout'} day`
+    const all = customTemplates(db)
+    const idx = all.findIndex((t) => t.name.toLowerCase() === name.toLowerCase())
+    const entry = { id: idx >= 0 ? all[idx].id : newId('tpl'), name, type: type || 'Other', exercises: clean }
+    const next = idx >= 0 ? all.map((t, i) => (i === idx ? entry : t)) : [...all, entry]
     try {
-      await savePlanDay(date, {
-        type: type || 'Other', exercises, notes, rest,
-        goalIds: existing?.goalIds || [],
-      })
+      await saveExerciseDB({ ...db, [CUSTOM_TEMPLATES_KEY]: next })
+      onDbSaved?.()
+      toast.success(idx >= 0 ? `Updated "${name}"` : `Saved "${name}"`)
+      setSavingTpl(false); setTplName('')
+    } catch (e) { toast.error(e.message) }
+  }
+
+  const buildDay = () => ({
+    type: type || 'Other', exercises: cleanExercises(exercises), notes, rest,
+    goalIds: existing?.goalIds || [],
+  })
+
+  async function save() {
+    setBusy(true)
+    try {
+      await savePlanDay(date, buildDay())
       toast.success('Day saved')
       plan.reload()
       onClose()
+    } catch (e) { toast.error(e.message) } finally { setBusy(false) }
+  }
+
+  // Starts from what is on screen (saved first), not from the last saved plan:
+  // it used to start from the saved copy and silently drop any edits just made.
+  async function startNow() {
+    setBusy(true)
+    try {
+      const day = buildDay()
+      await savePlanDay(date, day)
+      plan.reload()
+      onStart(date, day)
+    } catch (e) { toast.error(e.message) } finally { setBusy(false) }
+  }
+
+  async function clearDay() {
+    try {
+      await clearPlanDay(date)
+      toast.success('Day cleared')
+      plan.reload(); onClose()
     } catch (e) { toast.error(e.message) }
   }
+
+  const startersWithItems = WK_TYPES.filter((t) => (starters[t.id] || []).length)
 
   return (
     <Modal
@@ -519,59 +664,66 @@ function DayModal({ date, plan, effectiveByDate, db, allDates, sessions = [], on
       onClose={onClose}
       title={date ? pretty(date) : ''}
       sub="Plan your training for this day"
+      footer={<>
+        <button type="button" className="btn btn-danger btn-sm day-clear" onClick={clearDay}>
+          <Icon name="delete" size={15} /> Clear
+        </button>
+        <button type="button" className="btn btn-secondary" disabled={busy} onClick={startNow}>
+          <Icon name="play_arrow" size={16} /> Start now
+        </button>
+        <button type="button" className="btn btn-primary" disabled={busy} onClick={save}>
+          <Icon name="save" size={17} /> Save
+        </button>
+      </>}
     >
       <SectionLabel>Workout type</SectionLabel>
       <div className="wt-type-grid">
         {WK_TYPES.map((t) => (
-          <button key={t.id} className={`wt-type-btn${type === t.id ? ' selected' : ''}`}
+          <button key={t.id} type="button" className={`wt-type-btn${type === t.id ? ' selected' : ''}`}
             onClick={() => selectType(t.id)}>
             <span className="em"><Icon name={t.icon} size={22} /></span>{t.label}
           </button>
         ))}
       </div>
 
-      <SectionLabel>Quick template</SectionLabel>
-      <div className="exercise-picker">
-        <select value={bodypart} onChange={(e) => setBodypart(e.target.value)}>
-          {bodypartKeys(db).map((k) => <option key={k} value={k}>{bodypartLabel(k)}</option>)}
+      <SectionLabel>Exercises</SectionLabel>
+      <div className="tpl-load">
+        <select value={tplPick} aria-label="Load a template"
+          onChange={(e) => { setTplPick(e.target.value); setReplaceArmed(false) }}>
+          <option value="">Load a template…</option>
+          {custom.length > 0 && (
+            <optgroup label="My templates">
+              {custom.map((t) => <option key={t.id} value={`tpl:${t.id}`}>{t.name} ({t.exercises?.length || 0})</option>)}
+            </optgroup>
+          )}
+          {startersWithItems.length > 0 && (
+            <optgroup label="Starter lists">
+              {startersWithItems.map((t) => <option key={t.id} value={`type:${t.id}`}>{t.label} ({starters[t.id].length})</option>)}
+            </optgroup>
+          )}
         </select>
-        <select value={pick} onChange={(e) => setPick(e.target.value)}>
-          {list.map((x) => <option key={x} value={x}>{x}</option>)}
-        </select>
-        <button className="btn btn-secondary btn-sm"
-          onClick={() => pick && setExercises([...exercises, { name: pick, sets: 3, reps: '', weight: '' }])}>
-          <Icon name="library_add" size={15} /> Add
+        <button type="button" className={`btn btn-secondary btn-sm${replaceArmed ? ' armed' : ''}`} disabled={!tplPick} onClick={loadTemplate}>
+          {replaceArmed ? `Replace ${exercises.length}?` : 'Load'}
         </button>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
-        {exercises.map((ex, i) => (
-          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <input value={ex.name} placeholder="Exercise"
-              onChange={(e) => setExercises(exercises.map((x, j) => j === i ? { ...x, name: e.target.value } : x))}
-              style={{ fontSize: 13, padding: '8px 10px' }} />
-            <input type="number" value={ex.sets ?? 3} min={1} max={12} title="Sets"
-              onChange={(e) => setExercises(exercises.map((x, j) => j === i ? { ...x, sets: Number(e.target.value) } : x))}
-              style={{ width: 62, fontSize: 13, padding: '8px 6px', textAlign: 'center', fontWeight: 650 }} />
-            <button className="btn btn-icon btn-sm ex-move" disabled={i === 0}
-              onClick={() => moveExercise(i, -1)} aria-label="Move exercise up" title="Move up">
-              <Icon name="arrow_upward" size={15} />
-            </button>
-            <button className="btn btn-icon btn-sm ex-move" disabled={i === exercises.length - 1}
-              onClick={() => moveExercise(i, 1)} aria-label="Move exercise down" title="Move down">
-              <Icon name="arrow_downward" size={15} />
-            </button>
-            <button className="btn btn-icon btn-sm" onClick={() => setExercises(exercises.filter((_, j) => j !== i))}
-              aria-label="Remove">
-              <Icon name="close" size={15} />
-            </button>
+      <ExerciseEditor exercises={exercises} onChange={setExercises} db={db} />
+
+      <div className="tpl-save">
+        {!savingTpl ? (
+          <button type="button" className="btn btn-ghost btn-sm" disabled={!cleanExercises(exercises).length}
+            onClick={() => { setSavingTpl(true); setTplName(`${type && type !== 'Other' ? type : 'Workout'} day`) }}>
+            <Icon name="library_add" size={15} /> Save as a template
+          </button>
+        ) : (
+          <div className="tpl-save-form">
+            <input value={tplName} autoFocus placeholder="Template name" onChange={(e) => setTplName(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && saveAsTemplate()} />
+            <button type="button" className="btn btn-primary btn-sm" onClick={saveAsTemplate}>Save</button>
+            <button type="button" className="btn btn-ghost btn-sm" onClick={() => setSavingTpl(false)}>Cancel</button>
           </div>
-        ))}
+        )}
       </div>
-      <button className="btn btn-secondary btn-sm"
-        onClick={() => setExercises([...exercises, { name: '', sets: 3, reps: '', weight: '' }])}>
-        <Icon name="add" size={15} /> Add exercise
-      </button>
 
       <div style={{ marginTop: 14 }}>
         <SectionLabel>Notes / intention</SectionLabel>
@@ -579,9 +731,8 @@ function DayModal({ date, plan, effectiveByDate, db, allDates, sessions = [], on
           placeholder="e.g. Focus on form, keep rest short…" style={{ resize: 'none', minHeight: 0 }} />
       </div>
 
-      <label style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 14, cursor: 'pointer', fontSize: 13, fontWeight: 700, color: 'var(--text-2)' }}>
-        <input type="checkbox" checked={rest} onChange={(e) => setRest(e.target.checked)}
-          style={{ width: 16, height: 16 }} />
+      <label className="rest-toggle">
+        <input type="checkbox" checked={rest} onChange={(e) => setRest(e.target.checked)} />
         Mark as rest day
       </label>
 
@@ -598,9 +749,9 @@ function DayModal({ date, plan, effectiveByDate, db, allDates, sessions = [], on
           </select>
           <button className="btn btn-secondary btn-sm" disabled={!copyFrom}
             onClick={() => {
-              const src = copySources.find((s) => s.date === copyFrom)?.day
+              const src = copySources.find((x) => x.date === copyFrom)?.day
               if (!src) return
-              setType(src.type); setExercises(src.exercises || [])
+              setType(src.type); setExercises((src.exercises || []).map((x) => ({ ...x })))
               setNotes(src.notes || ''); setRest(Boolean(src.rest))
               toast.success('Copied')
             }}>
@@ -608,23 +759,52 @@ function DayModal({ date, plan, effectiveByDate, db, allDates, sessions = [], on
           </button>
         </div>
       </div>
+    </Modal>
+  )
+}
 
-      <div style={{ display: 'flex', gap: 10, marginTop: 18, flexWrap: 'wrap' }}>
-        <button className="btn btn-primary" onClick={save}>
-          <Icon name="save" size={17} /> Save
+/* ── Template editor (Database tab) ──────────────────────────────
+   Build a named, reusable workout from scratch, or edit one saved from a
+   day in Plan. They appear under "My templates" in every day's planner. */
+function TemplateEditorModal({ template, db, onClose, onSave }) {
+  const open = Boolean(template)
+  const [name, setName] = useState('')
+  const [type, setType] = useState('Strength')
+  const [exercises, setExercises] = useState([])
+  useEffect(() => {
+    if (!template) return
+    setName(template.name || '')
+    setType(template.type || 'Strength')
+    setExercises((template.exercises || []).map((x) => ({ ...x })))
+  }, [template])
+  if (!open) return null
+
+  const clean = cleanExercises(exercises)
+  const valid = name.trim() && clean.length
+  return (
+    <Modal open={open} onClose={onClose} title={template.id ? 'Edit template' : 'New template'}
+      sub="A reusable workout you can drop onto any day."
+      footer={<>
+        <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
+        <button type="button" className="btn btn-primary" disabled={!valid}
+          onClick={() => onSave({ id: template.id || newId('tpl'), name: name.trim(), type, exercises: clean })}>
+          <Icon name="check" size={16} /> Save template
         </button>
-        <button className="btn btn-secondary btn-sm" onClick={() => onStart(date)}>
-          <Icon name="play_arrow" size={16} /> Start session now
-        </button>
-        <button className="btn btn-danger btn-sm"
-          onClick={async () => {
-            await clearPlanDay(date)
-            toast.success('Day cleared')
-            plan.reload(); onClose()
-          }}>
-          <Icon name="delete" size={15} /> Clear
-        </button>
+      </>}>
+      <div className="tpl-head">
+        <div className="field">
+          <label>Name</label>
+          <input value={name} autoFocus={!template.id} placeholder="e.g. Push day A" onChange={(e) => setName(e.target.value)} />
+        </div>
+        <div className="field">
+          <label>Type</label>
+          <select value={type} onChange={(e) => setType(e.target.value)}>
+            {WK_TYPES.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
+          </select>
+        </div>
       </div>
+      <SectionLabel>Exercises</SectionLabel>
+      <ExerciseEditor exercises={exercises} onChange={setExercises} db={db} />
     </Modal>
   )
 }
@@ -1135,6 +1315,7 @@ function DatabaseTab({ db, onSaved }) {
   const [bodypart, setBodypart] = useState('Chest')
   const [templateType, setTemplateType] = useState('Strength')
   const [local, setLocal] = useState(db)
+  const [editingTpl, setEditingTpl] = useState(null)
   const confirm = useConfirm()
 
   useEffect(() => { setLocal(db) }, [db])
@@ -1157,8 +1338,58 @@ function DatabaseTab({ db, onSaved }) {
   const templates = local[WORKOUT_TEMPLATES_KEY] || WK_TEMPLATES
   const templateList = templates[templateType] || []
 
+  const myTemplates = customTemplates(local)
+  function saveTemplate(t) {
+    const exists = myTemplates.some((x) => x.id === t.id)
+    const next = exists ? myTemplates.map((x) => (x.id === t.id ? t : x)) : [...myTemplates, t]
+    commit({ ...local, [CUSTOM_TEMPLATES_KEY]: next })
+    setEditingTpl(null)
+    toast.success(exists ? 'Template updated' : 'Template created')
+  }
+  const duplicateTemplate = (t) => commit({ ...local, [CUSTOM_TEMPLATES_KEY]: [...myTemplates, { ...t, id: newId('tpl'), name: `${t.name} (copy)`, exercises: t.exercises.map((e) => ({ ...e })) }] })
+  const deleteTemplate = (id) => commit({ ...local, [CUSTOM_TEMPLATES_KEY]: myTemplates.filter((x) => x.id !== id) })
+
   return (
     <>
+      <Card style={{ marginBottom: 14 }} className="my-templates">
+        <CardHead
+          title="My templates"
+          sub="Workouts you build once and drop onto any day from Plan."
+          right={
+            <button className="btn btn-primary btn-sm" onClick={() => setEditingTpl({ name: '', type: 'Strength', exercises: [] })}>
+              <Icon name="add" size={15} /> New template
+            </button>
+          }
+        />
+        {!myTemplates.length ? (
+          <Empty icon="library_add" title="No templates yet">
+            Create one here, or open any day in Plan and choose "Save as a template".
+          </Empty>
+        ) : (
+          <div className="tpl-list">
+            {myTemplates.map((t) => (
+              <div key={t.id} className="tpl-item">
+                <div className="tpl-main">
+                  <strong>{t.name}</strong>
+                  <span>{t.type} · {t.exercises.length} exercise{t.exercises.length === 1 ? '' : 's'}</span>
+                  <small>{t.exercises.slice(0, 4).map((e) => e.name).join(', ')}{t.exercises.length > 4 ? '…' : ''}</small>
+                </div>
+                <div className="tpl-actions">
+                  <button className="btn btn-icon btn-sm" onClick={() => setEditingTpl(t)} aria-label={`Edit ${t.name}`} title="Edit"><Icon name="edit" size={15} /></button>
+                  <button className="btn btn-icon btn-sm" onClick={() => duplicateTemplate(t)} aria-label={`Duplicate ${t.name}`} title="Duplicate"><Icon name="content_copy" size={15} /></button>
+                  <button className={`btn btn-icon btn-sm${confirm.isArmed('ctpl-' + t.id) ? ' btn-danger' : ''}`}
+                    onClick={() => (confirm.isArmed('ctpl-' + t.id) ? deleteTemplate(t.id) : confirm.arm('ctpl-' + t.id))}
+                    aria-label={`Delete ${t.name}`} title={confirm.isArmed('ctpl-' + t.id) ? 'Tap again to delete' : 'Delete'}>
+                    <Icon name={confirm.isArmed('ctpl-' + t.id) ? 'check' : 'delete'} size={15} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+      <TemplateEditorModal template={editingTpl} db={local} onClose={() => setEditingTpl(null)} onSave={saveTemplate} />
+
       <Card>
         <CardHead
           title="Workout database"
@@ -1173,6 +1404,7 @@ function DatabaseTab({ db, onSaved }) {
                 ...JSON.parse(JSON.stringify(DEFAULT_EXERCISE_DB)),
                 [WORKOUT_TEMPLATES_KEY]: local[WORKOUT_TEMPLATES_KEY],
                 [BODYWEIGHT_KEY]: local[BODYWEIGHT_KEY],
+                [CUSTOM_TEMPLATES_KEY]: local[CUSTOM_TEMPLATES_KEY],
               })}>
               <Icon name="restart_alt" size={15} /> Reset
             </button>
@@ -1207,7 +1439,7 @@ function DatabaseTab({ db, onSaved }) {
       <Card style={{ marginTop: 14 }}>
         <CardHead
           title="Quick templates"
-          sub="Exercises auto-filled onto a day in Plan when you pick its workout type."
+          sub="Starter lists: the exercises filled in when you pick a workout type on an empty day."
           right={
             <button className="btn btn-secondary btn-sm"
               onClick={() => commit({ ...local, [WORKOUT_TEMPLATES_KEY]: JSON.parse(JSON.stringify(WK_TEMPLATES)) })}>
